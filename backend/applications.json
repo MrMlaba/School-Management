@@ -1,0 +1,641 @@
+[
+  {
+    "id": 1753640453559,
+    "nationalId": "0303045641089",
+    "firstName": "Bongumusa",
+    "lastName": "Miaba",
+    "dateOfBirth": "2003-03-04",
+    "gender": "Male",
+    "email": "bongumusamlaba4@gmail.com",
+    "phone": "0680177182",
+    "address": "Disney heights\r\n47 Mallision road",
+    "city": "Durban",
+    "parentName": "Mpume",
+    "parentPhone": "0739673632",
+    "parentEmail": "mlaba1@gmail.com",
+    "parentOccupation": "N/A",
+    "relationship": "Other",
+    "school": "Dlulumuzi",
+    "grade": "Grade 9",
+    "previousSchool": "Durban Boys",
+    "achievements": "ICT",
+    "whyAttend": "Good school",
+    "emergencyContact": "",
+    "emergencyPhone": "",
+    "documents": [
+      {
+        "type": "id"
+      },
+      {
+        "type": "gradeResult"
+      },
+      {
+        "type": "gradeReport"
+      },
+      {
+        "type": "removal"
+      }
+    ],
+    "documentCount": 0,
+    "requiredDocuments": [
+      "id",
+      "removal",
+      "gradeResult",
+      "gradeReport"
+    ],
+    "status": "pending",
+    "comment": "",
+    "submittedAt": "2025-07-27T18:20:43.359Z"
+  },
+  {
+    "id": 1753640465287,
+    "nationalId": "0303045641089",
+    "firstName": "Bongumusa",
+    "lastName": "Miaba",
+    "dateOfBirth": "2003-03-04",
+    "gender": "Male",
+    "email": "bongumusamlaba4@gmail.com",
+    "phone": "0680177182",
+    "address": "Disney heights\r\n47 Mallision road",
+    "city": "Durban",
+    "parentName": "Mpume",
+    "parentPhone": "0739673632",
+    "parentEmail": "mlaba1@gmail.com",
+    "parentOccupation": "N/A",
+    "relationship": "Other",
+    "school": "Mdepha",
+    "grade": "Grade 9",
+    "previousSchool": "Durban Boys",
+    "achievements": "ICT",
+    "whyAttend": "Good school",
+    "emergencyContact": "",
+    "emergencyPhone": "",
+    "documents": [
+      {
+        "type": "id"
+      },
+      {
+        "type": "gradeResult"
+      },
+      {
+        "type": "gradeReport"
+      },
+      {
+        "type": "removal"
+      }
+    ],
+    "documentCount": 0,
+    "requiredDocuments": [
+      "id",
+      "removal",
+      "gradeResult",
+      "gradeReport"
+    ],
+    "status": "pending",
+    "comment": "",
+    "submittedAt": "2025-07-27T18:20:43.738Z"
+  },
+  {
+    "id": 1753640480098,
+    "nationalId": "0303045641089",
+    "firstName": "Bongumusa",
+    "lastName": "Miaba",
+    "dateOfBirth": "2003-03-04",
+    "gender": "Male",
+    "email": "bongumusamlaba4@gmail.com",
+    "phone": "0680177182",
+    "address": "Disney heights\r\n47 Mallision road",
+    "city": "Durban",
+    "parentName": "Mpume",
+    "parentPhone": "0739673632",
+    "parentEmail": "mlaba1@gmail.com",
+    "parentOccupation": "N/A",
+    "relationship": "Other",
+    "school": "Banqobile",
+    "grade": "Grade 9",
+    "previousSchool": "Durban Boys",
+    "achievements": "ICT",
+    "whyAttend": "Good school",
+    "emergencyContact": "",
+    "emergencyPhone": "",
+    "documents": [
+      {
+        "type": "id"
+      },
+      {
+        "type": "gradeResult"
+      },
+      {
+        "type": "gradeReport"
+      },
+      {
+        "type": "removal"
+      },
+      {
+        "type": "id"
+      },
+      {
+        "type": "gradeResult"
+      },
+      {
+        "type": "gradeReport"
+      },
+      {
+        "type": "removal"
+      }
+    ],
+    "documentCount": 8,
+    "requiredDocuments": [
+      "id",
+      "removal",
+      "gradeResult",
+      "gradeReport"
+    ],
+    "status": "accepted",
+    "comment": "Offer accepted by applicant",
+    "submittedAt": "2025-07-27T18:20:43.738Z",
+    "updatedAt": "2025-07-27T21:06:00.016Z"
+  },
+  {
+    "id": 1753640465810,
+    "nationalId": "0303045641089",
+    "firstName": "Bongumusa",
+    "lastName": "Miaba",
+    "dateOfBirth": "2003-03-04",
+    "gender": "Male",
+    "email": "bongumusamlaba4@gmail.com",
+    "phone": "0680177182",
+    "address": "Disney heights\r\n47 Mallision road",
+    "city": "Durban",
+    "parentName": "Mpume",
+    "parentPhone": "0739673632",
+    "parentEmail": "mlaba1@gmail.com",
+    "parentOccupation": "N/A",
+    "relationship": "Other",
+    "school": "Julius",
+    "grade": "Grade 9",
+    "previousSchool": "Durban Boys",
+    "achievements": "ICT",
+    "whyAttend": "Good school",
+    "emergencyContact": "",
+    "emergencyPhone": "",
+    "documents": [
+      {
+        "type": "id"
+      },
+      {
+        "type": "gradeResult"
+      },
+      {
+        "type": "gradeReport"
+      },
+      {
+        "type": "removal"
+      }
+    ],
+    "documentCount": 0,
+    "requiredDocuments": [
+      "id",
+      "removal",
+      "gradeResult",
+      "gradeReport"
+    ],
+    "status": "pending",
+    "comment": "",
+    "submittedAt": "2025-07-27T18:20:43.738Z"
+  },
+  {
+    "id": 1753640489621,
+    "nationalId": "0303045641089",
+    "firstName": "Bongumusa",
+    "lastName": "Miaba",
+    "dateOfBirth": "2003-03-04",
+    "gender": "Male",
+    "email": "bongumusamlaba4@gmail.com",
+    "phone": "0680177182",
+    "address": "Disney heights\r\n47 Mallision road",
+    "city": "Durban",
+    "parentName": "Mpume",
+    "parentPhone": "0739673632",
+    "parentEmail": "mlaba1@gmail.com",
+    "parentOccupation": "N/A",
+    "relationship": "Other",
+    "school": "Luphaphe",
+    "grade": "Grade 9",
+    "previousSchool": "Durban Boys",
+    "achievements": "ICT",
+    "whyAttend": "Good school",
+    "emergencyContact": "",
+    "emergencyPhone": "",
+    "documents": [
+      {
+        "type": "id"
+      },
+      {
+        "type": "gradeResult"
+      },
+      {
+        "type": "gradeReport"
+      },
+      {
+        "type": "removal"
+      }
+    ],
+    "documentCount": 0,
+    "requiredDocuments": [
+      "id",
+      "removal",
+      "gradeResult",
+      "gradeReport"
+    ],
+    "status": "pending",
+    "comment": "",
+    "submittedAt": "2025-07-27T18:20:43.738Z"
+  },
+  {
+    "id": 1753640454703,
+    "nationalId": "0303045641089",
+    "firstName": "Bongumusa",
+    "lastName": "Miaba",
+    "dateOfBirth": "2003-03-04",
+    "gender": "Male",
+    "email": "bongumusamlaba4@gmail.com",
+    "phone": "0680177182",
+    "address": "Disney heights\r\n47 Mallision road",
+    "city": "Durban",
+    "parentName": "Mpume",
+    "parentPhone": "0739673632",
+    "parentEmail": "mlaba1@gmail.com",
+    "parentOccupation": "N/A",
+    "relationship": "Other",
+    "school": "Zizamele",
+    "grade": "Grade 9",
+    "previousSchool": "Durban Boys",
+    "achievements": "ICT",
+    "whyAttend": "Good school",
+    "emergencyContact": "",
+    "emergencyPhone": "",
+    "documents": [
+      {
+        "type": "id"
+      },
+      {
+        "type": "gradeResult"
+      },
+      {
+        "type": "gradeReport"
+      },
+      {
+        "type": "removal"
+      }
+    ],
+    "documentCount": 0,
+    "requiredDocuments": [
+      "id",
+      "removal",
+      "gradeResult",
+      "gradeReport"
+    ],
+    "status": "pending",
+    "comment": "",
+    "submittedAt": "2025-07-27T18:20:43.738Z"
+  },
+  {
+    "id": 1753640496032,
+    "nationalId": "0303045641089",
+    "firstName": "Bongumusa",
+    "lastName": "Miaba",
+    "dateOfBirth": "2003-03-04",
+    "gender": "Male",
+    "email": "bongumusamlaba4@gmail.com",
+    "phone": "0680177182",
+    "address": "Disney heights\r\n47 Mallision road",
+    "city": "Durban",
+    "parentName": "Mpume",
+    "parentPhone": "0739673632",
+    "parentEmail": "mlaba1@gmail.com",
+    "parentOccupation": "N/A",
+    "relationship": "Other",
+    "school": "Nobhala",
+    "grade": "Grade 9",
+    "previousSchool": "Durban Boys",
+    "achievements": "ICT",
+    "whyAttend": "Good school",
+    "emergencyContact": "",
+    "emergencyPhone": "",
+    "documents": [
+      {
+        "type": "id"
+      },
+      {
+        "type": "gradeResult"
+      },
+      {
+        "type": "gradeReport"
+      },
+      {
+        "type": "removal"
+      }
+    ],
+    "documentCount": 0,
+    "requiredDocuments": [
+      "id",
+      "removal",
+      "gradeResult",
+      "gradeReport"
+    ],
+    "status": "pending",
+    "comment": "",
+    "submittedAt": "2025-07-27T18:20:43.738Z"
+  },
+  {
+    "id": 1753640459266,
+    "nationalId": "0303045641089",
+    "firstName": "Bongumusa",
+    "lastName": "Miaba",
+    "dateOfBirth": "2003-03-04",
+    "gender": "Male",
+    "email": "bongumusamlaba4@gmail.com",
+    "phone": "0680177182",
+    "address": "Disney heights\r\n47 Mallision road",
+    "city": "Durban",
+    "parentName": "Mpume",
+    "parentPhone": "0739673632",
+    "parentEmail": "mlaba1@gmail.com",
+    "parentOccupation": "N/A",
+    "relationship": "Other",
+    "school": "Masijabule",
+    "grade": "Grade 9",
+    "previousSchool": "Durban Boys",
+    "achievements": "ICT",
+    "whyAttend": "Good school",
+    "emergencyContact": "",
+    "emergencyPhone": "",
+    "documents": [
+      {
+        "type": "id"
+      },
+      {
+        "type": "gradeResult"
+      },
+      {
+        "type": "gradeReport"
+      },
+      {
+        "type": "removal"
+      }
+    ],
+    "documentCount": 0,
+    "requiredDocuments": [
+      "id",
+      "removal",
+      "gradeResult",
+      "gradeReport"
+    ],
+    "status": "pending",
+    "comment": "",
+    "submittedAt": "2025-07-27T18:20:43.738Z"
+  },
+  {
+    "id": 1753640459607,
+    "nationalId": "0303045641089",
+    "firstName": "Bongumusa",
+    "lastName": "Miaba",
+    "dateOfBirth": "2003-03-04",
+    "gender": "Male",
+    "email": "bongumusamlaba4@gmail.com",
+    "phone": "0680177182",
+    "address": "Disney heights\r\n47 Mallision road",
+    "city": "Durban",
+    "parentName": "Mpume",
+    "parentPhone": "0739673632",
+    "parentEmail": "mlaba1@gmail.com",
+    "parentOccupation": "N/A",
+    "relationship": "Other",
+    "school": "Ngangezwe",
+    "grade": "Grade 9",
+    "previousSchool": "Durban Boys",
+    "achievements": "ICT",
+    "whyAttend": "Good school",
+    "emergencyContact": "",
+    "emergencyPhone": "",
+    "documents": [
+      {
+        "type": "id"
+      },
+      {
+        "type": "gradeResult"
+      },
+      {
+        "type": "gradeReport"
+      },
+      {
+        "type": "removal"
+      }
+    ],
+    "documentCount": 0,
+    "requiredDocuments": [
+      "id",
+      "removal",
+      "gradeResult",
+      "gradeReport"
+    ],
+    "status": "pending",
+    "comment": "",
+    "submittedAt": "2025-07-27T18:20:43.738Z"
+  },
+  {
+    "id": 1776673991641,
+    "nationalId": "0404055641089",
+    "firstName": "Tiwane",
+    "lastName": "Sne",
+    "dateOfBirth": "2004-04-05",
+    "gender": "Male",
+    "email": "arenstiwani@gmail.com",
+    "phone": "0797814919",
+    "address": "Mhlathuze ec",
+    "city": "Cato Ridge",
+    "parentName": "Nontsebenzo",
+    "parentPhone": "0660093757",
+    "parentEmail": "bongumusamlaba4@gmail.com",
+    "parentOccupation": "N/A",
+    "relationship": "Mother",
+    "school": "Banqobile",
+    "grade": "Grade 11",
+    "subject": "Physics",
+    "previousSchool": "Masijabule High school",
+    "achievements": "N/A",
+    "whyAttend": "Testing",
+    "emergencyContact": "",
+    "emergencyPhone": "",
+    "documents": [
+      {
+        "type": "id"
+      },
+      {
+        "type": "gradeResult"
+      },
+      {
+        "type": "gradeReport"
+      },
+      {
+        "type": "removal"
+      },
+      {
+        "type": "additional"
+      },
+      {
+        "type": "id"
+      },
+      {
+        "type": "gradeResult"
+      },
+      {
+        "type": "gradeReport"
+      },
+      {
+        "type": "removal"
+      },
+      {
+        "type": "additional"
+      },
+      {
+        "type": "id"
+      },
+      {
+        "type": "gradeResult"
+      },
+      {
+        "type": "gradeReport"
+      },
+      {
+        "type": "removal"
+      },
+      {
+        "type": "additional"
+      },
+      {
+        "type": "id"
+      },
+      {
+        "type": "gradeResult"
+      },
+      {
+        "type": "gradeReport"
+      },
+      {
+        "type": "removal"
+      },
+      {
+        "type": "additional"
+      }
+    ],
+    "documentCount": 20,
+    "requiredDocuments": [
+      "id",
+      "removal",
+      "gradeResult",
+      "gradeReport"
+    ],
+    "status": "pending",
+    "comment": "",
+    "submittedAt": "2026-04-20T08:31:41.674Z",
+    "updatedAt": "2026-04-20T09:41:50.015Z"
+  },
+  {
+    "id": 1776678386996,
+    "nationalId": "0404055641089",
+    "firstName": "Tiwane",
+    "lastName": "Sne",
+    "dateOfBirth": "2004-04-05",
+    "gender": "Male",
+    "email": "arenstiwani@gmail.com",
+    "phone": "0797814919",
+    "address": "Mhlathuze ec",
+    "city": "Durban",
+    "parentName": "Mlaba",
+    "parentPhone": "0660177181",
+    "parentEmail": "bongumusamlaba4@gmail.com",
+    "parentOccupation": "N/A",
+    "relationship": "Father",
+    "school": "Ngangezwe",
+    "grade": "Grade 8",
+    "subject": "",
+    "previousSchool": "",
+    "achievements": "NA",
+    "whyAttend": "NA",
+    "emergencyContact": "",
+    "emergencyPhone": "",
+    "documents": [
+      {
+        "type": "id"
+      },
+      {
+        "type": "gradeResult"
+      },
+      {
+        "type": "gradeReport"
+      },
+      {
+        "type": "additional"
+      }
+    ],
+    "documentCount": 0,
+    "requiredDocuments": [
+      "id",
+      "gradeResult",
+      "gradeReport"
+    ],
+    "status": "pending",
+    "comment": "",
+    "submittedAt": "2026-04-20T09:45:28.916Z"
+  },
+  {
+    "id": 1776678410908,
+    "nationalId": "0404055641089",
+    "firstName": "Tiwane",
+    "lastName": "Sne",
+    "dateOfBirth": "2004-04-05",
+    "gender": "Male",
+    "email": "arenstiwani@gmail.com",
+    "phone": "0797814919",
+    "address": "Mhlathuze ec",
+    "city": "Durban",
+    "parentName": "Mlaba",
+    "parentPhone": "0660177181",
+    "parentEmail": "bongumusamlaba4@gmail.com",
+    "parentOccupation": "N/A",
+    "relationship": "Father",
+    "school": "Mdepha",
+    "grade": "Grade 8",
+    "subject": "",
+    "previousSchool": "",
+    "achievements": "NA",
+    "whyAttend": "NA",
+    "emergencyContact": "",
+    "emergencyPhone": "",
+    "documents": [
+      {
+        "type": "id"
+      },
+      {
+        "type": "gradeResult"
+      },
+      {
+        "type": "gradeReport"
+      },
+      {
+        "type": "additional"
+      }
+    ],
+    "documentCount": 0,
+    "requiredDocuments": [
+      "id",
+      "gradeResult",
+      "gradeReport"
+    ],
+    "status": "pending",
+    "comment": "",
+    "submittedAt": "2026-04-20T09:45:28.916Z"
+  }
+]
