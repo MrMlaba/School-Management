@@ -33,7 +33,7 @@ const C = {
   dangerBg: '#FFEBEE',
 };
 
-const BASE = 'http://localhost:5005';
+const BASE = '%REACT_APP_API_URL%';
 
 const headCell = {
   backgroundColor: C.headerBg, color: C.brand, fontWeight: 700,

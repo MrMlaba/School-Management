@@ -39,7 +39,7 @@ const T = {
   purpleBg:  '#EDE9FE',
 };
 
-const BASE    = 'http://localhost:5005';
+const BASE    = '%REACT_APP_API_URL%';
 const authHdr = () => ({ Authorization: `Bearer ${localStorage.getItem('studentToken')}` });
 const jsonHdr = () => ({ 'Content-Type': 'application/json', ...authHdr() });
 

@@ -27,7 +27,7 @@ const StudentChangePassword = () => {
     const token = localStorage.getItem('studentToken');
     if (!token) { setError('Not authenticated'); setLoading(false); return; }
     try {
-      const res = await fetch('http://localhost:5005/api/student/change-password', {
+      const res = await fetch('%REACT_APP_API_URL%/api/student/change-password', {
         method:  'POST',
         headers: {
           'Content-Type':  'application/json',

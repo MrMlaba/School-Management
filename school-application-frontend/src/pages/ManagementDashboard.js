@@ -53,7 +53,7 @@ const C = {
   headerBg: '#F0F4F8',
 };
 
-const BASE  = 'http://localhost:5005';
+const BASE  = '%REACT_APP_API_URL%';
 const authH = () => ({ Authorization: `Bearer ${localStorage.getItem('adminToken')}` });
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 

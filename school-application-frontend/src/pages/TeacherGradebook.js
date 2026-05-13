@@ -128,7 +128,7 @@ function PctPill({ value, totalMarks }) {
 }
 
 /* ─── Main Component ─────────────────────────────────────────────────────── */
-const BASE = 'http://localhost:5005';
+const BASE = '%REACT_APP_API_URL%';
 
 export default function TeacherGradebook() {
   const { classId } = useParams();

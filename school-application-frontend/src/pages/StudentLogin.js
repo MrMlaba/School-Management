@@ -21,7 +21,7 @@ const StudentLogin = () => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('http://localhost:5005/api/student-login', {
+      const res = await fetch('%REACT_APP_API_URL%/api/student-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studentNumber, password }),

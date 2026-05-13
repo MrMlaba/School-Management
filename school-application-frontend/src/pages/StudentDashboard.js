@@ -170,7 +170,7 @@ const T = {
   border:'#E5E7EB',
 };
 const SIDEBAR_W = 240;
-const BASE = 'http://localhost:5005';
+const BASE = '%REACT_APP_API_URL%';
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 const getInitials = s => s ? `${s.firstName?.[0]??''}${s.lastName?.[0]??''}`.toUpperCase() : '?';

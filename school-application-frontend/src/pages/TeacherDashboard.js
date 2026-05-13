@@ -55,7 +55,7 @@ const C = {
   dangerBg:  '#FEE2E2',
 };
 
-const BASE  = 'http://localhost:5005';
+const BASE  = '%REACT_APP_API_URL%';
 const authH = () => ({ Authorization: `Bearer ${localStorage.getItem('teacherToken')}` });
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 const DAYS  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];

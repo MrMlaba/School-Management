@@ -8,7 +8,7 @@ const T = {
   bg:'#EEF1F8', white:'#FFFFFF',
   border:'#DDE3EE', muted:'#7A8BA0', text:'#1A2B3C',
 };
-const BASE = 'http://localhost:5005';
+const BASE = '%REACT_APP_API_URL%';
 
 const PALETTE = ['#6C63FF','#E0457B','#0097B2','#FF6B35','#00B89F','#9B5DE5','#F97316','#0EA5E9'];
 const senderColor = (name='') => {

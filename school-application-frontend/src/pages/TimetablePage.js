@@ -33,7 +33,7 @@ const C = {
   filledBorder:'#A5D6A7',
 };
 
-const BASE  = 'http://localhost:5005';
+const BASE  = '%REACT_APP_API_URL%';
 const authH = () => ({ Authorization: `Bearer ${localStorage.getItem('adminToken')}` });
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 const DAYS  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];

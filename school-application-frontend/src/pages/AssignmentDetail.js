@@ -33,7 +33,7 @@ const C = {
   goldBg:   '#FFFBEB',
 };
 
-const BASE = 'http://localhost:5005';
+const BASE = '%REACT_APP_API_URL%';
 
 /* ─── JWT helper ─────────────────────────────────────────────────────────── */
 const getStudentIdFromToken = () => {

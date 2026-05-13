@@ -14,7 +14,7 @@ const SchoolList = ({ bodyFont, displayFont }) => {
   const DISPLAY = displayFont || "'Cormorant Garamond', serif";
 
   useEffect(() => {
-    fetch('http://localhost:5005/api/schools')
+    fetch('%REACT_APP_API_URL%/api/schools')
       .then((res) => {
         if (!res.ok) throw new Error('Failed to load schools');
         return res.json();

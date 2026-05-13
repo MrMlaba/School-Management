@@ -186,7 +186,7 @@ const AdminPage = () => {
   const fetchApplications = () => {
     setLoading(true);
     const token = localStorage.getItem('adminToken');
-    fetch('http://localhost:5005/api/applications', {
+    fetch('%REACT_APP_API_URL%/api/applications', {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(res => res.json())

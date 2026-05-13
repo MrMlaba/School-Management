@@ -376,7 +376,7 @@ const StudentsPage = () => {
     setError('');
     try {
       const [pendingRes, enrolledRes] = await Promise.all([
-        fetch('http://localhost:5005/api/management/pending-enrollment', { headers: authHeaders }),
+        fetch('%REACT_APP_API_URL%/api/management/pending-enrollment', { headers: authHeaders }),
         fetch('http://localhost:5005/api/management/enrolled-students',  { headers: authHeaders }),
       ]);
 

@@ -272,7 +272,7 @@ const ApplicationForm = () => {
   const maxFileSize      = 5 * 1024 * 1024;
 
   useEffect(() => {
-    fetch('http://localhost:5005/api/schools')
+    fetch('%REACT_APP_API_URL%/api/schools')
       .then(r => r.json()).then(d => setAvailableSchools(Array.isArray(d) ? d : []))
       .catch(e => console.error(e)).finally(() => setSchoolsLoading(false));
   }, []);
