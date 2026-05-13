@@ -157,7 +157,7 @@ router.put('/periods', async (req, res) => {
         [schoolId, p.periodNumber, p.name,
          p.timeStart||null, p.timeEnd||null, p.isBreak||false]
       );
-    }S
+    }
 
     // Delete periods that were removed in UI BUT only if not used in timetable
     const incomingNumbers = periods.map(p => p.periodNumber);
