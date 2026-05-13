@@ -295,7 +295,7 @@ const ApplicationForm = () => {
       const p = new URLSearchParams();
       if (nationalId) p.append('nationalId', nationalId);
       if (appId)      p.append('applicationId', appId);
-      const res  = await fetch(`http://localhost:5005/api/applicant-applications?${p}`);
+      const res  = await fetch(`https://school-management-production-6167.up.railway.app/api/applicant-applications?${p}`);
       const apps = await res.json();
       if (res.ok && apps.length > 0) {
         const app = apps.find(a => String(a.id) === String(appId));
@@ -409,7 +409,7 @@ const ApplicationForm = () => {
     form.documents.forEach(d => fd.append('documents', d.file));
     fd.append('documentTypes', JSON.stringify(form.documents.map(d=>d.type)));
     try {
-      const url = isEditMode ? `http://localhost:5005/api/applications/${applicationId}` : 'http://localhost:5005/api/applications';
+      const url = isEditMode ? `https://school-management-production-6167.up.railway.app/api/applications/${applicationId}` : 'https://school-management-production-6167.up.railway.app/api/applications';
       const res  = await fetch(url, { method: isEditMode?'PUT':'POST', body: fd });
       const data = await res.json();
       if (data.success) { localStorage.removeItem('applicationDraft'); navigate(`/applicant-dashboard?nationalId=${encodeURIComponent(form.nationalId)}`); }
@@ -853,3 +853,4 @@ const ApplicationForm = () => {
 };
 
 export default ApplicationForm;
+

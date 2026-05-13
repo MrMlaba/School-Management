@@ -255,7 +255,7 @@ const AdminPage = () => {
     }
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch(`http://localhost:5005/api/applications/${id}`, {
+      const res = await fetch(`https://school-management-production-6167.up.railway.app/api/applications/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status, comment }),
@@ -941,10 +941,10 @@ const AdminPage = () => {
                             <Stack direction="row" spacing={0.75}>
                               <Button size="small" variant="outlined" startIcon={<VisibilityIcon />} onClick={() => handleViewDocument(doc)}>View</Button>
                               {doc.filename && (
-                                <Button size="small" variant="contained" startIcon={<DownloadIcon />} onClick={() => window.open(`http://localhost:5005/api/documents/${doc.filename}`, '_blank')}>Download</Button>
+                                <Button size="small" variant="contained" startIcon={<DownloadIcon />} onClick={() => window.open(`https://school-management-production-6167.up.railway.app/api/documents/${doc.filename}`, '_blank')}>Download</Button>
                               )}
                               {doc.filename && (
-                                <IconButton size="small" onClick={() => window.open(`http://localhost:5005/api/documents/${doc.filename}`, '_blank')}><OpenInNewIcon fontSize="small" /></IconButton>
+                                <IconButton size="small" onClick={() => window.open(`https://school-management-production-6167.up.railway.app/api/documents/${doc.filename}`, '_blank')}><OpenInNewIcon fontSize="small" /></IconButton>
                               )}
                             </Stack>
                           </Paper>
@@ -1010,10 +1010,10 @@ const AdminPage = () => {
                 <Stack spacing={1}>
                   {selectedDocument.filename && (
                     <>
-                      <Button variant="contained" startIcon={<OpenInNewIcon />} onClick={() => window.open(`http://localhost:5005/api/documents/${selectedDocument.filename}`, '_blank')}>Open in New Tab</Button>
-                      <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => { const l = document.createElement('a'); l.href = `http://localhost:5005/api/documents/${selectedDocument.filename}`; l.download = selectedDocument.filename; l.click(); }}>Download</Button>
+                      <Button variant="contained" startIcon={<OpenInNewIcon />} onClick={() => window.open(`https://school-management-production-6167.up.railway.app/api/documents/${selectedDocument.filename}`, '_blank')}>Open in New Tab</Button>
+                      <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => { const l = document.createElement('a'); l.href = `https://school-management-production-6167.up.railway.app/api/documents/${selectedDocument.filename}`; l.download = selectedDocument.filename; l.click(); }}>Download</Button>
                       {selectedDocument.filename.toLowerCase().endsWith('.pdf') && (
-                        <Button variant="outlined" onClick={() => window.open(`http://localhost:5005/api/documents/${selectedDocument.filename}#toolbar=1`, '_blank')}>Open PDF with Reader</Button>
+                        <Button variant="outlined" onClick={() => window.open(`https://school-management-production-6167.up.railway.app/api/documents/${selectedDocument.filename}#toolbar=1`, '_blank')}>Open PDF with Reader</Button>
                       )}
                     </>
                   )}
@@ -1041,3 +1041,4 @@ const AdminPage = () => {
 };
 
 export default AdminPage;
+

@@ -167,7 +167,7 @@ const ApplicantDashboard = () => {
     const storedNationalId = nationalId || localStorage.getItem('nationalId');
 
     try {
-      const response = await fetch(`http://localhost:5005/api/applications/${appId}/accept`, {
+      const response = await fetch(`https://school-management-production-6167.up.railway.app/api/applications/${appId}/accept`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nationalId: storedNationalId }),
@@ -517,3 +517,4 @@ const ApplicantDashboard = () => {
 };
 
 export default ApplicantDashboard;
+

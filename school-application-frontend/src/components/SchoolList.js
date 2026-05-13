@@ -92,3 +92,4 @@ const SchoolList = ({ bodyFont, displayFont }) => {
 };
 
 export default SchoolList;
+

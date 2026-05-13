@@ -377,7 +377,7 @@ const StudentsPage = () => {
     try {
       const [pendingRes, enrolledRes] = await Promise.all([
         fetch('%REACT_APP_API_URL%/api/management/pending-enrollment', { headers: authHeaders }),
-        fetch('http://localhost:5005/api/management/enrolled-students',  { headers: authHeaders }),
+        fetch('https://school-management-production-6167.up.railway.app/api/management/enrolled-students',  { headers: authHeaders }),
       ]);
 
       if (pendingRes.ok && enrolledRes.ok) {
@@ -432,7 +432,7 @@ const StudentsPage = () => {
     if (!enrollTarget) return;
     setEnrolling(true);
     try {
-      const res = await fetch('http://localhost:5005/api/management/enroll', {
+      const res = await fetch('https://school-management-production-6167.up.railway.app/api/management/enroll', {
         method: 'POST',
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({ applicationId: enrollTarget.id }),
@@ -732,3 +732,4 @@ const StudentsPage = () => {
 };
 
 export default StudentsPage;
+

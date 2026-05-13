@@ -885,3 +885,4 @@ function QuizzesSection({quizzes,fullWidth}) {
     </Card>
   );
 }
+

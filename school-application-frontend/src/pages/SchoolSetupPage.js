@@ -908,3 +908,4 @@ const SchoolSetupPage = () => {
 };
 
 export default SchoolSetupPage;
+
