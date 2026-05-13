@@ -600,7 +600,7 @@ Your application to <strong>${school}</strong> has been updated. Please log in t
 
   try {
     await resend.emails.send({
-      from:    'onboarding@resend.dev',
+      from:    'bongmusa04miaba@gmail.com',
       to,
       subject,
       html,
