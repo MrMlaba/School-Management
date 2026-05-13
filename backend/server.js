@@ -7,7 +7,7 @@ const crypto     = require('crypto');
 const jwt        = require('jsonwebtoken');   // ← NEW
 const bcrypt     = require('bcrypt');          // ← NEW
 require('dotenv').config();
-const nodemailer = require('nodemailer');
+
 const pool       = require('./db');
 
 // ── Import system-admin routes & middleware from auth.js ──────────────────────
@@ -500,23 +500,115 @@ function toApp(row) {
 }
 
 // ─── Email ────────────────────────────────────────────────────────────────────
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS },
-});
+const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-function sendStatusEmail(to, applicantName, school, status) {
+async function sendStatusEmail(to, applicantName, school, status) {
   if (!to) return;
-  const statusText = status.charAt(0).toUpperCase() + status.slice(1);
-  transporter.sendMail({
-    from:    process.env.GMAIL_USER,
-    to,
-    subject: `Your Application Status for ${school}`,
-    text:    `Dear ${applicantName || 'Applicant'},\n\nYour application to ${school} has been ${statusText}.\n\nThank you for using our system.`,
-  }, (err, info) => {
-    if (err) console.error('Error sending email:', err);
-    else     console.log('Status email sent:', info.response);
-  });
+
+  const isApproved = status === 'approved';
+  const isAccepted = status === 'accepted';
+  const isRejected = status === 'rejected';
+
+  const subject = isApproved
+    ? ` Application Approved – ${school}`
+    : isAccepted
+    ? `Offer Accepted – ${school}`
+    : isRejected
+    ? `Application Outcome – ${school}`
+    : `Application Status Update – ${school}`;
+
+  const portalLink = 'https://school-application.vercel.app';
+
+  const message = isApproved
+    ? `
+We are pleased to inform you that your application to <strong>${school}</strong> has been <strong>approved</strong>.
+
+Please log in to the applicant portal to accept your offer:
+<a href="${portalLink}/check-status" style="display:inline-block;margin:16px 0;padding:12px 24px;background:#1a73e8;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Accept Your Offer</a>
+
+Please note that your offer may expire if not accepted within the specified timeframe. We encourage you to log in as soon as possible.
+`
+    : isAccepted
+    ? `
+Thank you for accepting your offer to join <strong>${school}</strong>. We are excited to welcome you!
+
+Our admissions team will be in touch with further details regarding your enrollment.
+
+You can track your application status at any time by visiting:
+<a href="${portalLink}/check-status" style="display:inline-block;margin:16px 0;padding:12px 24px;background:#1a73e8;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">View Application Status</a>
+`
+    : isRejected
+    ? `
+Thank you for your interest in <strong>${school}</strong>. After careful consideration, we regret to inform you that your application was <strong>unsuccessful</strong> at this time.
+
+We encourage you to apply again in the future or explore other available schools on our platform.
+
+<a href="${portalLink}" style="display:inline-block;margin:16px 0;padding:12px 24px;background:#1a73e8;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Explore Other Schools</a>
+`
+    : `
+Your application to <strong>${school}</strong> has been updated. Please log in to the applicant portal to view the latest status.
+
+<a href="${portalLink}/check-status" style="display:inline-block;margin:16px 0;padding:12px 24px;background:#1a73e8;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Check Application Status</a>
+`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background:#1a73e8;padding:32px 40px;text-align:center;">
+              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:bold;">School Application System</h1>
+              <p style="margin:6px 0 0;color:#d0e8ff;font-size:14px;">${school}</p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:40px;">
+              <p style="margin:0 0 16px;font-size:16px;color:#333;">Dear <strong>${applicantName || 'Applicant'}</strong>,</p>
+              <div style="font-size:15px;color:#444;line-height:1.7;">${message}</div>
+              <hr style="border:none;border-top:1px solid #eee;margin:32px 0;">
+              <p style="margin:0;font-size:13px;color:#888;">
+                If you have any questions, please contact the admissions office at <strong>${school}</strong> directly.<br><br>
+                This is an automated message — please do not reply to this email.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f4f6f8;padding:20px 40px;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#aaa;">© ${new Date().getFullYear()} School Application System. All rights reserved.</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
+  try {
+    await resend.emails.send({
+      from:    'onboarding@resend.dev',
+      to,
+      subject,
+      html,
+    });
+    console.log('Status email sent to:', to);
+  } catch (err) {
+    console.error('Error sending email:', err);
+  }
 }
 
 // ─── REMOVED: adminTokens / schoolTokens in-memory stores ────────────────────
