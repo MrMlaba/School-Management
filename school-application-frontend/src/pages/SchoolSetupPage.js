@@ -33,7 +33,7 @@ const C = {
   dangerBg: '#FFEBEE',
 };
 
-const BASE = '%REACT_APP_API_URL%';
+const BASE = 'https://school-management-production-6167.up.railway.app';
 
 const headCell = {
   backgroundColor: C.headerBg, color: C.brand, fontWeight: 700,
@@ -908,4 +908,6 @@ const SchoolSetupPage = () => {
 };
 
 export default SchoolSetupPage;
+
+
 

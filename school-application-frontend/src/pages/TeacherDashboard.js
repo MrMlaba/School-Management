@@ -55,7 +55,7 @@ const C = {
   dangerBg:  '#FEE2E2',
 };
 
-const BASE  = '%REACT_APP_API_URL%';
+const BASE  = 'https://school-management-production-6167.up.railway.app';
 const authH = () => ({ Authorization: `Bearer ${localStorage.getItem('teacherToken')}` });
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 const DAYS  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
@@ -1451,4 +1451,6 @@ const TeacherDashboard = () => {
 };
 
 export default TeacherDashboard;
+
+
 

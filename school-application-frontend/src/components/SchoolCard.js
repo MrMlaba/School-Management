@@ -196,3 +196,5 @@ const SchoolCard = ({ school, onViewDetails }) => {
 
 export default SchoolCard;
 
+
+

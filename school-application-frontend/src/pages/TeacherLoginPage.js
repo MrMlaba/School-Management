@@ -19,7 +19,7 @@ const TeacherLoginPage = () => {
       return setError('Username and password are required');
     setLoading(true); setError('');
     try {
-      const res  = await fetch('%REACT_APP_API_URL%/api/teacher-login', {
+      const res  = await fetch('https://school-management-production-6167.up.railway.app/api/teacher-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -107,4 +107,6 @@ const TeacherLoginPage = () => {
 };
 
 export default TeacherLoginPage;
+
+
 

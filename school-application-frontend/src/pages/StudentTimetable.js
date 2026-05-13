@@ -21,7 +21,7 @@ const T = {
   breakText: '#9AABBD',
 };
 
-const BASE = '%REACT_APP_API_URL%';
+const BASE = 'https://school-management-production-6167.up.railway.app';
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const DAY_SHORT = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri' };
 
@@ -413,4 +413,6 @@ export default function StudentTimetable() {
     </Box>
   );
 }
+
+
 

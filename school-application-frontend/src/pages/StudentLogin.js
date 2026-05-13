@@ -21,7 +21,7 @@ const StudentLogin = () => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('%REACT_APP_API_URL%/api/student-login', {
+      const res = await fetch('https://school-management-production-6167.up.railway.app/api/student-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studentNumber, password }),
@@ -66,5 +66,7 @@ const StudentLogin = () => {
 };
 
 export default StudentLogin;
+
+
 
 

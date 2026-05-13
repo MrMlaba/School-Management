@@ -128,7 +128,7 @@ function PctPill({ value, totalMarks }) {
 }
 
 /* ─── Main Component ─────────────────────────────────────────────────────── */
-const BASE = '%REACT_APP_API_URL%';
+const BASE = 'https://school-management-production-6167.up.railway.app';
 
 export default function TeacherGradebook() {
   const { classId } = useParams();
@@ -680,4 +680,6 @@ export default function TeacherGradebook() {
     </Box>
   );
 }
+
+
 

@@ -33,7 +33,7 @@ const C = {
   goldBg:   '#FFFBEB',
 };
 
-const BASE = '%REACT_APP_API_URL%';
+const BASE = 'https://school-management-production-6167.up.railway.app';
 
 /* ─── JWT helper ─────────────────────────────────────────────────────────── */
 const getStudentIdFromToken = () => {
@@ -638,4 +638,6 @@ export default function AssignmentDetail() {
     </Box>
   );
 }
+
+
 

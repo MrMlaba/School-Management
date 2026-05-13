@@ -53,7 +53,7 @@ const C = {
   headerBg: '#F0F4F8',
 };
 
-const BASE  = '%REACT_APP_API_URL%';
+const BASE  = 'https://school-management-production-6167.up.railway.app';
 const authH = () => ({ Authorization: `Bearer ${localStorage.getItem('adminToken')}` });
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 
@@ -1979,4 +1979,6 @@ const ManagementDashboard = () => {
 };
 
 export default ManagementDashboard;
+
+
 

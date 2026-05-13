@@ -39,7 +39,7 @@ const T = {
   purpleBg:  '#EDE9FE',
 };
 
-const BASE    = '%REACT_APP_API_URL%';
+const BASE    = 'https://school-management-production-6167.up.railway.app';
 const authHdr = () => ({ Authorization: `Bearer ${localStorage.getItem('studentToken')}` });
 const jsonHdr = () => ({ 'Content-Type': 'application/json', ...authHdr() });
 
@@ -493,4 +493,6 @@ export default function StudentQuizAttempt() {
 
   return null;
 }
+
+
 

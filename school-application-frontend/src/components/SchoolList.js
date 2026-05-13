@@ -14,7 +14,7 @@ const SchoolList = ({ bodyFont, displayFont }) => {
   const DISPLAY = displayFont || "'Cormorant Garamond', serif";
 
   useEffect(() => {
-    fetch('%REACT_APP_API_URL%/api/schools')
+    fetch('https://school-management-production-6167.up.railway.app/api/schools')
       .then((res) => {
         if (!res.ok) throw new Error('Failed to load schools');
         return res.json();
@@ -92,4 +92,6 @@ const SchoolList = ({ bodyFont, displayFont }) => {
 };
 
 export default SchoolList;
+
+
 

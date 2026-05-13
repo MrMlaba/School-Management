@@ -22,7 +22,7 @@ const LoginPage = () => {
     setError('');
 
     try {
-      const response = await fetch('%REACT_APP_API_URL%/api/admin-login', {
+      const response = await fetch('https://school-management-production-6167.up.railway.app/api/admin-login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -169,4 +169,6 @@ const LoginPage = () => {
 };
 
 export default LoginPage; 
+
+
 

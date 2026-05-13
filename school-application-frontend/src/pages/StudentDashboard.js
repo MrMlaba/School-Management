@@ -170,7 +170,7 @@ const T = {
   border:'#E5E7EB',
 };
 const SIDEBAR_W = 240;
-const BASE = '%REACT_APP_API_URL%';
+const BASE = 'https://school-management-production-6167.up.railway.app';
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 const getInitials = s => s ? `${s.firstName?.[0]??''}${s.lastName?.[0]??''}`.toUpperCase() : '?';
@@ -885,4 +885,6 @@ function QuizzesSection({quizzes,fullWidth}) {
     </Card>
   );
 }
+
+
 

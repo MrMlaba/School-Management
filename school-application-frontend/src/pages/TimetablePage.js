@@ -33,7 +33,7 @@ const C = {
   filledBorder:'#A5D6A7',
 };
 
-const BASE  = '%REACT_APP_API_URL%';
+const BASE  = 'https://school-management-production-6167.up.railway.app';
 const authH = () => ({ Authorization: `Bearer ${localStorage.getItem('adminToken')}` });
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 const DAYS  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
@@ -715,4 +715,6 @@ const TimetablePage = () => {
 };
 
 export default TimetablePage;
+
+
 

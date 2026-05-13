@@ -146,7 +146,7 @@ const ApplicantDashboard = () => {
       if (nationalId)    params.append('nationalId', nationalId);
       if (applicationId) params.append('applicationId', applicationId);
 
-      const response = await fetch(`%REACT_APP_API_URL%/api/applicant-applications?${params}`);
+      const response = await fetch(`https://school-management-production-6167.up.railway.app/api/applicant-applications?${params}`);
       const data = await response.json();
 
       if (response.ok) {
@@ -517,4 +517,6 @@ const ApplicantDashboard = () => {
 };
 
 export default ApplicantDashboard;
+
+
 

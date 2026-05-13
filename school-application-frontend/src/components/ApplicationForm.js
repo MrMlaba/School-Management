@@ -272,7 +272,7 @@ const ApplicationForm = () => {
   const maxFileSize      = 5 * 1024 * 1024;
 
   useEffect(() => {
-    fetch('%REACT_APP_API_URL%/api/schools')
+    fetch('https://school-management-production-6167.up.railway.app/api/schools')
       .then(r => r.json()).then(d => setAvailableSchools(Array.isArray(d) ? d : []))
       .catch(e => console.error(e)).finally(() => setSchoolsLoading(false));
   }, []);
@@ -853,4 +853,6 @@ const ApplicationForm = () => {
 };
 
 export default ApplicationForm;
+
+
 

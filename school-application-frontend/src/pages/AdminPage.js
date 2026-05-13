@@ -186,7 +186,7 @@ const AdminPage = () => {
   const fetchApplications = () => {
     setLoading(true);
     const token = localStorage.getItem('adminToken');
-    fetch('%REACT_APP_API_URL%/api/applications', {
+    fetch('https://school-management-production-6167.up.railway.app/api/applications', {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(res => res.json())
@@ -1041,4 +1041,6 @@ const AdminPage = () => {
 };
 
 export default AdminPage;
+
+
 

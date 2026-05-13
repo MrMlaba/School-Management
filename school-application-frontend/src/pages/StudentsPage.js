@@ -376,7 +376,7 @@ const StudentsPage = () => {
     setError('');
     try {
       const [pendingRes, enrolledRes] = await Promise.all([
-        fetch('%REACT_APP_API_URL%/api/management/pending-enrollment', { headers: authHeaders }),
+        fetch('https://school-management-production-6167.up.railway.app/api/management/pending-enrollment', { headers: authHeaders }),
         fetch('https://school-management-production-6167.up.railway.app/api/management/enrolled-students',  { headers: authHeaders }),
       ]);
 
@@ -732,4 +732,6 @@ const StudentsPage = () => {
 };
 
 export default StudentsPage;
+
+
 

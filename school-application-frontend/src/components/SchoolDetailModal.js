@@ -256,3 +256,5 @@ const SchoolDetailModal = ({ open, onClose, school }) => {
 
 export default SchoolDetailModal;
 
+
+

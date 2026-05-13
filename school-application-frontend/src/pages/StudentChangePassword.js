@@ -27,7 +27,7 @@ const StudentChangePassword = () => {
     const token = localStorage.getItem('studentToken');
     if (!token) { setError('Not authenticated'); setLoading(false); return; }
     try {
-      const res = await fetch('%REACT_APP_API_URL%/api/student/change-password', {
+      const res = await fetch('https://school-management-production-6167.up.railway.app/api/student/change-password', {
         method:  'POST',
         headers: {
           'Content-Type':  'application/json',
@@ -105,4 +105,6 @@ const StudentChangePassword = () => {
 };
 
 export default StudentChangePassword;
+
+
 
