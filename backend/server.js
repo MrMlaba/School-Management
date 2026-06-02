@@ -27,7 +27,7 @@ const { teacherQuizRouter, studentQuizRouter } = require('./routes/quizRoutes');
 const chatRoutes       = require('./routes/chatRoutes');
 
 const app  = express();
-const PORT = process.env.PORT || 5005;
+const PORT = process.env.PORT || 8080;
 
 const SCHOOL_JWT_SECRET = process.env.JWT_SECRET || 'change_me_school';
 const TOKEN_EXPIRY      = '8h';
