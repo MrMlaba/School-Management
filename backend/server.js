@@ -826,11 +826,10 @@ async function ensureTables() {
   `);
 }
 
-ensureTables()
-  .then(() => {
-    app.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`));
-  })
-  .catch(err => {
-    console.error('Startup table check failed:', err);
-    process.exit(1);
-  });
+// Listen immediately — Railway needs the server responding fast
+app.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`));
+
+// Run table check after — non-blocking, won't crash server
+ensureTables().catch(err => {
+  console.error('Table check failed (non-fatal):', err.message);
+});
