@@ -73,7 +73,36 @@ app.use('/api/setup',      requireSchoolAdmin, phase2Routes);
 app.use('/api/management', requireSchoolAdmin, phase3Routes);
 
 // FIX: /api/admin-login now has its own limiter (was missing before)
-app.post('/api/admin-login',   schoolAdminLoginLimiter, handleSchoolAdminLogin);
+app.post('/api/admin-login', schoolAdminLoginLimiter, async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password)
+    return res.status(400).json({ success: false, message: 'Username and password required' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT sa.id, sa.username, sa.name, sa.password_hash, sa.is_active, sa.temp_password_flag,
+              s.name AS school, s.id AS school_id
+       FROM school_admins sa JOIN schools s ON s.id = sa.school_id
+       WHERE sa.username = $1`,
+      [username]
+    );
+    const admin = rows[0];
+    if (!admin) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    if (!admin.is_active) return res.status(403).json({ success: false, message: 'Account suspended.' });
+    const valid = await bcrypt.compare(password, admin.password_hash);
+    if (!valid) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    await pool.query('UPDATE school_admins SET last_login = NOW() WHERE id = $1', [admin.id]);
+    await logAudit(pool, { actor: admin.username, actorRole: 'school_admin', action: 'LOGIN', target: null, school: admin.school });
+    const token = jwt.sign(
+      { id: admin.id, username: admin.username, name: admin.name, school: admin.school, schoolId: admin.school_id },
+      SCHOOL_JWT_SECRET,
+      { expiresIn: TOKEN_EXPIRY }
+    );
+    return res.json({ success: true, token, school: admin.school, name: admin.name, tempPasswordFlag: admin.temp_password_flag });
+  } catch (err) {
+    console.error('admin-login error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 app.post('/api/teacher-login', teacherLoginLimiter,     teacherLogin);
 app.post('/api/student-login', studentLoginLimiter,     studentLogin);
 
