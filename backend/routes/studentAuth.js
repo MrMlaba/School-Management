@@ -33,7 +33,10 @@ const setStudentCredentials = async (req, res) => {
   const studentId = req.params.id;
   const { password } = req.body;
   try {
-    const { rows } = await pool.query('SELECT id, student_number, school_id FROM enrolled_students WHERE id = $1', [studentId]);
+    const { rows } = await pool.query(
+      'SELECT id, student_number, school_id FROM enrolled_students WHERE id = $1 AND school_id = $2',
+      [studentId, admin.schoolId]
+    );
     if (!rows.length) return res.status(404).json({ message: 'Student not found' });
     const student = rows[0];
     const temp = password || genTempPassword();
@@ -52,8 +55,12 @@ const setStudentCredentials = async (req, res) => {
 // Admin: bulk generate credentials for students without password
 // POST /api/management/students/generate-credentials
 const bulkGenerate = async (req, res) => {
+  const schoolId = req.admin.schoolId;
   try {
-    const { rows } = await pool.query("SELECT id, student_number FROM enrolled_students WHERE password_hash IS NULL OR password_hash = ''");
+    const { rows } = await pool.query(
+      "SELECT id, student_number FROM enrolled_students WHERE (password_hash IS NULL OR password_hash = '') AND school_id = $1",
+      [schoolId]
+    );
     const out = [];
     for (const s of rows) {
       const temp = genTempPassword();
