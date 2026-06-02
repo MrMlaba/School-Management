@@ -1813,6 +1813,7 @@ const ReportsSection = () => {
   const [endDate,    setEndDate]   = useState('');
   const [report,     setReport]    = useState(null);
   const [loading,    setLoading]   = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(null); // studentId being loaded
   const [snack,      setSnack]     = useState({open:false,msg:'',sev:'success'});
   const toast = toast_(setSnack);
  
@@ -1844,11 +1845,43 @@ const ReportsSection = () => {
     setLoading(false);
   };
  
-  // ── Export to Excel ──
+  // Open individual student PDF in new tab
+  const openStudentPDF = async (studentId) => {
+    setPdfLoading(studentId);
+    const termParam = selTerm ? `?termId=${selTerm}` : '';
+    const url = `${BASE}/api/management/reports/student/${studentId}/pdf${termParam}`;
+    const res = await fetch(url, {headers:authH()});
+    if (res.ok) {
+      const html = await res.text();
+      const blob = new Blob([html], {type:'text/html'});
+      window.open(URL.createObjectURL(blob), '_blank');
+    } else {
+      toast('Failed to generate report card','error');
+    }
+    setPdfLoading(null);
+  };
+ 
+  // Open full class PDF in new tab
+  const openClassPDF = async () => {
+    if (!selClass) return toast('Select a class first','error');
+    setPdfLoading('class');
+    const termParam = selTerm ? `?termId=${selTerm}` : '';
+    const url = `${BASE}/api/management/reports/class/${selClass}/pdf${termParam}`;
+    const res = await fetch(url, {headers:authH()});
+    if (res.ok) {
+      const html = await res.text();
+      const blob = new Blob([html], {type:'text/html'});
+      window.open(URL.createObjectURL(blob), '_blank');
+    } else {
+      toast('Failed to generate class report cards','error');
+    }
+    setPdfLoading(null);
+  };
+ 
+  // Export to Excel
   const exportExcel = () => {
     if (!report) return;
     const wb = XLSX.utils.book_new();
- 
     if (tab==='attendance') {
       const rows = report.students.map(s=>({
         'Student No.': s.studentNumber,
@@ -1857,6 +1890,7 @@ const ReportsSection = () => {
         'Present':     s.present,
         'Absent':      s.absent,
         'Late':        s.late,
+        'Excused':     s.excused,
         'Total Days':  s.total,
         'Attendance %': s.percentage!==null ? `${s.percentage}%` : '—',
       }));
@@ -1865,10 +1899,8 @@ const ReportsSection = () => {
       XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
       XLSX.writeFile(wb, `attendance_${report.class?.name}_${new Date().toISOString().slice(0,10)}.xlsx`);
     } else {
-      // Results: students as rows, subjects as columns
-      const headers = ['Student No.','Name',...(report.subjects||[]).map(s=>s.name),'Average %'];
       const rows = report.students.map(s=>{
-        const row = {'Student No.':s.studentNumber, 'Name':`${s.firstName} ${s.lastName}`};
+        const row = {'Student No.':s.studentNumber,'Name':`${s.firstName} ${s.lastName}`};
         (report.subjects||[]).forEach(sub=>{
           const r = s.results?.[sub.id];
           row[sub.name] = r ? `${r.score}/${r.maxScore} (${r.percentage}%)` : '—';
@@ -1877,46 +1909,33 @@ const ReportsSection = () => {
         return row;
       });
       const ws = XLSX.utils.json_to_sheet(rows);
-      ws['!cols'] = headers.map(()=>({wch:18}));
       XLSX.utils.book_append_sheet(wb, ws, 'Results');
       XLSX.writeFile(wb, `results_${report.class?.name}_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
     toast('Excel file downloaded');
   };
  
-  // ── Attendance colour ──
-  const attColor = (pct) => {
-    if (pct===null) return C.muted;
-    if (pct>=80) return '#16A34A';
-    if (pct>=60) return '#D97706';
-    return '#C62828';
-  };
- 
-  // ── Result colour ──
-  const resColor = (pct) => {
-    if (pct===null) return C.muted;
-    if (pct>=75) return '#16A34A';
-    if (pct>=50) return '#D97706';
-    return '#C62828';
-  };
+  const attColor = (pct) => { if(pct===null)return C.muted; if(pct>=80)return'#16A34A'; if(pct>=60)return'#D97706'; return'#C62828'; };
+  const resColor = (pct) => { if(pct===null)return C.muted; if(pct>=75)return'#16A34A'; if(pct>=50)return'#D97706'; return'#C62828'; };
+  const getSymbol = (pct) => { if(pct===null)return'—'; if(pct>=80)return'7'; if(pct>=70)return'6'; if(pct>=60)return'5'; if(pct>=50)return'4'; if(pct>=40)return'3'; if(pct>=30)return'2'; return'1'; };
  
   return (
     <Card_>
-      <SectionHead title="Reports" subtitle="Generate attendance and results reports"/>
+      <SectionHead title="Reports" subtitle="Generate attendance and results reports — download as PDF or Excel"/>
  
       {/* Report type tabs */}
       <Box sx={{display:'flex',gap:1.5,mb:3}}>
-          {['attendance','results'].map((t,i)=>(
+        {['attendance','results'].map(t=>(
           <Button key={t} onClick={()=>{setTab(t);setReport(null);}} size="small" sx={{
-            textTransform:'none', fontWeight:700, fontSize:'0.82rem',
+            textTransform:'none',fontWeight:700,fontSize:'0.82rem',
             fontFamily:"'IBM Plex Sans', sans-serif",
-            background: tab===t ? C.brand : 'transparent',
-            color: tab===t ? C.white : C.muted,
-            border: tab===t ? `1.5px solid ${C.brand}` : `1.5px solid ${C.border}`,
-            borderRadius:'6px', px:2, py:0.75,
-            '&:hover':{ background: tab===t ? C.brand : C.sidebarAct },
+            background:tab===t?C.brand:'transparent',
+            color:tab===t?C.white:C.muted,
+            border:tab===t?`1.5px solid ${C.brand}`:`1.5px solid ${C.border}`,
+            borderRadius:'6px',px:2,py:0.75,
+            '&:hover':{background:tab===t?C.brand:C.sidebarAct},
           }}>
-            {t==='attendance' ? '📋 Attendance Report' : '🏆 Results Report'}
+            {t==='attendance'?'📋 Attendance Report':'🏆 Results Report'}
           </Button>
         ))}
       </Box>
@@ -1924,7 +1943,7 @@ const ReportsSection = () => {
       {/* Filters */}
       <Box sx={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:'8px',p:2,mb:3}}>
         <Box sx={{display:'flex',gap:2,flexWrap:'wrap',alignItems:'flex-end'}}>
-          <TextField select label="Class *" value={selClass} onChange={e=>setSelClass(e.target.value)} size="small" sx={{minWidth:150}}>
+          <TextField select label="Class *" value={selClass} onChange={e=>{setSelClass(e.target.value);setReport(null);}} size="small" sx={{minWidth:160}}>
             <MenuItem value="">— Select class —</MenuItem>
             {classes.map(c=>(
               <MenuItem key={c.id} value={c.id}>
@@ -1941,25 +1960,36 @@ const ReportsSection = () => {
           ) : (
             <TextField select label="Term" value={selTerm} onChange={e=>setSelTerm(e.target.value)} size="small" sx={{minWidth:140}}>
               <MenuItem value="">All Terms</MenuItem>
-              {terms.map(t=><MenuItem key={t.id} value={t.id}>Term {t.term_number}</MenuItem>)}
+              {terms.map(t=><MenuItem key={t.id} value={t.id}>Term {t.termNumber || t.term_number}</MenuItem>)}
             </TextField>
           )}
  
           <Button variant="contained" onClick={generate} disabled={loading||!selClass}
             sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>
-            {loading?'Generating…':'Generate Report'}
+            {loading?<><CircularProgress size={14} sx={{color:'#fff',mr:1}}/>Generating…</>:'Generate Report'}
           </Button>
  
-          {report&&(
-            <Button variant="outlined" startIcon={<FileDownloadIcon/>} onClick={exportExcel}
-              sx={{borderColor:C.accent,color:C.accent,textTransform:'none',fontWeight:700,fontFamily:"'IBM Plex Sans', sans-serif",'&:hover':{background:'#F0FDF4'}}}>
-              Export to Excel
+          {/* PDF buttons */}
+          {selClass && (
+            <Button variant="outlined" onClick={openClassPDF}
+              disabled={pdfLoading==='class'}
+              startIcon={pdfLoading==='class'?<CircularProgress size={14}/>:null}
+              sx={{borderColor:'#C62828',color:'#C62828',textTransform:'none',fontWeight:700,
+                fontFamily:"'IBM Plex Sans', sans-serif",'&:hover':{background:'#FFF5F5'}}}>
+              {pdfLoading==='class'?'Preparing…':'🖨 Print All Report Cards'}
+            </Button>
+          )}
+ 
+          {report && (
+            <Button variant="outlined" onClick={exportExcel}
+              sx={{borderColor:C.accent,color:C.accent,textTransform:'none',fontWeight:700,
+                fontFamily:"'IBM Plex Sans', sans-serif",'&:hover':{background:'#F0FDF4'}}}>
+              📥 Export Excel
             </Button>
           )}
         </Box>
       </Box>
  
-      {/* Report output */}
       {loading && <Box sx={{display:'flex',justifyContent:'center',py:6}}><CircularProgress sx={{color:C.brand}}/></Box>}
  
       {report && !loading && (
@@ -1969,47 +1999,56 @@ const ReportsSection = () => {
             <Box>
               <Typography sx={{fontWeight:700,fontSize:'1rem',color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif"}}>
                 {tab==='attendance'?'Attendance Report':'Results Report'} — {report.class?.name}
+                {report.class?.stream?` (${report.class.stream})`:''}
               </Typography>
               <Typography sx={{fontSize:'0.78rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>
                 {report.students?.length} students
-                {tab==='attendance'&&report.dateRange?.startDate&&` · ${report.dateRange.startDate} to ${report.dateRange.endDate||'today'}`}
               </Typography>
             </Box>
           </Box>
  
           {/* ── ATTENDANCE TABLE ── */}
-          {tab==='attendance'&&(
+          {tab==='attendance' && (
             <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'6px'}}>
               <Table size="small" sx={{borderCollapse:'collapse'}}>
                 <TableHead><TableRow>
-                  {['#','Student No.','Name','Present','Absent','Late','Total','Attendance %'].map((h,i,arr)=>(
+                  {['#','Student No.','Name','Present','Absent','Late','Excused','Total','Attendance %','PDF'].map((h,i,arr)=>(
                     <TableCell key={h} sx={{...hc,...(i===arr.length-1?{borderRight:'none'}:{})}}>{h}</TableCell>
                   ))}
                 </TableRow></TableHead>
                 <TableBody>
                   {report.students.length===0?(
-                    <TableRow><TableCell colSpan={8} sx={{...bc,borderRight:'none',textAlign:'center',py:4,color:C.muted}}>No data available.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={10} sx={{...bc,borderRight:'none',textAlign:'center',py:4,color:C.muted}}>No attendance data found.</TableCell></TableRow>
                   ):(
                     report.students.map((s,idx)=>(
                       <TableRow key={s.id} sx={{backgroundColor:idx%2===0?C.white:'#FAFBFC'}}>
                         <TableCell sx={{...bc,color:C.muted,textAlign:'center',width:40}}>{idx+1}</TableCell>
                         <TableCell sx={{...bc,fontFamily:'monospace',fontSize:'0.8rem',color:C.brand,fontWeight:700}}>{s.studentNumber}</TableCell>
                         <TableCell sx={{...bc,fontWeight:600}}>{s.firstName} {s.lastName}</TableCell>
-                        <TableCell sx={{...bc,color:'#16A34A',fontWeight:700}}>{s.present}</TableCell>
-                        <TableCell sx={{...bc,color:'#C62828',fontWeight:700}}>{s.absent}</TableCell>
-                        <TableCell sx={{...bc,color:'#D97706',fontWeight:700}}>{s.late}</TableCell>
-                        <TableCell sx={bc}>{s.total}</TableCell>
-                        <TableCell sx={{...bc,borderRight:'none'}}>
+                        <TableCell sx={{...bc,color:'#16A34A',fontWeight:700,textAlign:'center'}}>{s.present}</TableCell>
+                        <TableCell sx={{...bc,color:'#C62828',fontWeight:700,textAlign:'center'}}>{s.absent}</TableCell>
+                        <TableCell sx={{...bc,color:'#D97706',fontWeight:700,textAlign:'center'}}>{s.late}</TableCell>
+                        <TableCell sx={{...bc,color:C.muted,textAlign:'center'}}>{s.excused}</TableCell>
+                        <TableCell sx={{...bc,textAlign:'center'}}>{s.total}</TableCell>
+                        <TableCell sx={{...bc}}>
                           {s.percentage!==null?(
                             <Box sx={{display:'flex',alignItems:'center',gap:1}}>
                               <Box sx={{flex:1,height:6,borderRadius:3,background:'#E2E8F0',overflow:'hidden'}}>
-                                <Box sx={{height:'100%',width:`${s.percentage}%`,background:attColor(s.percentage),borderRadius:3,transition:'width 0.3s'}}/>
+                                <Box sx={{height:'100%',width:`${s.percentage}%`,background:attColor(s.percentage),borderRadius:3}}/>
                               </Box>
-                              <Typography sx={{fontSize:'0.8rem',fontWeight:700,color:attColor(s.percentage),minWidth:40,fontFamily:"'IBM Plex Sans', sans-serif"}}>
-                                {s.percentage}%
-                              </Typography>
+                              <Typography sx={{fontSize:'0.8rem',fontWeight:700,color:attColor(s.percentage),minWidth:36,fontFamily:"'IBM Plex Sans', sans-serif"}}>{s.percentage}%</Typography>
                             </Box>
                           ):'—'}
+                        </TableCell>
+                        <TableCell sx={{...bc,borderRight:'none'}}>
+                          <Tooltip title="Open report card">
+                            <IconButton size="small"
+                              onClick={()=>openStudentPDF(s.id)}
+                              disabled={pdfLoading===s.id}
+                              sx={{color:'#C62828'}}>
+                              {pdfLoading===s.id?<CircularProgress size={14}/>:<FileDownloadIcon sx={{fontSize:16}}/>}
+                            </IconButton>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))
@@ -2020,7 +2059,7 @@ const ReportsSection = () => {
           )}
  
           {/* ── RESULTS TABLE ── */}
-          {tab==='results'&&(
+          {tab==='results' && (
             <Box sx={{overflowX:'auto'}}>
               <Table sx={{borderCollapse:'collapse',minWidth:600}}>
                 <TableHead>
@@ -2030,12 +2069,13 @@ const ReportsSection = () => {
                     {(report.subjects||[]).map(sub=>(
                       <TableCell key={sub.id} sx={{...hc,textAlign:'center',minWidth:110}}>{sub.name}</TableCell>
                     ))}
-                    <TableCell sx={{...hc,borderRight:'none',textAlign:'center'}}>Average</TableCell>
+                    <TableCell sx={{...hc,textAlign:'center'}}>Average</TableCell>
+                    <TableCell sx={{...hc,borderRight:'none'}}>PDF</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {report.students.length===0?(
-                    <TableRow><TableCell colSpan={(report.subjects?.length||0)+3} sx={{...bc,borderRight:'none',textAlign:'center',py:4,color:C.muted}}>No results found.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={(report.subjects?.length||0)+4} sx={{...bc,borderRight:'none',textAlign:'center',py:4,color:C.muted}}>No results found.</TableCell></TableRow>
                   ):(
                     report.students.map((s,idx)=>(
                       <TableRow key={s.id} sx={{backgroundColor:idx%2===0?C.white:'#FAFBFC'}}>
@@ -2048,16 +2088,26 @@ const ReportsSection = () => {
                               {r?(
                                 <Box>
                                   <Typography sx={{fontSize:'0.82rem',fontWeight:700,color:resColor(r.percentage),fontFamily:"'IBM Plex Sans', sans-serif"}}>{r.score}/{r.maxScore}</Typography>
-                                  <Typography sx={{fontSize:'0.7rem',color:resColor(r.percentage),fontFamily:"'IBM Plex Sans', sans-serif"}}>{r.percentage}%</Typography>
+                                  <Typography sx={{fontSize:'0.7rem',color:resColor(r.percentage),fontFamily:"'IBM Plex Sans', sans-serif"}}>{r.percentage}% (Sym {getSymbol(r.percentage)})</Typography>
                                 </Box>
                               ):<Typography sx={{color:C.muted,fontSize:'0.8rem'}}>—</Typography>}
                             </TableCell>
                           );
                         })}
-                        <TableCell sx={{...bc,borderRight:'none',textAlign:'center'}}>
+                        <TableCell sx={{...bc,textAlign:'center'}}>
                           {s.average!==null?(
                             <Typography sx={{fontWeight:800,fontSize:'0.9rem',color:resColor(s.average),fontFamily:"'IBM Plex Sans', sans-serif"}}>{s.average}%</Typography>
                           ):'—'}
+                        </TableCell>
+                        <TableCell sx={{...bc,borderRight:'none'}}>
+                          <Tooltip title="Open report card">
+                            <IconButton size="small"
+                              onClick={()=>openStudentPDF(s.id)}
+                              disabled={pdfLoading===s.id}
+                              sx={{color:'#C62828'}}>
+                              {pdfLoading===s.id?<CircularProgress size={14}/>:<FileDownloadIcon sx={{fontSize:16}}/>}
+                            </IconButton>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))
