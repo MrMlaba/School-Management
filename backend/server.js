@@ -34,10 +34,24 @@ const TOKEN_EXPIRY      = '8h';
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin:         ['http://localhost:3000', 'https://school-application.vercel.app', 'https://school-application-28lx41mx6-mrmlabas-orgs-projects.vercel.app',
-    /\.vercel\.app$/],
-  methods:        ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  origin: function(origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, curl)
+    if (!origin) return callback(null, true);
+    
+    // Allow any vercel.app subdomain + localhost
+    if (
+      origin.includes('vercel.app') ||
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1')
+    ) {
+      return callback(null, true);
+    }
+    
+    return callback(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
 
 app.use(express.json());
