@@ -37,7 +37,7 @@ import CampaignIcon     from '@mui/icons-material/Campaign';
 import AssessmentIcon   from '@mui/icons-material/Assessment';
 import PushPinIcon      from '@mui/icons-material/PushPin';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
-
+import RestoreIcon from '@mui/icons-material/Restore';
 /* ═══════════════════════════════════════════════════════════════
    TOKENS
 ═══════════════════════════════════════════════════════════════ */
@@ -356,6 +356,8 @@ const StudentsSection = () => {
   const [credDialogStudent, setCredDialogStudent] = useState(null);
   const [studentCred, setStudentCred] = useState({ password: '' });
   const [bulkDialog, setBulkDialog] = useState(null);
+  const [resetStudentDialog, setResetStudentDialog] = useState(null);   // student being reset
+  const [resetStudentResult, setResetStudentResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const [snack, setSnack] = useState({ open: false, msg: '', sev: 'success' });
   const toast = toast_(setSnack);
@@ -434,7 +436,23 @@ const StudentsSection = () => {
                       <TableCell sx={bc}>{s.stream?<Chip label={s.stream} size="small" sx={{fontSize:'0.7rem',fontWeight:700,bgcolor:'#EEF2FF',color:'#3730A3'}}/>:<Typography sx={{fontSize:'0.8rem',color:C.muted}}>—</Typography>}</TableCell>
                       <TableCell sx={bc}>
                         <Box sx={{display:'flex',gap:0.5}}>
-                          <Tooltip title="Set Login Credentials"><IconButton size="small" onClick={()=>{setCredDialogStudent(s);setStudentCred({password:''});}} sx={{color:'#6A1B9A'}}><KeyIcon sx={{fontSize:15}}/></IconButton></Tooltip>
+                          <Tooltip title="Set Login Credentials">
+                            <IconButton size="small"
+                              onClick={()=>{setCredDialogStudent(s);setStudentCred({password:''}); }}
+                              sx={{color:'#6A1B9A'}}>
+                              <KeyIcon sx={{fontSize:15}}/>
+                            </IconButton>
+                          </Tooltip>
+                          {/* NEW: Reset Password button — only show if student already has credentials */}
+                          {s.passwordHash !== null && s.passwordHash !== '' && (
+                            <Tooltip title="Reset Password">
+                              <IconButton size="small"
+                                onClick={()=>setResetStudentDialog(s)}
+                                sx={{color:C.danger}}>
+                                <RestoreIcon sx={{fontSize:15}}/>
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </Box>
                       </TableCell>
                       <TableCell sx={{...bc,borderRight:'none',color:C.muted}}>{s.enrollmentDate?fmt(s.enrollmentDate):'—'}</TableCell>
@@ -503,6 +521,97 @@ const StudentsSection = () => {
           <Button onClick={()=>setBulkDialog(null)} sx={{textTransform:'none'}}>Close</Button>
         </DialogActions>
       </Dialog>
+      {/* ── Reset Password Confirm Dialog ── */}
+      <Dialog open={!!resetStudentDialog && !resetStudentResult}
+        onClose={()=>setResetStudentDialog(null)} maxWidth="xs" fullWidth
+        PaperProps={{sx:{borderRadius:'10px'}}}>
+        <DialogTitle sx={{fontWeight:700,color:C.danger,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+          Reset Password
+        </DialogTitle>
+        <Divider/>
+        <DialogContent sx={{pt:2.5}}>
+          <InfoBanner color={C.danger} bg={C.dangerBg} border="#EF9A9A">
+            This will generate a new temporary password for{' '}
+            <strong>{resetStudentDialog?.firstName} {resetStudentDialog?.lastName}</strong>.
+            The old password will stop working immediately.
+          </InfoBanner>
+          <Typography sx={{fontSize:'0.85rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+            The new temporary password will be shown <strong>once only</strong>.
+            Write it down and give it to the student in person.
+          </Typography>
+        </DialogContent>
+        <Divider/>
+        <DialogActions sx={{px:3,py:2,gap:1}}>
+          <Button onClick={()=>setResetStudentDialog(null)} sx={{textTransform:'none',color:C.muted}}>
+            Cancel
+          </Button>
+          <Button variant="contained"
+            onClick={async()=>{
+              setSaving(true);
+              try {
+                const res = await fetch(
+                  `${BASE}/api/management/students/${resetStudentDialog.id}/reset-password`,
+                  {method:'POST', headers:authH()}
+                );
+                const d = await res.json();
+                if (res.ok) {
+                  setResetStudentResult(d);  // show the temp password
+                } else {
+                  toast(d.message||'Failed to reset','error');
+                  setResetStudentDialog(null);
+                }
+              } catch { toast('Network error','error'); setResetStudentDialog(null); }
+              setSaving(false);
+            }}
+            disabled={saving}
+            sx={{background:C.danger,textTransform:'none',fontWeight:700,boxShadow:'none',
+              fontFamily:"'IBM Plex Sans', sans-serif",'&:hover':{background:'#B71C1C'}}}>
+            {saving?'Resetting…':'Yes, Reset Password'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+ 
+      {/* ── Show Temp Password ONCE Dialog ── */}
+      <Dialog open={!!resetStudentResult}
+        onClose={()=>{setResetStudentResult(null);setResetStudentDialog(null);}}
+        maxWidth="xs" fullWidth
+        PaperProps={{sx:{borderRadius:'10px'}}}>
+        <DialogTitle sx={{fontWeight:700,color:C.accent,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+          ✓ Password Reset Successfully
+        </DialogTitle>
+        <Divider/>
+        <DialogContent sx={{pt:2.5}}>
+          <Box sx={{background:'#FFF8E1',border:'1px solid #FFE082',borderRadius:'8px',p:2,mb:2,textAlign:'center'}}>
+            <Typography sx={{fontSize:'0.75rem',color:C.muted,mb:0.5,fontFamily:"'IBM Plex Sans', sans-serif",textTransform:'uppercase',letterSpacing:'0.06em'}}>
+              Temporary password for {resetStudentResult?.firstName} {resetStudentResult?.lastName}
+            </Typography>
+            <Typography sx={{fontSize:'1.6rem',fontWeight:800,fontFamily:'monospace',letterSpacing:'0.15em',color:C.brand}}>
+              {resetStudentResult?.tempPassword}
+            </Typography>
+            <Typography sx={{fontSize:'0.72rem',color:C.muted,mt:0.5,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+              Student No: {resetStudentResult?.studentNumber}
+            </Typography>
+          </Box>
+          <Box sx={{background:C.dangerBg,border:'1px solid #EF9A9A',borderRadius:'6px',p:1.5}}>
+            <Typography sx={{fontSize:'0.82rem',fontWeight:700,color:C.danger,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+              ⚠ This password will NOT be shown again
+            </Typography>
+            <Typography sx={{fontSize:'0.8rem',color:C.danger,fontFamily:"'IBM Plex Sans', sans-serif",mt:0.5}}>
+              Write it down now and give it to the student in person.
+              The student will be forced to change it on first login.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <Divider/>
+        <DialogActions sx={{px:3,py:2}}>
+          <Button variant="contained"
+            onClick={()=>{setResetStudentResult(null);setResetStudentDialog(null);}}
+            sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',
+              fontFamily:"'IBM Plex Sans', sans-serif"}}>
+            I've written it down — Close
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snack_ snack={snack} onClose={()=>setSnack(s=>({...s,open:false}))}/>
     </Card_>
@@ -529,6 +638,8 @@ const TeachersSection = () => {
   const EF = { firstName:'', lastName:'', email:'', phone:'', employeeNumber:'', gender:'' };
   const [form, setForm] = useState(EF);
   const [cred, setCred] = useState({username:'',password:''});
+  const [resetTeacherDialog, setResetTeacherDialog] = useState(null);
+  const [resetTeacherResult, setResetTeacherResult] = useState(null);
 
   // Load national subjects
   useEffect(() => {
@@ -660,6 +771,15 @@ const TeachersSection = () => {
                     <Box sx={{display:'flex',gap:0.5}}>
                       <Tooltip title="Edit"><IconButton size="small" onClick={()=>openEdit(t)} sx={{color:C.brand}}><EditIcon sx={{fontSize:15}}/></IconButton></Tooltip>
                       <Tooltip title="Set Login Credentials"><IconButton size="small" onClick={()=>{setCredDialog(t);setCred({username:'',password:''});}} sx={{color:'#6A1B9A'}}><KeyIcon sx={{fontSize:15}}/></IconButton></Tooltip>
+                      {t.username && (
+                          <Tooltip title="Reset Password">
+                            <IconButton size="small"
+                              onClick={()=>setResetTeacherDialog(t)}
+                              sx={{color:C.danger}}>
+                              <RestoreIcon sx={{fontSize:15}}/>
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       {t.isActive&&<Tooltip title="Deactivate"><IconButton size="small" onClick={()=>handleDeactivate(t.id)} sx={{color:C.danger}}><DeleteIcon sx={{fontSize:15}}/></IconButton></Tooltip>}
                     </Box>
                   </TableCell>
@@ -770,6 +890,96 @@ const TeachersSection = () => {
           <Button variant="contained" onClick={handleSetCred} disabled={saving}
             sx={{background:'#6A1B9A',textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>
             {saving?'Saving…':'Set Credentials'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      {/* ── Teacher Reset Confirm ── */}
+      <Dialog open={!!resetTeacherDialog && !resetTeacherResult}
+        onClose={()=>setResetTeacherDialog(null)} maxWidth="xs" fullWidth
+        PaperProps={{sx:{borderRadius:'10px'}}}>
+        <DialogTitle sx={{fontWeight:700,color:C.danger,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+          Reset Teacher Password
+        </DialogTitle>
+        <Divider/>
+        <DialogContent sx={{pt:2.5}}>
+          <InfoBanner color={C.danger} bg={C.dangerBg} border="#EF9A9A">
+            This will reset the password for{' '}
+            <strong>{resetTeacherDialog?.firstName} {resetTeacherDialog?.lastName}</strong>.
+            Their current password will stop working immediately.
+          </InfoBanner>
+          <Typography sx={{fontSize:'0.85rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+            The new temporary password will be shown <strong>once only</strong>.
+            Give it to the teacher in person or over the phone.
+          </Typography>
+        </DialogContent>
+        <Divider/>
+        <DialogActions sx={{px:3,py:2,gap:1}}>
+          <Button onClick={()=>setResetTeacherDialog(null)} sx={{textTransform:'none',color:C.muted}}>
+            Cancel
+          </Button>
+          <Button variant="contained"
+            onClick={async()=>{
+              setSaving(true);
+              try {
+                const res = await fetch(
+                  `${BASE}/api/management/teachers/${resetTeacherDialog.id}/reset-password`,
+                  {method:'POST', headers:authH()}
+                );
+                const d = await res.json();
+                if (res.ok) {
+                  setResetTeacherResult(d);
+                } else {
+                  toast(d.message||'Failed to reset','error');
+                  setResetTeacherDialog(null);
+                }
+              } catch { toast('Network error','error'); setResetTeacherDialog(null); }
+              setSaving(false);
+            }}
+            disabled={saving}
+            sx={{background:C.danger,textTransform:'none',fontWeight:700,boxShadow:'none',
+              fontFamily:"'IBM Plex Sans', sans-serif",'&:hover':{background:'#B71C1C'}}}>
+            {saving?'Resetting…':'Yes, Reset Password'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+ 
+      {/* ── Teacher Temp Password shown ONCE ── */}
+      <Dialog open={!!resetTeacherResult}
+        onClose={()=>{setResetTeacherResult(null);setResetTeacherDialog(null);}}
+        maxWidth="xs" fullWidth
+        PaperProps={{sx:{borderRadius:'10px'}}}>
+        <DialogTitle sx={{fontWeight:700,color:C.accent,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+          ✓ Teacher Password Reset
+        </DialogTitle>
+        <Divider/>
+        <DialogContent sx={{pt:2.5}}>
+          <Box sx={{background:'#FFF8E1',border:'1px solid #FFE082',borderRadius:'8px',p:2,mb:2,textAlign:'center'}}>
+            <Typography sx={{fontSize:'0.75rem',color:C.muted,mb:0.5,fontFamily:"'IBM Plex Sans', sans-serif",textTransform:'uppercase',letterSpacing:'0.06em'}}>
+              Temporary password for {resetTeacherResult?.firstName} {resetTeacherResult?.lastName}
+            </Typography>
+            <Typography sx={{fontSize:'1.6rem',fontWeight:800,fontFamily:'monospace',letterSpacing:'0.15em',color:C.brand}}>
+              {resetTeacherResult?.tempPassword}
+            </Typography>
+            <Typography sx={{fontSize:'0.72rem',color:C.muted,mt:0.5,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+              Username: {resetTeacherResult?.username}
+            </Typography>
+          </Box>
+          <Box sx={{background:C.dangerBg,border:'1px solid #EF9A9A',borderRadius:'6px',p:1.5}}>
+            <Typography sx={{fontSize:'0.82rem',fontWeight:700,color:C.danger,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+              ⚠ This password will NOT be shown again
+            </Typography>
+            <Typography sx={{fontSize:'0.8rem',color:C.danger,fontFamily:"'IBM Plex Sans', sans-serif",mt:0.5}}>
+              Give it to the teacher directly. They will be forced to change it on next login.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <Divider/>
+        <DialogActions sx={{px:3,py:2}}>
+          <Button variant="contained"
+            onClick={()=>{setResetTeacherResult(null);setResetTeacherDialog(null);}}
+            sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',
+              fontFamily:"'IBM Plex Sans', sans-serif"}}>
+            I've written it down — Close
           </Button>
         </DialogActions>
       </Dialog>

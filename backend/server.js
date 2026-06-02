@@ -11,14 +11,9 @@ require('dotenv').config();
 
 const pool = require('./db');
 
-const {
-  router:             authRouter,
-  requireSchoolAdmin,
-  requireSystemAdmin,
-  logAudit,
-} = require('./auth');
+const { router: authRouter, requireSchoolAdmin, requireSystemAdmin, logAudit, schoolAdminSelfReset } = require('./auth');
 const { router: teacherRouter, requireTeacher, login: teacherLogin, setTeacherCredentials } = require('./routes/teacherRoutes');
-const { setStudentCredentials, bulkGenerate, studentLogin, studentChangePassword, requireStudent } = require('./routes/studentAuth');
+const { setStudentCredentials, resetStudentPassword, bulkGenerate, studentLogin, studentChangePassword, requireStudent } = require('./routes/studentAuth');
 const managementRoutes = require('./routes/managementRoutes');
 const phase2Routes     = require('./routes/phase2Routes');
 const phase3Routes     = require('./routes/phase3Routes');
@@ -111,6 +106,50 @@ app.post('/api/management/teachers/:id/set-credentials', requireSchoolAdmin, set
 app.post('/api/student/change-password',                 requireStudent,      studentChangePassword);
 app.post('/api/management/students/:id/set-credentials', requireSchoolAdmin, setStudentCredentials);
 app.post('/api/management/students/generate-credentials',requireSchoolAdmin, bulkGenerate);
+app.post('/api/management/students/:id/reset-password', requireSchoolAdmin, resetStudentPassword);
+app.post('/api/admin/change-password', requireSchoolAdmin, schoolAdminSelfReset);
+app.post('/api/management/teachers/:id/reset-password', requireSchoolAdmin, async (req, res) => {
+  const schoolId  = req.admin.schoolId;
+  const teacherId = req.params.id;
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, first_name, last_name, username FROM teachers WHERE id = $1 AND school_id = $2',
+      [teacherId, schoolId]
+    );
+    if (!rows.length) return res.status(404).json({ message: 'Teacher not found' });
+    const teacher  = rows[0];
+ 
+    const crypto   = require('crypto');
+    const tempPass = crypto.randomBytes(4).toString('hex');
+    const hash     = await require('bcrypt').hash(tempPass, 10);
+ 
+    await pool.query(
+      'UPDATE teachers SET password_hash = $1, temp_password_flag = true, updated_at = NOW() WHERE id = $2',
+      [hash, teacherId]
+    );
+ 
+    // Audit log
+    try {
+      await pool.query(
+        `INSERT INTO audit_logs (school_id, admin_id, actor, actor_role, action, target_type, target_id, target, created_at)
+         VALUES ($1,$2,$3,'school_admin','RESET_TEACHER_PASSWORD','teacher',$4,$5,NOW())`,
+        [schoolId, req.admin.id, req.admin.username, teacherId, `${teacher.first_name} ${teacher.last_name}`]
+      );
+    } catch {}
+ 
+    res.json({
+      success:      true,
+      username:     teacher.username,
+      firstName:    teacher.first_name,
+      lastName:     teacher.last_name,
+      tempPassword: tempPass,
+      message:      'Password reset. Show this password to the teacher — it will not be shown again.',
+    });
+  } catch (err) {
+    console.error('[reset teacher password]', err);
+    res.status(500).json({ message: 'Failed to reset teacher password' });
+  }
+});
 app.use('/api/management', requireSchoolAdmin, eventsRoutes);
 app.use('/api/teacher',    requireTeacher,     teacherQuizRouter);
 app.use('/api/student',    requireStudent,     studentQuizRouter);
