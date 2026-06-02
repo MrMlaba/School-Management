@@ -2070,7 +2070,7 @@ const ReportsSection = () => {
                       <TableCell key={sub.id} sx={{...hc,textAlign:'center',minWidth:110}}>{sub.name}</TableCell>
                     ))}
                     <TableCell sx={{...hc,textAlign:'center'}}>Average</TableCell>
-                    <TableCell sx={{...hc,borderRight:'none'}}>PDF</TableCell>
+                    <TableCell sx={{...hc,borderRight:'none',position:'sticky',right:0,background:C.headerBg,zIndex:2}}>PDF</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -2099,7 +2099,7 @@ const ReportsSection = () => {
                             <Typography sx={{fontWeight:800,fontSize:'0.9rem',color:resColor(s.average),fontFamily:"'IBM Plex Sans', sans-serif"}}>{s.average}%</Typography>
                           ):'—'}
                         </TableCell>
-                        <TableCell sx={{...bc,borderRight:'none'}}>
+                        <TableCell sx={{...bc,borderRight:'none',position:'sticky',right:0,background:'inherit',zIndex:1}}>
                           <Tooltip title="Open report card">
                             <IconButton size="small"
                               onClick={()=>openStudentPDF(s.id)}
