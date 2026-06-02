@@ -34,7 +34,8 @@ const TOKEN_EXPIRY      = '8h';
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin:         ['http://localhost:3000', 'https://school-application.vercel.app'],
+  origin:         ['http://localhost:3000', 'https://school-application.vercel.app', 'https://school-application-28lx41mx6-mrmlabas-orgs-projects.vercel.app',
+    /\.vercel\.app$/],
   methods:        ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
