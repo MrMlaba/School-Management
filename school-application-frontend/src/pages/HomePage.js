@@ -29,13 +29,12 @@ const usePageFonts = () => {
         from { opacity: 0; transform: translateY(24px); }
         to   { opacity: 1; transform: translateY(0); }
       }
-      @keyframes countUp { from { opacity: 0; } to { opacity: 1; } }
       .hero-anim { animation: fadeUp 0.7s cubic-bezier(.22,1,.36,1) both; }
       .hero-anim-1 { animation-delay: 0.1s; }
       .hero-anim-2 { animation-delay: 0.25s; }
       .hero-anim-3 { animation-delay: 0.4s; }
       .step-card { transition: transform 0.25s ease, box-shadow 0.25s ease; }
-      .step-card:hover { transform: translateY(-6px); box-shadow: 0 20px 48px rgba(5,150,105,0.12); }
+      .step-card:hover { transform: translateY(-6px); box-shadow: 0 20px 48px rgba(26,53,87,0.12); }
       .stat-item { transition: transform 0.2s ease; }
       .stat-item:hover { transform: scale(1.04); }
     `;
@@ -43,20 +42,23 @@ const usePageFonts = () => {
   }, []);
 };
 
-const G = {
-  green:    '#059669',
-  greenDk:  '#047857',
-  greenLt:  '#D1FAE5',
-  greenMd:  '#6EE7B7',
-  ink:      '#0F1F1A',
-  ink2:     '#1F3329',
-  muted:    '#4B6860',
-  muted2:   '#7A9E95',
-  border:   '#D1E8E0',
+// ── Blue colour palette (matches the rest of the system) ─────────────────
+const B = {
+  brand:    '#1A3557',
+  brandDk:  '#122740',
+  brandMd:  '#2563EB',
+  brandLt:  '#EFF6FF',
+  accent:   '#2E5FE8',
+  accentLt: '#BFDBFE',
+  ink:      '#0F1A2E',
+  ink2:     '#1A2340',
+  muted:    '#4A6080',
+  muted2:   '#7A90AB',
+  border:   '#D0D7DE',
+  borderLt: '#E8EFF8',
   paper:    '#FFFFFF',
-  paper2:   '#F4FAF7',
-  paper3:   '#EAF5EF',
-  accent:   '#F59E0B',
+  paper2:   '#F0F4F8',
+  paper3:   '#E8EFF8',
 };
 
 const DF = "'DM Serif Display', Georgia, serif";
@@ -123,30 +125,29 @@ export default function HomePage() {
   const schoolsRef = useRef(null);
 
   return (
-    <Box sx={{ bgcolor: G.paper, minHeight: '100vh', fontFamily: BF }}>
+    <Box sx={{ bgcolor: B.paper, minHeight: '100vh', fontFamily: BF }}>
 
       {/* ════════════════════════════════════════════════════════
           HERO
       ════════════════════════════════════════════════════════ */}
       <Box sx={{ position: 'relative', width: '100%', height: { xs: '100svh', md: '100vh' }, overflow: 'hidden', minHeight: 580 }}>
 
-        {/* Background slideshow */}
         <Box sx={{ position: 'absolute', inset: 0, zIndex: 0 }}>
           <BackgroundSlideshow fullscreen />
         </Box>
 
-        {/* Gradient overlay — lighter on top so navbar is visible, dark bottom for text */}
+        {/* Blue gradient overlay */}
         <Box sx={{
           position: 'absolute', inset: 0, zIndex: 1,
-          background: 'linear-gradient(160deg, rgba(5,150,105,0.15) 0%, rgba(15,31,26,0.55) 45%, rgba(15,31,26,0.82) 100%)',
+          background: 'linear-gradient(160deg, rgba(26,53,87,0.25) 0%, rgba(15,26,46,0.55) 45%, rgba(15,26,46,0.85) 100%)',
         }} />
 
-        {/* Green left accent bar */}
+        {/* Blue left accent bar */}
         <Box sx={{
           display: { xs: 'none', md: 'block' },
           position: 'absolute', left: 0, top: 0, bottom: 0,
           width: 5, zIndex: 3,
-          background: `linear-gradient(to bottom, transparent, ${G.green}, transparent)`,
+          background: `linear-gradient(to bottom, transparent, ${B.accent}, transparent)`,
         }} />
 
         {/* Hero content */}
@@ -160,7 +161,7 @@ export default function HomePage() {
           {/* Tag */}
           <Box className="hero-anim hero-anim-1" sx={{
             display: 'inline-flex', alignItems: 'center', gap: 1,
-            bgcolor: G.green, px: 1.75, py: 0.6, borderRadius: '4px',
+            bgcolor: B.accent, px: 1.75, py: 0.6, borderRadius: '4px',
             width: 'fit-content', mb: 2.5,
           }}>
             <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#fff' }} />
@@ -180,7 +181,7 @@ export default function HomePage() {
             maxWidth: 780,
           }}>
             Your Future<br />
-            <Box component="span" sx={{ color: G.greenMd, fontStyle: 'italic' }}>Starts Here.</Box>
+            <Box component="span" sx={{ color: B.accentLt, fontStyle: 'italic' }}>Starts Here.</Box>
           </Typography>
 
           {/* Sub */}
@@ -204,11 +205,10 @@ export default function HomePage() {
               sx={{
                 fontFamily: BF, fontWeight: 700, fontSize: '1rem',
                 textTransform: 'none',
-                bgcolor: G.green, color: '#fff',
-                px: 4, py: 1.6,
-                borderRadius: '6px',
-                boxShadow: `0 8px 24px rgba(5,150,105,0.4)`,
-                '&:hover': { bgcolor: G.greenDk, transform: 'translateY(-2px)', boxShadow: `0 12px 32px rgba(5,150,105,0.5)` },
+                bgcolor: B.accent, color: '#fff',
+                px: 4, py: 1.6, borderRadius: '6px',
+                boxShadow: `0 8px 24px rgba(46,95,232,0.45)`,
+                '&:hover': { bgcolor: B.brand, transform: 'translateY(-2px)', boxShadow: `0 12px 32px rgba(26,53,87,0.5)` },
                 transition: 'all 0.2s ease',
               }}
             >
@@ -238,10 +238,7 @@ export default function HomePage() {
           position: 'absolute', bottom: 28, right: { xs: 24, md: 48 }, zIndex: 3,
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5,
         }}>
-          <Box sx={{
-            width: 1.5, height: 40,
-            background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.5))',
-          }} />
+          <Box sx={{ width: 1.5, height: 40, background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.5))' }} />
           <Typography sx={{ fontFamily: BF, fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.12em', textTransform: 'uppercase', writingMode: 'vertical-rl' }}>
             Scroll
           </Typography>
@@ -251,7 +248,7 @@ export default function HomePage() {
       {/* ════════════════════════════════════════════════════════
           STATS STRIP
       ════════════════════════════════════════════════════════ */}
-      <Box sx={{ bgcolor: G.ink2, py: { xs: 4, md: 5 } }}>
+      <Box sx={{ bgcolor: B.ink2, py: { xs: 4, md: 5 } }}>
         <Container maxWidth="lg">
           <Grid container>
             {STATS.map((s, i) => (
@@ -261,7 +258,7 @@ export default function HomePage() {
                   borderRight: { md: i < 3 ? `1px solid rgba(255,255,255,0.1)` : 'none' },
                   borderBottom: { xs: i < 2 ? `1px solid rgba(255,255,255,0.08)` : 'none', md: 'none' },
                 }}>
-                  <Box sx={{ color: G.greenMd, mb: 1, '& svg': { fontSize: 22 } }}>{s.icon}</Box>
+                  <Box sx={{ color: B.accentLt, mb: 1, '& svg': { fontSize: 22 } }}>{s.icon}</Box>
                   <Typography sx={{
                     fontFamily: DF, fontWeight: 400,
                     fontSize: { xs: '2.2rem', md: '2.8rem' },
@@ -286,28 +283,26 @@ export default function HomePage() {
       {/* ════════════════════════════════════════════════════════
           SCHOOLS SECTION
       ════════════════════════════════════════════════════════ */}
-      <Box ref={schoolsRef} sx={{ bgcolor: G.paper2, py: { xs: 8, md: 12 } }}>
+      <Box ref={schoolsRef} sx={{ bgcolor: B.paper2, py: { xs: 8, md: 12 } }}>
         <Container maxWidth="lg">
-
-          {/* Section header */}
           <Box sx={{ mb: { xs: 6, md: 8 }, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 4, alignItems: { md: 'flex-end' }, justifyContent: 'space-between' }}>
             <Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                <Box sx={{ width: 32, height: 2, bgcolor: G.green }} />
-                <Typography sx={{ fontFamily: BF, fontWeight: 600, fontSize: '0.72rem', color: G.green, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+                <Box sx={{ width: 32, height: 2, bgcolor: B.accent }} />
+                <Typography sx={{ fontFamily: BF, fontWeight: 600, fontSize: '0.72rem', color: B.accent, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
                   Partner Institutions
                 </Typography>
               </Box>
               <Typography variant="h2" sx={{
                 fontFamily: DF, fontWeight: 400,
                 fontSize: { xs: '2.2rem', md: '3rem' },
-                color: G.ink, lineHeight: 1.1, mb: 1.5,
+                color: B.ink, lineHeight: 1.1, mb: 1.5,
               }}>
                 Explore Our Schools
               </Typography>
               <Typography sx={{
                 fontFamily: BF, fontWeight: 400, fontSize: '1rem',
-                color: G.muted, lineHeight: 1.75, maxWidth: 440,
+                color: B.muted, lineHeight: 1.75, maxWidth: 440,
               }}>
                 Each school offers unique programmes and learning environments.
                 Find the one that matches your ambitions.
@@ -320,9 +315,9 @@ export default function HomePage() {
               sx={{
                 fontFamily: BF, fontWeight: 600, fontSize: '0.9rem',
                 textTransform: 'none', flexShrink: 0,
-                borderColor: G.green, color: G.green,
+                borderColor: B.accent, color: B.accent,
                 px: 3.5, py: 1.4, borderRadius: '6px', borderWidth: 1.5,
-                '&:hover': { bgcolor: G.greenLt, borderColor: G.greenDk },
+                '&:hover': { bgcolor: B.brandLt, borderColor: B.brand },
               }}
             >
               Start Application
@@ -336,20 +331,20 @@ export default function HomePage() {
       {/* ════════════════════════════════════════════════════════
           HOW IT WORKS
       ════════════════════════════════════════════════════════ */}
-      <Box sx={{ bgcolor: G.paper, py: { xs: 8, md: 12 }, borderTop: `1px solid ${G.border}` }}>
+      <Box sx={{ bgcolor: B.paper, py: { xs: 8, md: 12 }, borderTop: `1px solid ${B.border}` }}>
         <Container maxWidth="lg">
           <Box sx={{ textAlign: 'center', mb: { xs: 6, md: 9 } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 2 }}>
-              <Box sx={{ width: 32, height: 2, bgcolor: G.green }} />
-              <Typography sx={{ fontFamily: BF, fontWeight: 600, fontSize: '0.72rem', color: G.green, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+              <Box sx={{ width: 32, height: 2, bgcolor: B.accent }} />
+              <Typography sx={{ fontFamily: BF, fontWeight: 600, fontSize: '0.72rem', color: B.accent, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
                 Simple Process
               </Typography>
-              <Box sx={{ width: 32, height: 2, bgcolor: G.green }} />
+              <Box sx={{ width: 32, height: 2, bgcolor: B.accent }} />
             </Box>
             <Typography variant="h2" sx={{
               fontFamily: DF, fontWeight: 400,
               fontSize: { xs: '2.2rem', md: '3rem' },
-              color: G.ink, lineHeight: 1.1,
+              color: B.ink, lineHeight: 1.1,
             }}>
               How It Works
             </Typography>
@@ -360,20 +355,20 @@ export default function HomePage() {
               <Grid item xs={12} md={4} key={step.num}>
                 <Box className="step-card" sx={{
                   height: '100%', p: { xs: 3.5, md: 4 },
-                  bgcolor: G.paper2,
-                  border: `1px solid ${G.border}`,
+                  bgcolor: B.paper2,
+                  border: `1px solid ${B.border}`,
                   borderRadius: '12px',
                   position: 'relative',
                   overflow: 'hidden',
                 }}>
-                  {/* Green top accent */}
-                  <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, bgcolor: G.green }} />
+                  {/* Blue top accent */}
+                  <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, bgcolor: B.accent }} />
 
                   {/* Step number watermark */}
                   <Typography sx={{
                     position: 'absolute', top: 12, right: 20,
                     fontFamily: DF, fontSize: '5.5rem',
-                    color: 'rgba(5,150,105,0.07)',
+                    color: 'rgba(46,95,232,0.06)',
                     lineHeight: 1, userSelect: 'none',
                   }}>
                     {step.num}
@@ -382,32 +377,31 @@ export default function HomePage() {
                   {/* Icon */}
                   <Box sx={{
                     width: 52, height: 52, borderRadius: '10px',
-                    bgcolor: G.greenLt, color: G.green,
+                    bgcolor: B.brandLt, color: B.accent,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    mb: 3, border: `1px solid ${G.greenMd}44`,
+                    mb: 3, border: `1px solid ${B.accentLt}`,
                   }}>
                     {step.icon}
                   </Box>
 
-                  <Typography sx={{ fontFamily: DF, fontSize: '1.4rem', color: G.ink, mb: 1.5, lineHeight: 1.2 }}>
+                  <Typography sx={{ fontFamily: DF, fontSize: '1.4rem', color: B.ink, mb: 1.5, lineHeight: 1.2 }}>
                     {step.title}
                   </Typography>
-                  <Typography sx={{ fontFamily: BF, fontSize: '0.9rem', color: G.muted, lineHeight: 1.8 }}>
+                  <Typography sx={{ fontFamily: BF, fontSize: '0.9rem', color: B.muted, lineHeight: 1.8 }}>
                     {step.desc}
                   </Typography>
 
-                  {/* Connector arrow — desktop only */}
                   {i < 2 && (
                     <Box sx={{
                       display: { xs: 'none', md: 'flex' },
                       position: 'absolute', right: -20, top: '50%',
                       transform: 'translateY(-50%)', zIndex: 2,
                       width: 40, height: 40,
-                      bgcolor: G.paper2, borderRadius: '50%',
-                      border: `1px solid ${G.border}`,
+                      bgcolor: B.paper2, borderRadius: '50%',
+                      border: `1px solid ${B.border}`,
                       alignItems: 'center', justifyContent: 'center',
                     }}>
-                      <ArrowForwardIcon sx={{ fontSize: 16, color: G.green }} />
+                      <ArrowForwardIcon sx={{ fontSize: 16, color: B.accent }} />
                     </Box>
                   )}
                 </Box>
@@ -420,26 +414,23 @@ export default function HomePage() {
       {/* ════════════════════════════════════════════════════════
           FEATURES STRIP
       ════════════════════════════════════════════════════════ */}
-      <Box sx={{ bgcolor: G.paper3, py: { xs: 6, md: 8 }, borderTop: `1px solid ${G.border}`, borderBottom: `1px solid ${G.border}` }}>
+      <Box sx={{ bgcolor: B.paper3, py: { xs: 6, md: 8 }, borderTop: `1px solid ${B.border}`, borderBottom: `1px solid ${B.border}` }}>
         <Container maxWidth="lg">
           <Typography sx={{
-            fontFamily: BF, fontWeight: 600, fontSize: '0.72rem', color: G.green,
+            fontFamily: BF, fontWeight: 600, fontSize: '0.72rem', color: B.accent,
             letterSpacing: '0.15em', textTransform: 'uppercase', textAlign: 'center', mb: 4,
           }}>
             Everything You Need
           </Typography>
-          <Box sx={{
-            display: 'flex', flexWrap: 'wrap',
-            justifyContent: 'center', gap: { xs: 2, md: 3 },
-          }}>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: { xs: 2, md: 3 } }}>
             {FEATURES.map(f => (
               <Box key={f} sx={{
                 display: 'flex', alignItems: 'center', gap: 1,
                 px: 2, py: 1, borderRadius: '100px',
-                bgcolor: G.paper, border: `1px solid ${G.border}`,
+                bgcolor: B.paper, border: `1px solid ${B.border}`,
               }}>
-                <CheckCircleOutlineIcon sx={{ fontSize: 16, color: G.green }} />
-                <Typography sx={{ fontFamily: BF, fontWeight: 500, fontSize: '0.88rem', color: G.ink2 }}>
+                <CheckCircleOutlineIcon sx={{ fontSize: 16, color: B.accent }} />
+                <Typography sx={{ fontFamily: BF, fontWeight: 500, fontSize: '0.88rem', color: B.ink2 }}>
                   {f}
                 </Typography>
               </Box>
@@ -452,21 +443,21 @@ export default function HomePage() {
           CTA STRIP
       ════════════════════════════════════════════════════════ */}
       <Box sx={{
-        bgcolor: G.green,
+        bgcolor: B.brand,
         py: { xs: 7, md: 10 },
         textAlign: 'center', px: 3,
         position: 'relative', overflow: 'hidden',
+        borderTop: `3px solid ${B.accent}`,
       }}>
-        {/* Decorative circles */}
         {[
-          { size: 320, top: -120, right: -80, opacity: 0.08 },
-          { size: 200, bottom: -80, left: -60, opacity: 0.06 },
+          { size: 320, top: -120, right: -80, opacity: 0.06 },
+          { size: 200, bottom: -80, left: -60, opacity: 0.05 },
         ].map((c, i) => (
           <Box key={i} sx={{
             position: 'absolute',
             width: c.size, height: c.size,
             borderRadius: '50%',
-            border: '1px solid #fff',
+            border: '1px solid rgba(255,255,255,0.15)',
             opacity: c.opacity,
             top: c.top, right: c.right,
             bottom: c.bottom, left: c.left,
@@ -483,7 +474,7 @@ export default function HomePage() {
         </Typography>
         <Typography sx={{
           fontFamily: BF, fontSize: { xs: '0.95rem', md: '1.05rem' },
-          color: 'rgba(255,255,255,0.8)', mb: 4.5, lineHeight: 1.7,
+          color: 'rgba(255,255,255,0.7)', mb: 4.5, lineHeight: 1.7,
           maxWidth: 480, mx: 'auto', position: 'relative',
         }}>
           Applications are open for the 2025/2026 academic year.
@@ -498,10 +489,10 @@ export default function HomePage() {
             sx={{
               fontFamily: BF, fontWeight: 700, fontSize: '1rem',
               textTransform: 'none',
-              bgcolor: '#fff', color: G.green,
+              bgcolor: B.accent, color: '#fff',
               px: 5, py: 1.7, borderRadius: '6px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-              '&:hover': { bgcolor: G.greenLt },
+              boxShadow: '0 8px 24px rgba(46,95,232,0.4)',
+              '&:hover': { bgcolor: B.brandDk },
             }}
           >
             Apply Now
@@ -513,7 +504,7 @@ export default function HomePage() {
             sx={{
               fontFamily: BF, fontWeight: 600, fontSize: '1rem',
               textTransform: 'none',
-              borderColor: 'rgba(255,255,255,0.6)', borderWidth: 1.5,
+              borderColor: 'rgba(255,255,255,0.5)', borderWidth: 1.5,
               color: '#fff', px: 5, py: 1.7, borderRadius: '6px',
               '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,0.1)' },
             }}
@@ -527,12 +518,14 @@ export default function HomePage() {
           FOOTER
       ════════════════════════════════════════════════════════ */}
       <Box sx={{
-        bgcolor: G.ink, py: 4, px: 3,
+        bgcolor: '#080f2e',
+        py: 4, px: 3,
         display: 'flex', flexDirection: { xs: 'column', md: 'row' },
         alignItems: 'center', justifyContent: 'space-between', gap: 2,
+        borderTop: '1px solid rgba(255,255,255,0.07)',
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: G.green }} />
+          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: B.accent }} />
           <Typography sx={{ fontFamily: BF, fontSize: '0.78rem', color: 'rgba(255,255,255,0.5)' }}>
             School Application System
           </Typography>
@@ -544,7 +537,8 @@ export default function HomePage() {
           {['Privacy Policy', 'Contact Us', 'Help'].map(link => (
             <Typography key={link} sx={{
               fontFamily: BF, fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)',
-              cursor: 'pointer', '&:hover': { color: G.greenMd },
+              cursor: 'pointer',
+              '&:hover': { color: B.accentLt },
               transition: 'color 0.15s',
             }}>
               {link}

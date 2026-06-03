@@ -1,22 +1,38 @@
+// src/pages/TeacherLoginPage.js — Teacher Login
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, TextField, Button, Alert, CircularProgress } from '@mui/material';
-import SchoolIcon from '@mui/icons-material/School';
+import {
+  Box, TextField, Button, Typography,
+  InputAdornment, IconButton, Alert, CircularProgress, Divider,
+} from '@mui/material';
+import PersonOutlineIcon         from '@mui/icons-material/PersonOutline';
+import LockOutlinedIcon          from '@mui/icons-material/LockOutlined';
+import VisibilityOutlinedIcon    from '@mui/icons-material/VisibilityOutlined';
+import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
+import ArrowForwardIcon          from '@mui/icons-material/ArrowForward';
+import { LoginShell, MobileLogo, B, FF, inputSx } from '../components/LoginLayout';
 
-const C = {
-  brand: '#1A3557', border: '#D0D7DE',
-  text: '#1A2332', muted: '#6B7C93', white: '#FFFFFF',
+const LEFT = {
+  badge:    'Teacher Portal',
+  tagline:  'Your classroom, your way.',
+  features: [
+    'View & manage your timetable',
+    'Create assignments & grade students',
+    'Mark attendance digitally',
+    'Generate AI-powered quizzes',
+  ],
 };
 
-const TeacherLoginPage = () => {
+export default function TeacherLoginPage() {
   const navigate = useNavigate();
   const [form,    setForm]    = useState({ username: '', password: '' });
+  const [showPass,setShowPass]= useState(false);
   const [error,   setError]   = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
-    if (!form.username || !form.password)
-      return setError('Username and password are required');
+  const handleSubmit = async (e) => {
+    e?.preventDefault();
+    if (!form.username || !form.password) return setError('Username and password are required');
     setLoading(true); setError('');
     try {
       const res  = await fetch('https://school-management-production-6167.up.railway.app/api/teacher-login', {
@@ -32,7 +48,7 @@ const TeacherLoginPage = () => {
         localStorage.setItem('teacherSchool',    data.teacher.school);
         navigate('/teacher/dashboard');
       } else {
-        setError(data.message || 'Login failed');
+        setError(data.message || 'Login failed. Please check your credentials.');
       }
     } catch {
       setError('Network error. Please try again.');
@@ -42,72 +58,96 @@ const TeacherLoginPage = () => {
   };
 
   return (
-    <Box sx={{
-      minHeight: '100vh', background: '#F0F4F8',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: "'IBM Plex Sans', sans-serif",
-    }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&display=swap');`}</style>
+    <LoginShell leftProps={LEFT}>
+      <MobileLogo />
 
-      <Box sx={{
-        width: '100%', maxWidth: 400,
-        background: C.white, border: `1px solid ${C.border}`,
-        borderRadius: '12px', p: 4,
-        boxShadow: '0 4px 24px rgba(15,31,61,0.08)',
-      }}>
-        {/* Logo */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-          <Box sx={{ width: 40, height: 40, borderRadius: '10px', background: C.brand, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <SchoolIcon sx={{ color: C.white, fontSize: 22 }} />
-          </Box>
-          <Box>
-            <Typography sx={{ fontWeight: 800, fontSize: '1rem', color: C.brand, fontFamily: "'IBM Plex Sans', sans-serif", lineHeight: 1.2 }}>
-              Teacher Portal
-            </Typography>
-            <Typography sx={{ fontSize: '0.75rem', color: C.muted, fontFamily: "'IBM Plex Sans', sans-serif" }}>
-              Sign in to your account
-            </Typography>
-          </Box>
-        </Box>
-
-        <Typography sx={{ fontWeight: 700, fontSize: '1.4rem', color: C.text, mb: 2.5, fontFamily: "'IBM Plex Sans', sans-serif" }}>
-          Welcome back
+      {/* Heading */}
+      <Box sx={{ mb: 4 }}>
+        <Typography sx={{ fontFamily: "'IBM Plex Serif', Georgia, serif", fontSize: { xs: '2rem', md: '2.2rem' }, fontWeight: 600, color: B.text, lineHeight: 1.15, mb: 0.75 }}>
+          Teacher Sign In
         </Typography>
+        <Typography sx={{ fontFamily: FF, fontSize: '0.88rem', color: B.muted }}>
+          Sign in to access your teaching dashboard
+        </Typography>
+      </Box>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2, fontSize: '0.82rem', borderRadius: '6px' }}>{error}</Alert>
-        )}
+      {error && <Alert severity="error" sx={{ mb: 3, borderRadius: '8px', fontFamily: FF, fontSize: '0.82rem' }}>{error}</Alert>}
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <TextField
-            label="Username" value={form.username} size="small" fullWidth
-            onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-          />
-          <TextField
-            label="Password" type="password" value={form.password} size="small" fullWidth
-            onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-          />
-          <Button
-            variant="contained" fullWidth onClick={handleLogin} disabled={loading}
-            sx={{
-              background: C.brand, textTransform: 'none', fontWeight: 700,
-              py: 1.25, borderRadius: '6px', boxShadow: 'none',
-              fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.95rem',
-              '&:hover': { background: '#122740', boxShadow: 'none' },
-            }}
-          >
-            {loading ? <CircularProgress size={20} color="inherit" /> : 'Sign In'}
-          </Button>
+      {/* Form */}
+      <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <TextField
+          label="Username" value={form.username} size="small" fullWidth
+          autoComplete="username"
+          onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
+          InputProps={{ startAdornment: <InputAdornment position="start"><PersonOutlineIcon sx={{ color: B.muted, fontSize: 18 }} /></InputAdornment> }}
+          sx={inputSx}
+        />
+        <TextField
+          label="Password" type={showPass ? 'text' : 'password'}
+          value={form.password} size="small" fullWidth
+          autoComplete="current-password"
+          onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+          InputProps={{
+            startAdornment: <InputAdornment position="start"><LockOutlinedIcon sx={{ color: B.muted, fontSize: 18 }} /></InputAdornment>,
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton onClick={() => setShowPass(s => !s)} edge="end" size="small">
+                  {showPass
+                    ? <VisibilityOffOutlinedIcon sx={{ color: B.muted, fontSize: 17 }} />
+                    : <VisibilityOutlinedIcon   sx={{ color: B.muted, fontSize: 17 }} />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+          sx={inputSx}
+        />
+
+        <Button
+          type="submit" variant="contained" fullWidth disabled={loading}
+          sx={{
+            fontFamily: FF, fontWeight: 700, fontSize: '0.9rem',
+            textTransform: 'none', mt: 0.5,
+            bgcolor: B.brand, color: '#fff',
+            py: 1.4, borderRadius: '8px', boxShadow: 'none',
+            '&:hover': { bgcolor: B.brandDk, boxShadow: '0 4px 16px rgba(26,53,87,0.25)' },
+            '&.Mui-disabled': { bgcolor: '#B0BEC5', color: '#fff' },
+          }}
+        >
+          {loading ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : 'Sign In'}
+        </Button>
+      </Box>
+
+      {/* Other portals */}
+      <Box sx={{ mt: 4 }}>
+        <Divider sx={{ mb: 3, borderColor: B.border }}>
+          <Typography sx={{ fontFamily: FF, fontSize: '0.72rem', color: B.mutedLt, px: 1 }}>Other portals</Typography>
+        </Divider>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {[
+            { label: 'Admin Portal',              sub: 'School administration',         path: '/login' },
+            { label: 'Student Portal',            sub: 'Sign in as a student',          path: '/student-login' },
+            { label: 'Check Application Status',  sub: 'Track your school application', path: '/login-applicant' },
+          ].map(link => (
+            <Box
+              key={link.path}
+              onClick={() => navigate(link.path)}
+              sx={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                p: 1.5, borderRadius: '8px', cursor: 'pointer',
+                border: `1px solid ${B.border}`, bgcolor: B.white,
+                transition: 'all 0.15s',
+                '&:hover': { borderColor: B.accent, bgcolor: B.brandLt },
+              }}
+            >
+              <Box>
+                <Typography sx={{ fontFamily: FF, fontWeight: 600, fontSize: '0.82rem', color: B.text }}>{link.label}</Typography>
+                <Typography sx={{ fontFamily: FF, fontSize: '0.7rem', color: B.muted }}>{link.sub}</Typography>
+              </Box>
+              <ArrowForwardIcon sx={{ fontSize: 16, color: B.muted }} />
+            </Box>
+          ))}
         </Box>
       </Box>
-    </Box>
+    </LoginShell>
   );
-};
-
-export default TeacherLoginPage;
-
-
-
-
+}

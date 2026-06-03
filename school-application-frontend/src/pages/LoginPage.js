@@ -1,56 +1,39 @@
-import React, { useState, useEffect } from 'react';
+// src/pages/LoginPage.js — Admin Login
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, TextField, Button, Typography, InputAdornment,
-  IconButton, Alert, CircularProgress,
+  Box, TextField, Button, Typography,
+  InputAdornment, IconButton, Alert, CircularProgress, Divider,
 } from '@mui/material';
-import PersonOutlineIcon      from '@mui/icons-material/PersonOutline';
-import LockOutlinedIcon       from '@mui/icons-material/LockOutlined';
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import PersonOutlineIcon         from '@mui/icons-material/PersonOutline';
+import LockOutlinedIcon          from '@mui/icons-material/LockOutlined';
+import VisibilityOutlinedIcon    from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
-import SchoolIcon             from '@mui/icons-material/School';
-import BackgroundSlideshow    from '../components/BackgroundSlideshow';
+import ArrowForwardIcon          from '@mui/icons-material/ArrowForward';
+import { LoginShell, MobileLogo, B, FF, inputSx } from '../components/LoginLayout';
 
-const G = {
-  green:   '#059669',
-  greenDk: '#047857',
-  greenLt: '#D1FAE5',
-  ink:     '#0F1F1A',
-  muted:   '#4B6860',
-  border:  '#D1E8E0',
-  paper:   '#FFFFFF',
-  paper2:  '#F4FAF7',
-  error:   '#DC2626',
-  errorLt: '#FEE2E2',
+const LEFT = {
+  badge:    'Admin Portal',
+  tagline:  'Manage your school with confidence.',
+  features: [
+    'Student enrolment & records',
+    'Teacher management & timetables',
+    'Applications & document uploads',
+    'PDF report cards & analytics',
+  ],
 };
-
-const useLoginFonts = () => {
-  useEffect(() => {
-    if (document.getElementById('login-fonts')) return;
-    const link = document.createElement('link');
-    link.id   = 'login-fonts';
-    link.rel  = 'stylesheet';
-    link.href = 'https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap';
-    document.head.appendChild(link);
-  }, []);
-};
-
-const BF = "'DM Sans', sans-serif";
-const DF = "'DM Serif Display', Georgia, serif";
 
 export default function LoginPage() {
-  useLoginFonts();
-  const [username,  setUsername]  = useState('');
-  const [password,  setPassword]  = useState('');
-  const [showPass,  setShowPass]  = useState(false);
-  const [error,     setError]     = useState('');
-  const [loading,   setLoading]   = useState(false);
   const navigate = useNavigate();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPass, setShowPass] = useState(false);
+  const [error,    setError]    = useState('');
+  const [loading,  setLoading]  = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const res  = await fetch('https://school-management-production-6167.up.railway.app/api/admin-login', {
         method: 'POST',
@@ -67,219 +50,101 @@ export default function LoginPage() {
         setError(data.message || 'Invalid credentials. Please try again.');
       }
     } catch {
-      setError('Network error. Please check your connection and try again.');
+      setError('Network error. Please check your connection.');
     } finally {
       setLoading(false);
     }
   };
 
-  const inputSx = {
-    '& .MuiOutlinedInput-root': {
-      borderRadius: '8px',
-      fontFamily: BF,
-      bgcolor: G.paper,
-      '& fieldset': { borderColor: G.border },
-      '&:hover fieldset': { borderColor: G.green },
-      '&.Mui-focused fieldset': { borderColor: G.green, borderWidth: 1.5 },
-    },
-    '& .MuiInputLabel-root': { fontFamily: BF, color: G.muted },
-    '& .MuiInputLabel-root.Mui-focused': { color: G.green },
-    '& .MuiInputBase-input': { fontFamily: BF, color: G.ink, fontSize: '0.95rem' },
-  };
-
   return (
-    <Box sx={{
-      minHeight: '100svh', display: 'flex',
-      fontFamily: BF, position: 'relative', overflow: 'hidden',
-    }}>
-      {/* Left panel — background slideshow — desktop only */}
-      <Box sx={{
-        display: { xs: 'none', md: 'block' },
-        width: '48%', flexShrink: 0,
-        position: 'relative', overflow: 'hidden',
-      }}>
-        <Box sx={{ position: 'absolute', inset: 0 }}>
-          <BackgroundSlideshow fullscreen />
-        </Box>
-        <Box sx={{
-          position: 'absolute', inset: 0,
-          background: 'linear-gradient(135deg, rgba(5,150,105,0.7) 0%, rgba(15,31,26,0.75) 100%)',
-        }} />
-        {/* Overlay content */}
-        <Box sx={{
-          position: 'absolute', inset: 0,
-          display: 'flex', flexDirection: 'column',
-          justifyContent: 'center', px: 6, py: 6, zIndex: 2,
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 6 }}>
-            <Box sx={{
-              width: 38, height: 38, borderRadius: '10px',
-              bgcolor: G.green, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <SchoolIcon sx={{ color: '#fff', fontSize: 20 }} />
-            </Box>
-            <Typography sx={{ fontFamily: BF, fontWeight: 700, fontSize: '1rem', color: '#fff' }}>
-              School Management System
-            </Typography>
-          </Box>
-          <Typography sx={{
-            fontFamily: DF, fontSize: '2.8rem', color: '#fff',
-            lineHeight: 1.1, mb: 2.5,
-          }}>
-            Managing<br />
-            <Box component="span" sx={{ color: '#6EE7B7', fontStyle: 'italic' }}>schools made</Box><br />
-            simple.
-          </Typography>
-          <Typography sx={{ fontFamily: BF, fontSize: '0.95rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.8, maxWidth: 340 }}>
-            The complete platform for student applications, enrolment, assessments, and reports across KwaZulu-Natal.
-          </Typography>
-          {/* Feature dots */}
-          <Box sx={{ mt: 5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            {['Student & teacher management', 'Digital report cards & PDF export', 'AI-powered quiz generator'].map(f => (
-              <Box key={f} sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#6EE7B7', flexShrink: 0 }} />
-                <Typography sx={{ fontFamily: BF, fontSize: '0.85rem', color: 'rgba(255,255,255,0.75)' }}>{f}</Typography>
-              </Box>
-            ))}
-          </Box>
-        </Box>
+    <LoginShell leftProps={LEFT}>
+      <MobileLogo />
+
+      {/* Heading */}
+      <Box sx={{ mb: 4 }}>
+        <Typography sx={{ fontFamily: "'IBM Plex Serif', Georgia, serif", fontSize: { xs: '2rem', md: '2.2rem' }, fontWeight: 600, color: B.text, lineHeight: 1.15, mb: 0.75 }}>
+          Admin Sign In
+        </Typography>
+        <Typography sx={{ fontFamily: FF, fontSize: '0.88rem', color: B.muted }}>
+          Sign in to access the school management portal
+        </Typography>
       </Box>
 
-      {/* Right panel — login form */}
-      <Box sx={{
-        flex: 1, display: 'flex', flexDirection: 'column',
-        justifyContent: 'center', alignItems: 'center',
-        bgcolor: G.paper2,
-        px: { xs: 3, sm: 5, md: 6 },
-        py: { xs: 4, md: 6 },
-        position: 'relative',
-      }}>
-        {/* Mobile background */}
-        <Box sx={{ display: { xs: 'block', md: 'none' }, position: 'absolute', inset: 0, zIndex: 0 }}>
-          <BackgroundSlideshow fullscreen />
-          <Box sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(244,250,247,0.94)' }} />
-        </Box>
+      {error && <Alert severity="error" sx={{ mb: 3, borderRadius: '8px', fontFamily: FF, fontSize: '0.82rem' }}>{error}</Alert>}
 
-        <Box sx={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }}>
-          {/* Logo — mobile */}
-          <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1.5, mb: 4 }}>
-            <Box sx={{ width: 38, height: 38, borderRadius: '10px', bgcolor: G.green, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <SchoolIcon sx={{ color: '#fff', fontSize: 20 }} />
-            </Box>
-            <Typography sx={{ fontFamily: BF, fontWeight: 700, fontSize: '0.95rem', color: G.ink }}>
-              School Management System
-            </Typography>
-          </Box>
+      {/* Form */}
+      <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <TextField
+          label="Username" value={username} onChange={e => setUsername(e.target.value)}
+          required fullWidth size="small" autoComplete="username"
+          InputProps={{ startAdornment: <InputAdornment position="start"><PersonOutlineIcon sx={{ color: B.muted, fontSize: 18 }} /></InputAdornment> }}
+          sx={inputSx}
+        />
+        <TextField
+          label="Password" type={showPass ? 'text' : 'password'}
+          value={password} onChange={e => setPassword(e.target.value)}
+          required fullWidth size="small" autoComplete="current-password"
+          InputProps={{
+            startAdornment: <InputAdornment position="start"><LockOutlinedIcon sx={{ color: B.muted, fontSize: 18 }} /></InputAdornment>,
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton onClick={() => setShowPass(s => !s)} edge="end" size="small">
+                  {showPass
+                    ? <VisibilityOffOutlinedIcon sx={{ color: B.muted, fontSize: 17 }} />
+                    : <VisibilityOutlinedIcon   sx={{ color: B.muted, fontSize: 17 }} />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+          sx={inputSx}
+        />
 
-          {/* Heading */}
-          <Box sx={{ mb: 4 }}>
-            <Typography sx={{ fontFamily: DF, fontSize: { xs: '2rem', md: '2.4rem' }, color: G.ink, lineHeight: 1.1, mb: 1 }}>
-              Admin Sign In
-            </Typography>
-            <Typography sx={{ fontFamily: BF, fontSize: '0.9rem', color: G.muted }}>
-              Enter your credentials to access the management portal
-            </Typography>
-          </Box>
+        <Button
+          type="submit" variant="contained" fullWidth disabled={loading}
+          sx={{
+            fontFamily: FF, fontWeight: 700, fontSize: '0.9rem',
+            textTransform: 'none', mt: 0.5,
+            bgcolor: B.brand, color: '#fff',
+            py: 1.4, borderRadius: '8px', boxShadow: 'none',
+            '&:hover': { bgcolor: B.brandDk, boxShadow: '0 4px 16px rgba(26,53,87,0.25)' },
+            '&.Mui-disabled': { bgcolor: '#B0BEC5', color: '#fff' },
+          }}
+        >
+          {loading ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : 'Sign In'}
+        </Button>
+      </Box>
 
-          {/* Error */}
-          {error && (
-            <Alert severity="error" sx={{ mb: 3, borderRadius: '8px', fontFamily: BF, fontSize: '0.85rem' }}>
-              {error}
-            </Alert>
-          )}
-
-          {/* Form */}
-          <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-            <TextField
-              label="Username"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              required fullWidth
-              autoComplete="username"
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <PersonOutlineIcon sx={{ color: G.muted, fontSize: 20 }} />
-                  </InputAdornment>
-                ),
-              }}
-              sx={inputSx}
-            />
-            <TextField
-              label="Password"
-              type={showPass ? 'text' : 'password'}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required fullWidth
-              autoComplete="current-password"
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <LockOutlinedIcon sx={{ color: G.muted, fontSize: 20 }} />
-                  </InputAdornment>
-                ),
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton onClick={() => setShowPass(s => !s)} edge="end" size="small">
-                      {showPass
-                        ? <VisibilityOffOutlinedIcon sx={{ color: G.muted, fontSize: 18 }} />
-                        : <VisibilityOutlinedIcon   sx={{ color: G.muted, fontSize: 18 }} />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-              sx={inputSx}
-            />
-
-            <Button
-              type="submit"
-              variant="contained"
-              fullWidth
-              disabled={loading}
+      {/* Other portals */}
+      <Box sx={{ mt: 4 }}>
+        <Divider sx={{ mb: 3, borderColor: B.border }}>
+          <Typography sx={{ fontFamily: FF, fontSize: '0.72rem', color: B.mutedLt, px: 1 }}>Other portals</Typography>
+        </Divider>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {[
+            { label: 'Teacher Portal',            sub: 'Sign in as a teacher',          path: '/teacher-login' },
+            { label: 'Student Portal',            sub: 'Sign in as a student',          path: '/student-login' },
+            { label: 'Check Application Status',  sub: 'Track your school application', path: '/login-applicant' },
+          ].map(link => (
+            <Box
+              key={link.path}
+              onClick={() => navigate(link.path)}
               sx={{
-                fontFamily: BF, fontWeight: 700, fontSize: '0.95rem',
-                textTransform: 'none',
-                bgcolor: G.green, color: '#fff',
-                py: 1.6, borderRadius: '8px', mt: 0.5,
-                boxShadow: `0 4px 16px rgba(5,150,105,0.3)`,
-                '&:hover': { bgcolor: G.greenDk, boxShadow: `0 6px 20px rgba(5,150,105,0.4)` },
-                '&.Mui-disabled': { bgcolor: '#A7F3D0', color: '#fff' },
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                p: 1.5, borderRadius: '8px', cursor: 'pointer',
+                border: `1px solid ${B.border}`, bgcolor: B.white,
+                transition: 'all 0.15s',
+                '&:hover': { borderColor: B.accent, bgcolor: B.brandLt },
               }}
             >
-              {loading ? <CircularProgress size={20} sx={{ color: '#fff' }} /> : 'Sign In'}
-            </Button>
-          </Box>
-
-          {/* Links */}
-          <Box sx={{ mt: 4, pt: 4, borderTop: `1px solid ${G.border}`, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            {[
-              { label: 'Teacher Portal', path: '/teacher-login', desc: 'Log in as a teacher' },
-              { label: 'Student Portal', path: '/student-login', desc: 'Log in as a student' },
-              { label: 'Check Application Status', path: '/login-applicant', desc: 'Track your admission' },
-            ].map(link => (
-              <Box
-                key={link.path}
-                onClick={() => navigate(link.path)}
-                sx={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  p: 1.5, borderRadius: '8px', cursor: 'pointer',
-                  border: `1px solid ${G.border}`, bgcolor: G.paper,
-                  transition: 'all 0.15s',
-                  '&:hover': { borderColor: G.green, bgcolor: G.greenLt },
-                }}
-              >
-                <Box>
-                  <Typography sx={{ fontFamily: BF, fontWeight: 600, fontSize: '0.85rem', color: G.ink }}>{link.label}</Typography>
-                  <Typography sx={{ fontFamily: BF, fontSize: '0.72rem', color: G.muted }}>{link.desc}</Typography>
-                </Box>
-                <Box sx={{ color: G.green, display: 'flex', alignItems: 'center' }}>
-                  <Box sx={{ fontSize: 18, color: G.green }}>›</Box>
-                </Box>
+              <Box>
+                <Typography sx={{ fontFamily: FF, fontWeight: 600, fontSize: '0.82rem', color: B.text }}>{link.label}</Typography>
+                <Typography sx={{ fontFamily: FF, fontSize: '0.7rem', color: B.muted }}>{link.sub}</Typography>
               </Box>
-            ))}
-          </Box>
+              <ArrowForwardIcon sx={{ fontSize: 16, color: B.muted }} />
+            </Box>
+          ))}
         </Box>
       </Box>
-    </Box>
+    </LoginShell>
   );
 }
