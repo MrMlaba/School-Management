@@ -118,7 +118,7 @@ _gs.textContent = `
     min-height: 44px;
   }
   .sn-item:hover  { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.9); }
-  .sn-item.active { background: rgba(255,255,255,0.11); color: #fff; box-shadow: inset 3px 0 0 #D97706; }
+  .sn-item.active { background: rgba(5,150,105,0.18); color: #fff; box-shadow: inset 3px 0 0 #059669; }
   .sn-item.active .sn-label { font-weight: 700 !important; }
 
   /* Link card */
@@ -162,14 +162,37 @@ document.head.appendChild(_gs);
 
 /* ─── Design tokens ─────────────────────────────────────────────────────── */
 const T = {
-  ink:'#111827', ink2:'#374151', ink3:'#6B7280', ink4:'#9CA3AF', ink5:'#D1D5DB',
-  paper:'#FFFFFF', paper2:'#F9FAFB', paper3:'#F3F4F6',
-  amber:'#D97706', amberL:'#FEF3C7', amberM:'#FDE68A',
-  green:'#059669', greenL:'#D1FAE5',
-  red:'#DC2626', redL:'#FEE2E2',
-  blue:'#2563EB', blueL:'#EFF6FF',
-  border:'#E5E7EB',
+  // ── Core text ──────────────────────────────────────────────
+  ink:    '#0F1F1A',   // was #111827 — warmer, more SA feel
+  ink2:   '#1F3329',
+  ink3:   '#4B6860',   // was #6B7280 — green-tinted muted
+  ink4:   '#7A9E95',   // was #9CA3AF
+  ink5:   '#D1E8E0',   // was #D1D5DB — green-tinted border
+ 
+  // ── Surfaces ───────────────────────────────────────────────
+  paper:  '#FFFFFF',
+  paper2: '#F4FAF7',   // was #F9FAFB — light green tint
+  paper3: '#EAF5EF',   // was #F3F4F6 — stronger green tint
+ 
+  // ── Status colors (unchanged) ──────────────────────────────
+  amber:  '#D97706',
+  amberL: '#FEF3C7',
+  amberM: '#FDE68A',
+ 
+  // ── Primary — GREEN instead of amber for sidebar active ────
+  green:  '#059669',   // SA green — main accent
+  greenL: '#D1FAE5',
+ 
+  red:    '#DC2626',
+  redL:   '#FEE2E2',
+ 
+  blue:   '#2563EB',
+  blueL:  '#EFF6FF',
+ 
+  // ── Borders — green-tinted ──────────────────────────────────
+  border: '#D1E8E0',   // was #E5E7EB — green-tinted
 };
+
 const SIDEBAR_W = 240;
 const BASE = 'https://school-management-production-6167.up.railway.app';
 
@@ -297,7 +320,7 @@ function Sidebar({student,desktopTab,setDesktopTab,overdueCount,pendingQuizzesCo
     {label:'Timetable',  icon:<CalendarMonthIcon    sx={{fontSize:15}}/>, href:'/student/timetable'},
   ];
   return (
-    <Box sx={{width:SIDEBAR_W,flexShrink:0,background:T.ink,display:{xs:'none',md:'flex'},flexDirection:'column',position:'fixed',top:0,left:0,bottom:0,zIndex:200,borderRight:'1px solid rgba(255,255,255,0.06)',overflowY:'auto',overflowX:'hidden'}}>
+    <Box sx={{width:SIDEBAR_W,flexShrink:0,background:'#0F2318',display:{xs:'none',md:'flex'},flexDirection:'column',position:'fixed',top:0,left:0,bottom:0,zIndex:200,borderRight:'1px solid rgba(255,255,255,0.06)',overflowY:'auto',overflowX:'hidden'}}>
       <Box sx={{px:2.25,pt:2.5,pb:2,borderBottom:'1px solid rgba(255,255,255,0.07)',flexShrink:0}}>
         <Box sx={{display:'flex',alignItems:'center',gap:1.25}}>
           <Box sx={{width:32,height:32,borderRadius:'9px',background:T.amber,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
