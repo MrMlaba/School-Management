@@ -423,10 +423,11 @@ export default function StudentDashboard() {
           setSubmissionsMap(map);
         }
         if (qRes?.ok) setQuizzes(await qRes.json());
+        if (eRes?.ok) setExams(await eRes.json());
       } catch(e){console.error(e);}
       
       finally{setLoading(false);}
-      if (eRes?.ok) setExams(await eRes.json());
+      
     })();
   },[navigate]);
 
