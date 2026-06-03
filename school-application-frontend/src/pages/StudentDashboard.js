@@ -23,6 +23,7 @@ import QuizIcon               from '@mui/icons-material/Quiz';
 import DashboardIcon          from '@mui/icons-material/Dashboard';
 import BarChartIcon           from '@mui/icons-material/BarChart';
 import ScheduleIcon           from '@mui/icons-material/Schedule';
+import SchoolIcon from '@mui/icons-material/School';
 
 /* ─── Google Fonts ─────────────────────────────────────────────────────── */
 const _fl = document.createElement('link');
@@ -289,6 +290,7 @@ function Sidebar({student,desktopTab,setDesktopTab,overdueCount,pendingQuizzesCo
     {key:'quizzes',    label:'Quizzes',     icon:<QuizIcon       sx={{fontSize:17}}/>, badge:pendingQuizzesCount},
     {key:'results',    label:'Results',     icon:<BarChartIcon   sx={{fontSize:17}}/>},
     {key:'deadlines',  label:'Deadlines',   icon:<ScheduleIcon   sx={{fontSize:17}}/>},
+    {key:'exams', label:'Exams', icon:<SchoolIcon sx={{fontSize:17}}/>},
   ];
   const LINKS = [
     {label:'Class Chat', icon:<ChatBubbleOutlineIcon sx={{fontSize:15}}/>, href:`/classroom-chat/${gradeId}`},
@@ -369,6 +371,7 @@ export default function StudentDashboard() {
   const [submissionsMap, setSubmissionsMap] = useState({});
   const [quizzes,        setQuizzes]        = useState([]);
   const [loading,        setLoading]        = useState(true);
+  const [exams, setExams] = useState([]);
   const [mobileTab,      setMobileTab]      = useState('home');
   const [desktopTab,     setDesktopTab]     = useState('overview');
   const navigate = useNavigate();
@@ -381,11 +384,12 @@ export default function StudentDashboard() {
     const headers = {Authorization:`Bearer ${token}`};
     (async()=>{
       try {
-        const [pRes,aRes,sRes,qRes] = await Promise.all([
+        const [pRes,aRes,sRes,qRes,eRes] = await Promise.all([
           fetch(`${BASE}/api/student/me`,          {headers}),
           fetch(`${BASE}/api/student/assignments`, {headers}),
           fetch(`${BASE}/api/student/submissions`, {headers}),
           fetch(`${BASE}/api/student/quizzes`,     {headers}),
+          fetch(`${BASE}/api/student/exams`,       {headers}),
         ]);
         if (pRes.status===401){localStorage.removeItem('studentToken');navigate('/student-login');return;}
         if (pRes.ok) setStudent(await pRes.json());
@@ -397,7 +401,9 @@ export default function StudentDashboard() {
         }
         if (qRes?.ok) setQuizzes(await qRes.json());
       } catch(e){console.error(e);}
+      
       finally{setLoading(false);}
+      if (eRes?.ok) setExams(await eRes.json());
     })();
   },[navigate]);
 
@@ -424,7 +430,8 @@ export default function StudentDashboard() {
     {key:'home',   icon:<HomeIcon/>,       label:'Home',   badge:0},
     {key:'tasks',  icon:<AssignmentIcon/>, label:'Tasks',  badge:overdueCount},
     {key:'quizzes',icon:<QuizIcon/>,       label:'Quizzes',badge:pendingQuizzes.length},
-    {key:'grades', icon:<EmojiEventsIcon/>,label:'Grades', badge:0},
+    {key:'grades', icon:<EmojiEventsIcon/>, label:'Grades',  badge:0},
+    {key:'exams',  icon:<SchoolIcon/>,      label:'Exams',   badge:0},
     {key:'more',   icon:<MoreHorizIcon/>,  label:'More',   badge:0},
   ];
 
@@ -709,6 +716,7 @@ export default function StudentDashboard() {
           {desktopTab==='quizzes'     && <QuizzesSection quizzes={quizzes} fullWidth/>}
           {desktopTab==='results'     && <RecentResultsSection gradedSubs={gradedSubs} assignments={assignments} fullWidth/>}
           {desktopTab==='deadlines'   && <DeadlinesSection pendingDeadlines={pendingDeadlines} fullWidth/>}
+          {desktopTab==='exams' && <ExamsSection exams={exams} fullWidth/>}
         </Box>
 
         {/* ── FIX: Mobile content — sd-scroll for iOS smooth scroll, mob-content for safe bottom padding ── */}
@@ -717,6 +725,7 @@ export default function StudentDashboard() {
           {mobileTab==='tasks'   && <MobileTasks/>}
           {mobileTab==='quizzes' && <MobileQuizzes/>}
           {mobileTab==='grades'  && <MobileGrades/>}
+          {mobileTab==='exams' && <ExamsSection exams={exams} fullWidth/>}
           {mobileTab==='more'    && <MobileMore/>}
         </Box>
       </Box>
@@ -883,6 +892,150 @@ function QuizzesSection({quizzes,fullWidth}) {
           })}
       </Box>
     </Card>
+  );
+}
+
+function ExamsSection({ exams, fullWidth }) {
+  const upcoming = exams.filter(e => new Date(e.examDate) >= new Date());
+  const past     = exams.filter(e => new Date(e.examDate) <  new Date());
+ 
+  const scoreColor = pct => {
+    if (pct == null) return T.ink4;
+    if (pct >= 75)   return T.green;
+    if (pct >= 50)   return T.amber;
+    return T.red;
+  };
+  const scoreBg = pct => {
+    if (pct == null) return T.paper3;
+    if (pct >= 75)   return T.greenL;
+    if (pct >= 50)   return T.amberL;
+    return T.redL;
+  };
+  const symbolFor = pct => {
+    if (pct == null) return '—';
+    if (pct >= 80)   return '7';
+    if (pct >= 70)   return '6';
+    if (pct >= 60)   return '5';
+    if (pct >= 50)   return '4';
+    if (pct >= 40)   return '3';
+    if (pct >= 30)   return '2';
+    return '1';
+  };
+ 
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+ 
+      {/* Summary stats */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1.5 }}>
+        <Box className="sd-card" sx={{ p: 2, textAlign: 'center' }}>
+          <Typography sx={{ fontWeight: 800, fontSize: '1.6rem', color: T.blue, fontFamily: "'Fraunces',serif" }}>{upcoming.length}</Typography>
+          <Typography sx={{ fontSize: '0.75rem', color: T.ink3, fontFamily: "'Plus Jakarta Sans',sans-serif", mt: '3px' }}>Upcoming</Typography>
+        </Box>
+        <Box className="sd-card" sx={{ p: 2, textAlign: 'center' }}>
+          <Typography sx={{ fontWeight: 800, fontSize: '1.6rem', color: T.green, fontFamily: "'Fraunces',serif" }}>{past.filter(e => e.marksObtained != null).length}</Typography>
+          <Typography sx={{ fontSize: '0.75rem', color: T.ink3, fontFamily: "'Plus Jakarta Sans',sans-serif", mt: '3px' }}>Results in</Typography>
+        </Box>
+        <Box className="sd-card" sx={{ p: 2, textAlign: 'center' }}>
+          {(() => {
+            const marked = past.filter(e => e.percentage != null);
+            const avg = marked.length > 0 ? Math.round(marked.reduce((s, e) => s + parseFloat(e.percentage), 0) / marked.length) : null;
+            return (
+              <>
+                <Typography sx={{ fontWeight: 800, fontSize: '1.6rem', color: avg != null ? scoreColor(avg) : T.ink4, fontFamily: "'Fraunces',serif" }}>{avg != null ? `${avg}%` : '—'}</Typography>
+                <Typography sx={{ fontSize: '0.75rem', color: T.ink3, fontFamily: "'Plus Jakarta Sans',sans-serif", mt: '3px' }}>Exam average</Typography>
+              </>
+            );
+          })()}
+        </Box>
+      </Box>
+ 
+      {/* Upcoming exams */}
+      {upcoming.length > 0 && (
+        <Card title={`Upcoming Exams (${upcoming.length})`}>
+          <Box sx={{ p: 1.75, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {upcoming.map(e => {
+              const days = Math.ceil((new Date(e.examDate) - new Date()) / 86_400_000);
+              const urgent = days <= 7;
+              return (
+                <Box key={e.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1.75, py: 1.5, borderRadius: 'var(--r-sm)', background: urgent ? T.amberL : T.paper3, border: `1px solid ${urgent ? T.amberM : T.border}`, minHeight: 60 }}>
+                  <Box sx={{ width: 44, height: 44, borderRadius: '10px', background: urgent ? T.amberM : T.blueL, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Typography sx={{ fontSize: '0.72rem', fontWeight: 800, color: urgent ? T.amber : T.blue, fontFamily: "'Plus Jakarta Sans',sans-serif", lineHeight: 1 }}>{days === 0 ? 'TODAY' : `${days}d`}</Typography>
+                  </Box>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: T.ink, fontFamily: "'Plus Jakarta Sans',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.examTitle || e.title}</Typography>
+                    <Typography sx={{ fontSize: '0.75rem', color: T.ink3, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+                      {e.subjectName} · {e.totalMarks} marks · {new Date(e.examDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </Typography>
+                  </Box>
+                  {urgent && (
+                    <Box sx={{ px: 1.25, py: '5px', borderRadius: '6px', background: T.amber, minHeight: 28, display: 'flex', alignItems: 'center' }}>
+                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: '#fff', fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Study!</Typography>
+                    </Box>
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+        </Card>
+      )}
+ 
+      {/* Past exams with results */}
+      <Card title={`Exam Results (${past.length})`}
+        aside={past.filter(e => e.marksObtained == null).length > 0 && (
+          <Box sx={{ px: 1.25, py: '3px', borderRadius: '6px', background: T.amberL }}>
+            <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: T.amber, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+              {past.filter(e => e.marksObtained == null).length} awaiting
+            </Typography>
+          </Box>
+        )}>
+        <Box sx={{ p: 1.75, display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {past.length === 0 ? (
+            <Typography sx={{ color: T.ink4, fontSize: '0.82rem', textAlign: 'center', py: 3, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>No past exams yet.</Typography>
+          ) : (
+            past.map(e => {
+              const pct    = e.percentage != null ? parseFloat(e.percentage) : null;
+              const hasResult = e.marksObtained != null;
+              return (
+                <Box key={e.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1.75, py: 1.5, borderRadius: 'var(--r-sm)', background: T.paper3, border: `1px solid ${T.border}`, minHeight: 60 }}>
+                  {/* Score circle */}
+                  <Box sx={{ width: 44, height: 44, borderRadius: '50%', background: scoreBg(pct), border: `2px solid ${pct != null ? scoreColor(pct) : T.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {hasResult ? (
+                      <>
+                        <Typography sx={{ fontSize: '0.65rem', fontWeight: 800, color: scoreColor(pct), fontFamily: "'Fraunces',serif", lineHeight: 1 }}>{symbolFor(pct)}</Typography>
+                        <Typography sx={{ fontSize: '0.55rem', color: scoreColor(pct), fontFamily: "'Plus Jakarta Sans',sans-serif", lineHeight: 1 }}>{Math.round(pct)}%</Typography>
+                      </>
+                    ) : (
+                      <Typography sx={{ fontSize: '0.6rem', color: T.ink4, fontFamily: "'Plus Jakarta Sans',sans-serif", textAlign: 'center', lineHeight: 1.2 }}>No result</Typography>
+                    )}
+                  </Box>
+ 
+                  {/* Exam info */}
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: T.ink, fontFamily: "'Plus Jakarta Sans',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.examTitle || e.title}</Typography>
+                    <Typography sx={{ fontSize: '0.75rem', color: T.ink3, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+                      {e.subjectName} · {new Date(e.examDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </Typography>
+                  </Box>
+ 
+                  {/* Mark pill */}
+                  {hasResult ? (
+                    <Box sx={{ px: 1.25, py: '5px', borderRadius: '6px', background: scoreBg(pct), minHeight: 28, display: 'flex', alignItems: 'center' }}>
+                      <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: scoreColor(pct), fontFamily: "'Plus Jakarta Sans',sans-serif", whiteSpace: 'nowrap' }}>
+                        {e.marksObtained}/{e.totalMarks}
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Box sx={{ px: 1.25, py: '5px', borderRadius: '6px', background: T.amberL, minHeight: 28, display: 'flex', alignItems: 'center' }}>
+                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: T.amber, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Pending</Typography>
+                    </Box>
+                  )}
+                </Box>
+              );
+            })
+          )}
+        </Box>
+      </Card>
+    </Box>
   );
 }
 

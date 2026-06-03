@@ -351,22 +351,22 @@ router.get('/reports/results', async (req, res) => {
     );
 
     // Exam results
-    const eParams = [studentIds, subjectIds, classId];
-    let eTermFilter = '';
-    if (termId) { eParams.push(termId); eTermFilter = ` AND e.term_id = $${eParams.length}`; }
-
-    const { rows: examResults } = await pool.query(
-      `SELECT r.student_id, r.exam_id,
-              r.marks_obtained AS score, e.total_marks AS "maxScore",
-              e.subject_id AS "subjectId", e.title, e.type
-       FROM results r
-       JOIN exams e ON e.id = r.exam_id
-       WHERE r.student_id  = ANY($1::int[])
-         AND e.subject_id  = ANY($2::int[])
-         AND e.class_id    = $3
-         ${eTermFilter}`,
-      eParams
-    );
+    const eParams2 = [studentIds, subjectIds, schoolId];
+  let eTermFilter2 = '';
+  if (termId) { eParams2.push(termId); eTermFilter2 = ` AND e.term_id = $${eParams2.length}`; }
+ 
+  const { rows: examResults2 } = await pool.query(
+    `SELECT r.student_id, r.exam_id,
+            r.marks_obtained AS score, e.total_marks AS "maxScore",
+            e.subject_id AS "subjectId", e.title, e.type
+     FROM results r
+     JOIN exams e ON e.id = r.exam_id
+     WHERE r.student_id = ANY($1::int[])
+       AND e.subject_id = ANY($2::int[])
+       AND r.school_id  = $3
+       ${eTermFilter2}`,
+    eParams2
+  );
 
     // Build per-student per-subject aggregates
     const studentsWithResults = students.map(s => {
@@ -486,8 +486,9 @@ async function getStudentReportData(schoolId, studentId, termId) {
             e.subject_id AS "subjectId", e.title, e.type
      FROM results r
      JOIN exams e ON e.id = r.exam_id
-     WHERE r.student_id=$1 ${eWhere}`,
-    eParams
+     WHERE r.student_id = $1
+       AND r.school_id  = $2`,
+    [studentId, schoolId]
   );
 
   // Attendance

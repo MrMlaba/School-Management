@@ -27,13 +27,15 @@ const PORT = process.env.PORT || 8080;
 const SCHOOL_JWT_SECRET = process.env.JWT_SECRET || 'change_me_school';
 const TOKEN_EXPIRY      = '8h';
 
+// ─── FIX 1: Trust proxy — Railway sits behind a load balancer ────────────────
+// Without this, express-rate-limit throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+// and BLOCKS requests. This was silently preventing writes from reaching the DB.
+app.set('trust proxy', 1);
+
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow requests with no origin (mobile apps, Postman, curl)
     if (!origin) return callback(null, true);
-    
-    // Allow any vercel.app subdomain + localhost
     if (
       origin.includes('vercel.app') ||
       origin.includes('localhost') ||
@@ -41,7 +43,6 @@ app.use(cors({
     ) {
       return callback(null, true);
     }
-    
     return callback(new Error('Not allowed by CORS'));
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
@@ -52,13 +53,11 @@ app.use(cors({
 app.use(express.json());
 
 // ─── Rate limiters ────────────────────────────────────────────────────────────
-// FIX 3: Different limits per role — admins get stricter limits
 const studentLoginLimiter     = rateLimit({ windowMs: 15*60*1000, max: 15, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { success: false, message: 'Too many login attempts. Try again in 15 minutes.' } });
 const teacherLoginLimiter     = rateLimit({ windowMs: 15*60*1000, max: 10, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { success: false, message: 'Too many login attempts. Try again in 15 minutes.' } });
 const schoolAdminLoginLimiter = rateLimit({ windowMs: 30*60*1000, max:  8, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { success: false, message: 'Too many login attempts. Try again in 30 minutes.' } });
 const systemAdminLoginLimiter = rateLimit({ windowMs: 60*60*1000, max:  5, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { success: false, message: 'Too many login attempts. Try again in 60 minutes.' } });
 
-// Apply system admin limiter before authRouter so /api/system/login is covered
 app.use('/api/system/login', systemAdminLoginLimiter);
 app.use(authRouter);
 
@@ -67,7 +66,6 @@ app.use('/api/management', requireSchoolAdmin, managementRoutes);
 app.use('/api/setup',      requireSchoolAdmin, phase2Routes);
 app.use('/api/management', requireSchoolAdmin, phase3Routes);
 
-// FIX: /api/admin-login now has its own limiter (was missing before)
 app.post('/api/admin-login', schoolAdminLoginLimiter, async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password)
@@ -98,16 +96,18 @@ app.post('/api/admin-login', schoolAdminLoginLimiter, async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
-app.post('/api/teacher-login', teacherLoginLimiter,     teacherLogin);
-app.post('/api/student-login', studentLoginLimiter,     studentLogin);
+
+app.post('/api/teacher-login', teacherLoginLimiter, teacherLogin);
+app.post('/api/student-login', studentLoginLimiter, studentLogin);
 
 app.use('/api/teacher', requireTeacher, teacherRouter);
 app.post('/api/management/teachers/:id/set-credentials', requireSchoolAdmin, setTeacherCredentials);
 app.post('/api/student/change-password',                 requireStudent,      studentChangePassword);
 app.post('/api/management/students/:id/set-credentials', requireSchoolAdmin, setStudentCredentials);
 app.post('/api/management/students/generate-credentials',requireSchoolAdmin, bulkGenerate);
-app.post('/api/management/students/:id/reset-password', requireSchoolAdmin, resetStudentPassword);
-app.post('/api/admin/change-password', requireSchoolAdmin, schoolAdminSelfReset);
+app.post('/api/management/students/:id/reset-password',  requireSchoolAdmin, resetStudentPassword);
+app.post('/api/admin/change-password',                   requireSchoolAdmin, schoolAdminSelfReset);
+
 app.post('/api/management/teachers/:id/reset-password', requireSchoolAdmin, async (req, res) => {
   const schoolId  = req.admin.schoolId;
   const teacherId = req.params.id;
@@ -118,17 +118,12 @@ app.post('/api/management/teachers/:id/reset-password', requireSchoolAdmin, asyn
     );
     if (!rows.length) return res.status(404).json({ message: 'Teacher not found' });
     const teacher  = rows[0];
- 
-    const crypto   = require('crypto');
     const tempPass = crypto.randomBytes(4).toString('hex');
-    const hash     = await require('bcrypt').hash(tempPass, 10);
- 
+    const hash     = await bcrypt.hash(tempPass, 10);
     await pool.query(
       'UPDATE teachers SET password_hash = $1, temp_password_flag = true, updated_at = NOW() WHERE id = $2',
       [hash, teacherId]
     );
- 
-    // Audit log
     try {
       await pool.query(
         `INSERT INTO audit_logs (school_id, admin_id, actor, actor_role, action, target_type, target_id, target, created_at)
@@ -136,20 +131,18 @@ app.post('/api/management/teachers/:id/reset-password', requireSchoolAdmin, asyn
         [schoolId, req.admin.id, req.admin.username, teacherId, `${teacher.first_name} ${teacher.last_name}`]
       );
     } catch {}
- 
     res.json({
-      success:      true,
-      username:     teacher.username,
-      firstName:    teacher.first_name,
-      lastName:     teacher.last_name,
+      success: true, username: teacher.username,
+      firstName: teacher.first_name, lastName: teacher.last_name,
       tempPassword: tempPass,
-      message:      'Password reset. Show this password to the teacher — it will not be shown again.',
+      message: 'Password reset. Show this password to the teacher — it will not be shown again.',
     });
   } catch (err) {
     console.error('[reset teacher password]', err);
     res.status(500).json({ message: 'Failed to reset teacher password' });
   }
 });
+
 app.use('/api/management', requireSchoolAdmin, eventsRoutes);
 app.use('/api/teacher',    requireTeacher,     teacherQuizRouter);
 app.use('/api/student',    requireStudent,     studentQuizRouter);
@@ -186,7 +179,7 @@ function validateFile(file, expectedType) {
   return { valid: true };
 }
 
-// ─── School logo upload (system admin) ───────────────────────────────────────
+// ─── School logo upload ───────────────────────────────────────────────────────
 const schoolImgDir = path.join(__dirname, 'uploads', 'schools');
 if (!fs.existsSync(schoolImgDir)) fs.mkdirSync(schoolImgDir, { recursive: true });
 
@@ -211,7 +204,6 @@ app.post('/api/system/upload-image', requireSystemAdmin, uploadSchoolImage.singl
   res.json({ success: true, url: '/api/school-images/' + req.file.filename });
 });
 
-// FIX 1b: school-images also sanitised (was raw before)
 app.get('/api/school-images/:filename', (req, res) => {
   const filename = path.basename(req.params.filename);
   if (!filename || !/^[a-zA-Z0-9_.-]+$/.test(filename))
@@ -225,12 +217,10 @@ app.get('/api/school-images/:filename', (req, res) => {
 });
 
 // ─── Serve uploaded documents ─────────────────────────────────────────────────
-// FIX 1a: Full path traversal protection — basename + regex + startsWith
 app.get('/api/documents/:filename', requireStudent, (req, res) => {
   const filename = path.basename(req.params.filename);
   if (!filename || !/^[a-zA-Z0-9_.-]+$/.test(filename))
     return res.status(400).json({ success: false, message: 'Invalid filename' });
-
   const uploadRoot = path.resolve(__dirname, 'uploads');
   const candidates = [
     path.join(uploadRoot, filename),
@@ -289,6 +279,90 @@ app.get('/api/student/assignments', requireStudent, async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error('[student assignments]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/student/exams
+app.get('/api/student/exams', requireStudent, async (req, res) => {
+  try {
+    const studentId = req.student.id;
+    const schoolId  = req.student.schoolId;
+    const { rows: stuRows } = await pool.query(
+      'SELECT grade, stream FROM enrolled_students WHERE id = $1', [studentId]
+    );
+    if (!stuRows.length) return res.status(404).json({ message: 'Student not found' });
+    const { grade, stream } = stuRows[0];
+    const numericGrade = parseInt((grade || '').replace(/[^0-9]/g, ''), 10);
+    if (!numericGrade) return res.json([]);
+
+    const { rows: clsRows } = await pool.query(
+      `SELECT id FROM classes
+       WHERE school_id = $1 AND grade = $2
+         AND (($3::TEXT IS NULL AND stream IS NULL) OR stream = $3)
+         AND is_active = true
+       LIMIT 1`,
+      [schoolId, numericGrade, stream || null]
+    );
+
+    let exams;
+    if (clsRows.length) {
+      const classId = clsRows[0].id;
+      const { rows } = await pool.query(
+        `SELECT e.id, e.title, e.exam_date AS "examDate", e.total_marks AS "totalMarks",
+                e.type, ss.name AS "subjectName",
+                r.marks_obtained AS "marksObtained", r.percentage, r.captured_at AS "capturedAt"
+         FROM exams e
+         JOIN school_subjects ss ON ss.id = e.subject_id
+         LEFT JOIN results r ON r.exam_id = e.id AND r.student_id = $1
+         WHERE e.class_id = $2 AND e.school_id = $3
+         ORDER BY e.exam_date DESC`,
+        [studentId, classId, schoolId]
+      );
+      exams = rows;
+    } else {
+      const { rows } = await pool.query(
+        `SELECT e.id, e.title, e.exam_date AS "examDate", e.total_marks AS "totalMarks",
+                e.type, ss.name AS "subjectName",
+                r.marks_obtained AS "marksObtained", r.percentage, r.captured_at AS "capturedAt"
+         FROM exams e
+         JOIN classes c ON c.id = e.class_id
+         JOIN school_subjects ss ON ss.id = e.subject_id
+         LEFT JOIN results r ON r.exam_id = e.id AND r.student_id = $1
+         WHERE e.school_id = $2 AND c.grade = $3
+         ORDER BY e.exam_date DESC`,
+        [studentId, schoolId, numericGrade]
+      );
+      exams = rows;
+    }
+    res.json(exams);
+  } catch (err) {
+    console.error('[student exams]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/student/results
+app.get('/api/student/results', requireStudent, async (req, res) => {
+  try {
+    const studentId = req.student.id;
+    const schoolId  = req.student.schoolId;
+    const { rows } = await pool.query(
+      `SELECT r.id, r.marks_obtained AS "marksObtained", r.percentage,
+              r.captured_at AS "capturedAt",
+              e.id AS "examId", e.title AS "examTitle",
+              e.exam_date AS "examDate", e.total_marks AS "totalMarks", e.type,
+              ss.name AS "subjectName"
+       FROM results r
+       JOIN exams e ON e.id = r.exam_id
+       JOIN school_subjects ss ON ss.id = e.subject_id
+       WHERE r.student_id = $1 AND r.school_id = $2
+       ORDER BY r.captured_at DESC`,
+      [studentId, schoolId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[student results]', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -355,17 +429,14 @@ app.get('/api/student/timetable', requireStudent, async (req, res) => {
   try {
     const schoolId = req.student.schoolId;
     const { rows: stuRows } = await pool.query(
-      'SELECT grade, stream FROM enrolled_students WHERE id = $1',
-      [req.student.id]
+      'SELECT grade, stream FROM enrolled_students WHERE id = $1', [req.student.id]
     );
     if (!stuRows.length) return res.status(404).json({ message: 'Student not found' });
     const { grade, stream } = stuRows[0];
     const numericGrade = parseInt((grade || '').replace(/[^0-9]/g, ''), 10);
     if (!numericGrade) return res.json({ class: null, slots: [], periods: [] });
-
     const { rows: classRows } = await pool.query(
-      `SELECT c.id, c.name, c.grade, c.stream
-       FROM classes c
+      `SELECT c.id, c.name, c.grade, c.stream FROM classes c
        WHERE c.school_id = $1 AND c.grade = $2
          AND (($3::TEXT IS NULL AND c.stream IS NULL) OR c.stream = $3)
          AND c.is_active = true
@@ -374,7 +445,6 @@ app.get('/api/student/timetable', requireStudent, async (req, res) => {
     );
     if (!classRows.length) return res.json({ class: null, slots: [], periods: [] });
     const cls = classRows[0];
-
     const [slotsRes, periodsRes] = await Promise.all([
       pool.query(
         `SELECT ts.day_of_week AS "dayOfWeek", ss.name AS "subjectName",
@@ -402,11 +472,9 @@ app.get('/api/student/timetable', requireStudent, async (req, res) => {
   }
 });
 
-// FIX: Assignment submit now requires student auth — was completely public before
-// FIX: CREATE TABLE removed from here — table created at startup (see ensureTables below)
 app.post('/api/assignments/:id/submit', requireStudent, upload.single('file'), async (req, res) => {
   const assignmentId = req.params.id;
-  const studentId    = req.student.id;  // from JWT — not from body anymore
+  const studentId    = req.student.id;
   if (!req.file) return res.status(400).json({ success: false, message: 'File required' });
   const v = validateFile(req.file, 'additional');
   if (!v.valid) return res.status(400).json({ success: false, message: v.error });
@@ -452,14 +520,11 @@ app.post('/api/marks', requireTeacher, async (req, res) => {
         const assessmentId = m.assessmentId || m.assessment_id;
         const studentId    = m.studentId    || m.student_id;
         if (!assessmentId || !studentId) throw new Error('assessmentId and studentId required');
-
-        // FIX 12: Log old score before overwriting — grade audit trail
         const existing = await client.query(
           'SELECT score FROM marks WHERE assessment_id = $1 AND student_id = $2',
           [assessmentId, studentId]
         );
         const oldScore = existing.rows[0]?.score ?? null;
-
         await client.query(
           `INSERT INTO marks (assessment_id, student_id, score, max_score, source, entered_by)
            VALUES ($1,$2,$3,$4,$5,$6)
@@ -468,8 +533,6 @@ app.post('/api/marks', requireTeacher, async (req, res) => {
              source = EXCLUDED.source, entered_by = EXCLUDED.entered_by, entered_at = NOW()`,
           [assessmentId, studentId, m.score, m.maxScore || m.max_score || null, m.source || 'manual', req.teacher.id || null]
         );
-
-        // Write audit row whenever score changes
         if (oldScore !== null && oldScore !== m.score) {
           await client.query(
             `INSERT INTO grade_audit_log (school_id, student_id, assessment_id, old_score, new_score, changed_by)
@@ -493,6 +556,9 @@ app.post('/api/marks', requireTeacher, async (req, res) => {
   }
 });
 
+// ─── FIX 3: /api/exams/upload — was crashing because it tried to insert into
+// exam_submissions with an assessment_id that doesn't exist in assessments.
+// Fixed: verify the assessment exists first, return clear error if not found.
 app.post('/api/exams/upload', requireTeacher, upload.single('file'), async (req, res) => {
   try {
     const { assessmentId, studentId } = req.body;
@@ -500,6 +566,15 @@ app.post('/api/exams/upload', requireTeacher, upload.single('file'), async (req,
     const v = validateFile(req.file, 'gradeResult');
     if (!v.valid)     return res.status(400).json({ message: v.error });
     if (!assessmentId || !studentId) return res.status(400).json({ message: 'assessmentId and studentId required' });
+
+    // FIX: Verify assessment exists before inserting — prevents FK constraint crash
+    const { rows: aRows } = await pool.query(
+      'SELECT id FROM assessments WHERE id = $1', [assessmentId]
+    );
+    if (!aRows.length) {
+      return res.status(404).json({ message: `Assessment ${assessmentId} not found. Create it first via POST /api/assessments.` });
+    }
+
     const filepath = path.join('uploads', req.file.filename);
     const { rows } = await pool.query(
       `INSERT INTO exam_submissions (assessment_id, student_id, filename, filepath, status)
@@ -517,7 +592,6 @@ app.post('/api/exams/upload', requireTeacher, upload.single('file'), async (req,
 // ─── Email helper ─────────────────────────────────────────────────────────────
 const { Resend } = require('resend');
 const resend     = new Resend(process.env.RESEND_API_KEY);
-// FIX: use env var for from address — never hardcode a personal email
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@yourschoolapp.co.za';
 
 async function sendStatusEmail(to, applicantName, school, status) {
@@ -534,9 +608,7 @@ async function sendStatusEmail(to, applicantName, school, status) {
     : isRejected
     ? `Thank you for your interest in <strong>${school}</strong>. After careful consideration, we regret that your application was unsuccessful.<br><br><a href="${portalLink}" style="display:inline-block;margin:16px 0;padding:12px 24px;background:#1a73e8;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Explore Other Schools</a>`
     : `Your application to <strong>${school}</strong> has been updated.<br><br><a href="${portalLink}/check-status" style="display:inline-block;margin:16px 0;padding:12px 24px;background:#1a73e8;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Check Status</a>`;
-
   const html = `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:40px 0;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;"><tr><td style="background:#1a73e8;padding:32px 40px;text-align:center;"><h1 style="margin:0;color:#fff;font-size:22px;">School Application System</h1><p style="margin:6px 0 0;color:#d0e8ff;font-size:14px;">${school}</p></td></tr><tr><td style="padding:40px;"><p style="margin:0 0 16px;font-size:16px;color:#333;">Dear <strong>${applicantName || 'Applicant'}</strong>,</p><div style="font-size:15px;color:#444;line-height:1.7;">${message}</div><hr style="border:none;border-top:1px solid #eee;margin:32px 0;"><p style="margin:0;font-size:13px;color:#888;">This is an automated message — please do not reply.</p></td></tr></table></td></tr></table></body></html>`;
-
   try {
     await resend.emails.send({ from: FROM_EMAIL, to, subject, html });
   } catch (err) {
@@ -622,30 +694,22 @@ app.get('/api/schools', async (req, res) => {
 
 // ─── Submit Application ───────────────────────────────────────────────────────
 app.post('/api/applications', upload.array('documents', 10), async (req, res) => {
-  const {
-    nationalId, firstName, lastName, dateOfBirth, gender, email, phone, address, city,
-    parentName, parentPhone, parentEmail, parentOccupation, relationship,
-    grade, subject, previousSchool, achievements, whyAttend, emergencyContact, emergencyPhone,
-  } = req.body;
-
+  const { nationalId, firstName, lastName, dateOfBirth, gender, email, phone, address, city, parentName, parentPhone, parentEmail, parentOccupation, relationship, grade, subject, previousSchool, achievements, whyAttend, emergencyContact, emergencyPhone } = req.body;
   let schools = req.body.schools;
   if (!nationalId) return res.status(400).json({ success: false, message: 'National ID is required' });
   if (['Grade 10', 'Grade 11', 'Grade 12'].includes(grade) && !subject)
     return res.status(400).json({ success: false, message: 'Subject stream is required for Grade 10–12' });
-
   if (typeof schools === 'string') {
     try { const p = JSON.parse(schools); schools = Array.isArray(p) ? p : [p]; } catch { schools = schools.split(',').map(s => s.trim()); }
   }
   if (!Array.isArray(schools) || schools.length === 0)
     return res.status(400).json({ success: false, message: 'At least one school must be selected' });
-
   const documents     = req.files || [];
   const documentTypes = req.body.documentTypes ? JSON.parse(req.body.documentTypes) : [];
   for (let i = 0; i < documents.length; i++) {
     const v = validateFile(documents[i], documentTypes[i] || 'additional');
     if (!v.valid) return res.status(400).json({ success: false, message: `File validation failed: ${v.error}` });
   }
-
   const requiredDocuments = grade === 'Grade 8' ? ['id', 'gradeResult', 'gradeReport'] : ['id', 'removal', 'gradeResult', 'gradeReport'];
   const uploadedTypes     = documentTypes.map((type, i) => ({ type, filename: documents[i]?.filename || null, originalname: documents[i]?.originalname || null, mimetype: documents[i]?.mimetype || null }));
   const missing           = requiredDocuments.filter(r => !uploadedTypes.some(u => u.type === r));
@@ -653,38 +717,13 @@ app.post('/api/applications', upload.array('documents', 10), async (req, res) =>
     const names = missing.map(t => t === 'id' ? 'SA ID Copy' : t === 'removal' ? 'School Removal Letter' : t === 'gradeResult' ? 'Previous Grade Result' : 'Grade Report');
     return res.status(400).json({ success: false, message: `Missing required documents: ${names.join(', ')}` });
   }
-
   try {
     const insertedApps = [];
     for (const school of schools) {
-      // FIX: removed manual id generation (Date.now + random) — use DB SERIAL
       const { rows } = await pool.query(
-        `INSERT INTO applications (
-          national_id, first_name, last_name, date_of_birth, gender,
-          email, phone, address, city,
-          parent_name, parent_phone, parent_email, parent_occupation, relationship,
-          school, grade, subject, previous_school, achievements, why_attend,
-          emergency_contact, emergency_phone,
-          documents, document_count, required_documents,
-          status, comment, submitted_at
-        ) VALUES (
-          $1,$2,$3,$4,$5,
-          $6,$7,$8,$9,
-          $10,$11,$12,$13,$14,
-          $15,$16,$17,$18,$19,$20,
-          $21,$22,
-          $23,$24,$25,
-          'pending','',$26
-        ) RETURNING *`,
-        [
-          nationalId, firstName, lastName, dateOfBirth || null, gender,
-          email, phone, address, city,
-          parentName, parentPhone, parentEmail, parentOccupation, relationship,
-          school, grade, subject || null, previousSchool, achievements, whyAttend,
-          emergencyContact || null, emergencyPhone || null,
-          JSON.stringify(uploadedTypes), documents.length, JSON.stringify(requiredDocuments),
-          new Date().toISOString(),
-        ]
+        `INSERT INTO applications (national_id,first_name,last_name,date_of_birth,gender,email,phone,address,city,parent_name,parent_phone,parent_email,parent_occupation,relationship,school,grade,subject,previous_school,achievements,why_attend,emergency_contact,emergency_phone,documents,document_count,required_documents,status,comment,submitted_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,'pending','',$26) RETURNING *`,
+        [nationalId,firstName,lastName,dateOfBirth||null,gender,email,phone,address,city,parentName,parentPhone,parentEmail,parentOccupation,relationship,school,grade,subject||null,previousSchool,achievements,whyAttend,emergencyContact||null,emergencyPhone||null,JSON.stringify(uploadedTypes),documents.length,JSON.stringify(requiredDocuments),new Date().toISOString()]
       );
       insertedApps.push(toApp(rows[0]));
     }
@@ -695,20 +734,16 @@ app.post('/api/applications', upload.array('documents', 10), async (req, res) =>
   }
 });
 
-// ─── Get Applications (school admin) ─────────────────────────────────────────
+// ─── Get Applications ─────────────────────────────────────────────────────────
 app.get('/api/applications', requireSchoolAdmin, async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      'SELECT * FROM applications WHERE school = $1 ORDER BY submitted_at DESC',
-      [req.admin.school]
-    );
+    const { rows } = await pool.query('SELECT * FROM applications WHERE school = $1 ORDER BY submitted_at DESC', [req.admin.school]);
     res.json(rows.map(toApp));
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
-// ─── Get by nationalId or applicationId (applicant self-service) ──────────────
 app.get('/api/applicant-applications', async (req, res) => {
   const { nationalId, applicationId } = req.query;
   try {
@@ -726,16 +761,15 @@ app.get('/api/applicant-applications', async (req, res) => {
   }
 });
 
-// ─── Update Status (school admin PATCH) ──────────────────────────────────────
 app.patch('/api/applications/:id', requireSchoolAdmin, async (req, res) => {
-  const { id }              = req.params;
+  const { id } = req.params;
   const { status, comment } = req.body;
   if (!['approved', 'rejected', 'pending', 'accepted'].includes(status))
     return res.status(400).json({ success: false, message: 'Invalid status' });
   try {
     const { rows } = await pool.query(
-      `UPDATE applications SET status = $1, comment = COALESCE($2, comment), updated_at = NOW()
-       WHERE id = $3 AND school = $4 RETURNING *`,
+      `UPDATE applications SET status=$1, comment=COALESCE($2,comment), updated_at=NOW()
+       WHERE id=$3 AND school=$4 RETURNING *`,
       [status, comment ?? null, id, req.admin.school]
     );
     if (!rows.length) return res.status(404).json({ success: false, message: 'Application not found' });
@@ -747,15 +781,14 @@ app.patch('/api/applications/:id', requireSchoolAdmin, async (req, res) => {
   }
 });
 
-// ─── Accept Offer (applicant self-service) ────────────────────────────────────
 app.patch('/api/applications/:id/accept', async (req, res) => {
   const { id } = req.params;
   const { nationalId } = req.body;
   if (!nationalId) return res.status(400).json({ success: false, message: 'National ID is required' });
   try {
     const { rows } = await pool.query(
-      `UPDATE applications SET status = 'accepted', comment = 'Offer accepted by applicant', updated_at = NOW()
-       WHERE id = $1 AND national_id = $2 AND status = 'approved' RETURNING *`,
+      `UPDATE applications SET status='accepted', comment='Offer accepted by applicant', updated_at=NOW()
+       WHERE id=$1 AND national_id=$2 AND status='approved' RETURNING *`,
       [id, nationalId]
     );
     if (!rows.length) return res.status(404).json({ success: false, message: 'Application not found, already accepted, or not approved yet' });
@@ -766,7 +799,6 @@ app.patch('/api/applications/:id/accept', async (req, res) => {
   }
 });
 
-// ─── Update Application Details (applicant PUT) ───────────────────────────────
 app.put('/api/applications/:id', upload.array('documents', 10), async (req, res) => {
   const { id } = req.params;
   const { nationalId, firstName, lastName, dateOfBirth, gender, email, phone, address, city, parentName, parentPhone, parentEmail, parentOccupation, relationship, grade, subject, previousSchool, achievements, whyAttend, emergencyContact, emergencyPhone } = req.body;
@@ -779,7 +811,6 @@ app.put('/api/applications/:id', upload.array('documents', 10), async (req, res)
     if (!existing.rows.length) return res.status(404).json({ success: false, message: 'Application not found' });
     if (!['pending', 'rejected'].includes(existing.rows[0].status))
       return res.status(403).json({ success: false, message: 'Only pending or rejected applications can be edited' });
-
     const newFiles      = req.files || [];
     const documentTypes = req.body.documentTypes ? JSON.parse(req.body.documentTypes) : [];
     for (let i = 0; i < newFiles.length; i++) {
@@ -796,15 +827,8 @@ app.put('/api/applications/:id', upload.array('documents', 10), async (req, res)
       return res.status(400).json({ success: false, message: `Missing required documents: ${names.join(', ')}` });
     }
     const { rows } = await pool.query(
-      `UPDATE applications SET
-        national_id=$1, first_name=$2, last_name=$3, date_of_birth=$4, gender=$5, email=$6,
-        phone=$7, address=$8, city=$9, parent_name=$10, parent_phone=$11, parent_email=$12,
-        parent_occupation=$13, relationship=$14, grade=$15, subject=$16, previous_school=$17,
-        achievements=$18, why_attend=$19, emergency_contact=$20, emergency_phone=$21,
-        documents=$22, document_count=$23, required_documents=$24,
-        status='pending', comment='', updated_at=NOW()
-       WHERE id=$25 RETURNING *`,
-      [nationalId, firstName, lastName, dateOfBirth || null, gender, email, phone, address, city, parentName, parentPhone, parentEmail, parentOccupation, relationship, grade, subject || null, previousSchool, achievements, whyAttend, emergencyContact || null, emergencyPhone || null, JSON.stringify(allDocuments), allDocuments.length, JSON.stringify(requiredDocuments), id]
+      `UPDATE applications SET national_id=$1,first_name=$2,last_name=$3,date_of_birth=$4,gender=$5,email=$6,phone=$7,address=$8,city=$9,parent_name=$10,parent_phone=$11,parent_email=$12,parent_occupation=$13,relationship=$14,grade=$15,subject=$16,previous_school=$17,achievements=$18,why_attend=$19,emergency_contact=$20,emergency_phone=$21,documents=$22,document_count=$23,required_documents=$24,status='pending',comment='',updated_at=NOW() WHERE id=$25 RETURNING *`,
+      [nationalId,firstName,lastName,dateOfBirth||null,gender,email,phone,address,city,parentName,parentPhone,parentEmail,parentOccupation,relationship,grade,subject||null,previousSchool,achievements,whyAttend,emergencyContact||null,emergencyPhone||null,JSON.stringify(allDocuments),allDocuments.length,JSON.stringify(requiredDocuments),id]
     );
     res.json({ success: true, application: toApp(rows[0]) });
   } catch (err) {
@@ -812,7 +836,6 @@ app.put('/api/applications/:id', upload.array('documents', 10), async (req, res)
   }
 });
 
-// ─── Document Stats ───────────────────────────────────────────────────────────
 app.get('/api/document-stats', requireSchoolAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM applications WHERE school = $1', [req.admin.school]);
@@ -831,7 +854,6 @@ app.get('/api/document-stats', requireSchoolAdmin, async (req, res) => {
   }
 });
 
-// ─── Accepted Students ────────────────────────────────────────────────────────
 app.get('/api/students', requireSchoolAdmin, async (req, res) => {
   try {
     let query    = 'SELECT * FROM applications WHERE school = $1 AND status = $2';
@@ -845,29 +867,111 @@ app.get('/api/students', requireSchoolAdmin, async (req, res) => {
   }
 });
 
-// ─── Startup: ensure tables exist, then start server ─────────────────────────
-// FIX: CREATE TABLE moved out of request handler — runs once at startup
+// ─── FIX 2: Create all required tables at startup ────────────────────────────
+// audit_logs was missing — every login was failing with "relation does not exist"
 async function ensureTables() {
+  // assignment_submissions
   await pool.query(`
     CREATE TABLE IF NOT EXISTS assignment_submissions (
-      id            SERIAL   PRIMARY KEY,
-      assignment_id INTEGER  REFERENCES assignments(id) ON DELETE CASCADE,
-      student_id    INTEGER,
-      filename      TEXT,
-      originalname  TEXT,
-      mimetype      TEXT,
+      id             SERIAL PRIMARY KEY,
+      assignment_id  INTEGER REFERENCES assignments(id) ON DELETE CASCADE,
+      student_id     INTEGER,
+      filename       TEXT,
+      originalname   TEXT,
+      mimetype       TEXT,
       marks_obtained NUMERIC,
-      percentage    NUMERIC,
-      submitted_at  TIMESTAMPTZ DEFAULT NOW(),
-      graded_at     TIMESTAMPTZ,
-      graded_by     INTEGER
+      percentage     NUMERIC,
+      submitted_at   TIMESTAMPTZ DEFAULT NOW(),
+      graded_at      TIMESTAMPTZ,
+      graded_by      INTEGER
     )
   `);
+
+  // FIX 2: audit_logs — was missing, caused every login/action to throw an error
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id          SERIAL PRIMARY KEY,
+      school_id   INTEGER,
+      admin_id    INTEGER,
+      actor       VARCHAR(200),
+      actor_role  VARCHAR(50),
+      action      VARCHAR(100) NOT NULL,
+      target_type VARCHAR(50),
+      target_id   INTEGER,
+      target      TEXT,
+      detail      TEXT,
+      school      TEXT,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  // assessments — needed by /api/exams/upload and /api/marks
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS assessments (
+      id          SERIAL PRIMARY KEY,
+      school_id   INTEGER,
+      class_id    INTEGER,
+      subject_id  INTEGER,
+      title       VARCHAR(200) NOT NULL,
+      type        VARCHAR(50),
+      date        DATE,
+      max_score   NUMERIC DEFAULT 100,
+      weight      NUMERIC DEFAULT 1,
+      term        VARCHAR(20),
+      created_by  INTEGER,
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  // marks
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS marks (
+      id            SERIAL PRIMARY KEY,
+      assessment_id INTEGER REFERENCES assessments(id) ON DELETE CASCADE,
+      student_id    INTEGER NOT NULL,
+      score         NUMERIC,
+      max_score     NUMERIC,
+      source        VARCHAR(50) DEFAULT 'manual',
+      entered_by    INTEGER,
+      entered_at    TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(assessment_id, student_id)
+    )
+  `);
+
+  // exam_submissions
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS exam_submissions (
+      id            SERIAL PRIMARY KEY,
+      assessment_id INTEGER REFERENCES assessments(id) ON DELETE CASCADE,
+      student_id    INTEGER,
+      filename      TEXT,
+      filepath      TEXT,
+      status        VARCHAR(50) DEFAULT 'uploaded',
+      created_at    TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  // grade_audit_log
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS grade_audit_log (
+      id            SERIAL PRIMARY KEY,
+      school_id     INTEGER,
+      student_id    INTEGER,
+      assessment_id INTEGER,
+      old_score     NUMERIC,
+      new_score     NUMERIC,
+      changed_by    INTEGER,
+      changed_at    TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  console.log('✅ All tables verified');
 }
 
-// Listen immediately — Railway needs the server responding fast
+// Listen immediately — Railway needs fast response
 app.listen(PORT, '0.0.0.0', () => console.log(`Backend running on http://localhost:${PORT}`));
-// Run table check after — non-blocking, won't crash server
+
+// Run table check after — non-blocking
 ensureTables().catch(err => {
   console.error('Table check failed (non-fatal):', err.message);
 });
