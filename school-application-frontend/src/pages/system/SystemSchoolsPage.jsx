@@ -50,50 +50,34 @@ const fieldSx = {
 };
 
 // ── Image upload component (Database storage via base64) ─────────────────────
-const ImageUploader = ({ schoolId, imageId, onImageUpdate }) => {
+// ── Image upload component (stores base64 in form, saved on submit) ──────────
+const ImageUploader = ({ schoolId, imageId, currentBase64, onImageSelect }) => {
   const inputRef = useRef(null);
-  const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(null);
 
   useEffect(() => {
-    if (imageId && schoolId) {
+    if (currentBase64) {
+      setPreview(currentBase64);
+    } else if (imageId && schoolId) {
       setPreview(`${API}/api/system/schools/${schoolId}/image?t=${Date.now()}`);
+    } else {
+      setPreview(null);
     }
-  }, [imageId, schoolId]);
+  }, [imageId, schoolId, currentBase64]);
 
-  const handleFile = async (e) => {
+  const handleFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    // Create preview
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image must be under 5MB.');
+      e.target.value = '';
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (evt) => {
       setPreview(evt.target.result);
-      setUploading(true);
-
-      // Send to backend as base64
-      fetch(`${API}/api/system/schools/${schoolId}/upload-image`, {
-        method: 'POST',
-        headers: jsonHdr(),
-        body: JSON.stringify({ image: evt.target.result }),
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data.success) {
-            onImageUpdate?.(data.imageId);
-          } else {
-            alert('Upload failed: ' + (data.error || 'Unknown error'));
-            setPreview(null);
-          }
-        })
-        .catch(() => {
-          alert('Upload failed — check backend is running.');
-          setPreview(null);
-        })
-        .finally(() => {
-          setUploading(false);
-          e.target.value = '';
-        });
+      onImageSelect?.(evt.target.result); // store base64 in the parent form
+      e.target.value = '';
     };
     reader.readAsDataURL(file);
   };
@@ -109,24 +93,14 @@ const ImageUploader = ({ schoolId, imageId, onImageUpdate }) => {
         sx={{
           width: '100%', height: 180,
           border: `2px dashed ${preview ? BLUE : '#e2e8f0'}`,
-          borderRadius: '10px',
-          overflow: 'hidden',
-          cursor: 'pointer',
+          borderRadius: '10px', overflow: 'hidden', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          bgcolor: '#f8fafc',
-          position: 'relative',
+          bgcolor: '#f8fafc', position: 'relative',
           transition: 'border-color 0.2s, background 0.2s',
           '&:hover': { borderColor: BLUE, bgcolor: 'rgba(56,189,248,0.04)' },
         }}
       >
-        {uploading ? (
-          <Stack alignItems="center" spacing={1}>
-            <CircularProgress size={28} sx={{ color: BLUE }} />
-            <Typography sx={{ fontFamily: FONT, fontSize: '0.78rem', color: '#94a3b8' }}>
-              Uploading…
-            </Typography>
-          </Stack>
-        ) : preview ? (
+        {preview ? (
           <>
             <Box
               component="img"
@@ -136,12 +110,10 @@ const ImageUploader = ({ schoolId, imageId, onImageUpdate }) => {
               onError={(e) => { e.target.style.display = 'none'; }}
             />
             <Box sx={{
-              position: 'absolute', inset: 0,
-              bgcolor: 'rgba(0,0,0,0.45)',
+              position: 'absolute', inset: 0, bgcolor: 'rgba(0,0,0,0.45)',
               display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center',
-              opacity: 0, transition: 'opacity 0.2s',
-              '&:hover': { opacity: 1 },
+              opacity: 0, transition: 'opacity 0.2s', '&:hover': { opacity: 1 },
             }}>
               <CloudUploadIcon sx={{ color: '#fff', fontSize: 28 }} />
               <Typography sx={{ fontFamily: FONT, fontSize: '0.78rem', color: '#fff', mt: 0.5 }}>
@@ -590,7 +562,8 @@ const SystemSchoolsPage = () => {
               <ImageUploader
                 schoolId={editSchool?.id}
                 imageId={editSchool?.image_id}
-                onImageUpdate={(imageId) => setEdit(prev => ({ ...prev, image_id: imageId }))}
+                currentBase64={form.imageBase64}
+                onImageSelect={(base64) => setForm(p => ({ ...p, imageBase64: base64 }))}
               />
             </Grid>
 
