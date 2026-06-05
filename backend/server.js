@@ -14,6 +14,7 @@ const pool = require('./db');
 const { router: authRouter, requireSchoolAdmin, requireSystemAdmin, logAudit, schoolAdminSelfReset } = require('./auth');
 const { router: teacherRouter, requireTeacher, login: teacherLogin, setTeacherCredentials } = require('./routes/teacherRoutes');
 const { setStudentCredentials, resetStudentPassword, bulkGenerate, studentLogin, studentChangePassword, requireStudent } = require('./routes/studentAuth');
+const { router: systemRouter, requireSystemAdmin: requireSystemAdminFromSystem } = require('./routes/systemRoutes');
 const managementRoutes = require('./routes/managementRoutes');
 const phase2Routes     = require('./routes/phase2Routes');
 const phase3Routes     = require('./routes/phase3Routes');
@@ -60,6 +61,9 @@ const systemAdminLoginLimiter = rateLimit({ windowMs: 60*60*1000, max:  5, skipS
 
 app.use('/api/system/login', systemAdminLoginLimiter);
 app.use(authRouter);
+
+// ─── System Admin Routes ──────────────────────────────────────────────────────
+app.use('/api/system', systemRouter);
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/management', requireSchoolAdmin, managementRoutes);
