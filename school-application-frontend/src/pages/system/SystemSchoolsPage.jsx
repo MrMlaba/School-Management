@@ -441,7 +441,7 @@ const SystemSchoolsPage = () => {
                             {s.image_id ? (
                               <Box
                                 component="img"
-                                src={`${API}/api/system/schools/${s.id}/image`}
+                                src={`${API}/api/system/schools/${s.id}/image?v=${s.image_id}`}
                                 alt={s.name}
                                 sx={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
                                 onError={(e) => { e.target.style.display = 'none'; }}
