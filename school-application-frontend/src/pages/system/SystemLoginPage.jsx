@@ -55,6 +55,7 @@ const SystemLoginPage = () => {
   const [error, setError]       = useState('');
 
   useEffect(() => {
+    console.log('[SystemLoginPage] API_BASE:', API_BASE);
     if (localStorage.getItem('systemToken')) navigate('/system/dashboard');
   }, [navigate]);
 
