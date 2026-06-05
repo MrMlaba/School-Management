@@ -33,6 +33,7 @@ const requireSystemAdmin = (req, res, next) => {
 // ─────────────────────────────────────────────────────────────
 
 // POST /api/system/login - System admin login
+// POST /api/system/login - System admin login
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
 
@@ -41,9 +42,9 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    // Query system_admins table
+    // Query system_admin table (singular)
     const result = await pool.query(
-      'SELECT id, username, name, password_hash FROM system_admins WHERE username = $1',
+      'SELECT id, username, name, password_hash FROM system_admin WHERE username = $1',
       [username]
     );
 
@@ -67,7 +68,7 @@ router.post('/login', async (req, res) => {
 
     // Update last login
     await pool.query(
-      'UPDATE system_admins SET last_login = NOW() WHERE id = $1',
+      'UPDATE system_admin SET last_login = NOW() WHERE id = $1',
       [admin.id]
     );
 
@@ -82,7 +83,6 @@ router.post('/login', async (req, res) => {
     return res.status(500).json({ error: 'Server error' });
   }
 });
-
 // ─────────────────────────────────────────────────────────────
 //  IMAGE MANAGEMENT
 // ─────────────────────────────────────────────────────────────
