@@ -14,8 +14,9 @@ import DeleteIcon       from '@mui/icons-material/Delete';
 import VisibilityIcon      from '@mui/icons-material/Visibility';
 import VisibilityOffIcon   from '@mui/icons-material/VisibilityOff';
 import SystemLayout, { FONT, BLUE } from '../../components/system/SystemLayout';
+import API_BASE from '../../config';
 
-const API   = 'http://localhost:5005';
+const API   = API_BASE;
 const token = () => localStorage.getItem('systemToken');
 const hdr   = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` });
 

@@ -16,8 +16,9 @@ import ImageIcon        from '@mui/icons-material/Image';
 import PersonAddIcon    from '@mui/icons-material/PersonAdd';
 import LockResetIcon    from '@mui/icons-material/LockReset';
 import SystemLayout, { FONT, BLUE } from '../../components/system/SystemLayout';
+import API_BASE from '../../config';
 
-const API   = 'http://localhost:5005';
+const API   = API_BASE;
 const token = () => localStorage.getItem('systemToken');
 const hdr   = () => ({ Authorization: `Bearer ${token()}` });
 const jsonHdr = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` });

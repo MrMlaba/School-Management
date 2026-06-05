@@ -4,6 +4,7 @@ import {
   Box, TextField, Button, Typography, CircularProgress,
   InputAdornment, IconButton, GlobalStyles,
 } from '@mui/material';
+import API_BASE from '../../config';
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import VisibilityIcon     from '@mui/icons-material/Visibility';
 import VisibilityOffIcon  from '@mui/icons-material/VisibilityOff';
@@ -63,7 +64,7 @@ const SystemLoginPage = () => {
     setLoading(true);
     setError('');
     try {
-      const res  = await fetch('http://localhost:5005/api/system/login', {
+      const res  = await fetch(`${API_BASE}/api/system/login`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ username, password }),

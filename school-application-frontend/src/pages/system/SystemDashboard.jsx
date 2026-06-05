@@ -11,8 +11,9 @@ import CancelOutlinedIcon       from '@mui/icons-material/CancelOutlined';
 import SchoolOutlinedIcon       from '@mui/icons-material/SchoolOutlined';
 import TodayIcon                from '@mui/icons-material/Today';
 import SystemLayout, { FONT, BLUE } from '../../components/system/SystemLayout';
+import API_BASE from '../../config';
 
-const API = 'http://localhost:5005';
+const API = API_BASE;
 const token = () => localStorage.getItem('systemToken');
 
 // ── Stat card ─────────────────────────────────────────────────

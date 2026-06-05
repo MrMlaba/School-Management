@@ -8,8 +8,9 @@ import {
 import SearchIcon  from '@mui/icons-material/Search';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SystemLayout, { FONT, BLUE } from '../../components/system/SystemLayout';
+import API_BASE from '../../config';
 
-const API   = 'http://localhost:5005';
+const API   = API_BASE;
 const token = () => localStorage.getItem('systemToken');
 const hdr   = () => ({ Authorization: `Bearer ${token()}` });
 
