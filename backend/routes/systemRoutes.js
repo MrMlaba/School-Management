@@ -29,6 +29,61 @@ const requireSystemAdmin = (req, res, next) => {
 };
 
 // ─────────────────────────────────────────────────────────────
+//  SYSTEM ADMIN AUTHENTICATION
+// ─────────────────────────────────────────────────────────────
+
+// POST /api/system/login - System admin login
+router.post('/login', async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+
+  try {
+    // Query system_admins table
+    const result = await pool.query(
+      'SELECT id, username, name, password_hash FROM system_admins WHERE username = $1',
+      [username]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    const admin = result.rows[0];
+    const passwordMatch = await bcrypt.compare(password, admin.password_hash);
+
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: admin.id, username: admin.username, name: admin.name },
+      SYSTEM_JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+
+    // Update last login
+    await pool.query(
+      'UPDATE system_admins SET last_login = NOW() WHERE id = $1',
+      [admin.id]
+    );
+
+    return res.json({
+      success: true,
+      token,
+      username: admin.username,
+      name: admin.name
+    });
+  } catch (err) {
+    console.error('[system-login error]', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
 //  IMAGE MANAGEMENT
 // ─────────────────────────────────────────────────────────────
 
