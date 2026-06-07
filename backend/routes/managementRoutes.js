@@ -375,7 +375,7 @@ router.get('/reports/results', async (req, res) => {
 
       subjects.forEach(sub => {
         const aMarks = assignmentMarks.filter(m => m.student_id === s.id && m.subjectId === sub.id);
-        const eMarks = examResults.filter(m => m.student_id === s.id && m.subjectId === sub.id);
+        const eMarks = examResults2.filter(m => m.student_id === s.id && m.subjectId === sub.id);
         const all    = [...aMarks, ...eMarks];
 
         if (all.length === 0) { subjectResults[sub.id] = null; return; }
