@@ -300,11 +300,11 @@ router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
     const values = [];
     let paramIndex = 1;
 
-    if (name !== undefined) {
+    if (name !== undefined && name !== null) {
       updateFields.push(`name = $${paramIndex++}`);
       values.push(name);
     }
-    if (location !== undefined) {
+    if (location !== undefined && location !== null) {
       updateFields.push(`location = $${paramIndex++}`);
       values.push(location);
     }
@@ -320,11 +320,11 @@ router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
       updateFields.push(`principal = $${paramIndex++}`);
       values.push(principal);
     }
-    if (grades !== undefined) {
+    if (grades !== undefined && grades !== null) {
       updateFields.push(`grades = $${paramIndex++}`);
       values.push(JSON.stringify(grades));
     }
-    if (streams !== undefined) {
+    if (streams !== undefined && streams !== null) {
       updateFields.push(`streams = $${paramIndex++}`);
       values.push(JSON.stringify(streams));
     }
@@ -333,21 +333,36 @@ router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
       values.push(isActive);
     }
 
-    values.push(schoolId);
-    updateFields.push(`updated_at = NOW()`);
+    // If no fields to update except possibly the image, still allow the request
+    if (updateFields.length === 0 && !imageBase64) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
 
-    const result = await pool.query(
-      `UPDATE schools SET ${updateFields.join(', ')} WHERE id = $${paramIndex}
-       RETURNING *`,
-      values
-    );
+    let result = { rows: [{}] };
+    
+    if (updateFields.length > 0) {
+      values.push(schoolId);
+      result = await pool.query(
+        `UPDATE schools SET ${updateFields.join(', ')} WHERE id = $${paramIndex}
+         RETURNING *`,
+        values
+      );
 
-    if (!result.rows[0]) {
-      return res.status(404).json({ error: 'School not found' });
+      if (!result.rows[0]) {
+        return res.status(404).json({ error: 'School not found' });
+      }
+    } else {
+      // If only updating image, fetch current school
+      result = await pool.query(
+        `SELECT * FROM schools WHERE id = $1`,
+        [schoolId]
+      );
+      if (!result.rows[0]) {
+        return res.status(404).json({ error: 'School not found' });
+      }
     }
 
     let updatedSchool = result.rows[0];
-    let newImageId = null;
 
     // Handle image upload if provided
     if (imageBase64) {
@@ -374,7 +389,7 @@ router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
           [schoolId, imageBuffer, mimeType, imageBuffer.length]
         );
 
-        newImageId = imgResult.rows[0].id;
+        const newImageId = imgResult.rows[0].id;
 
         await pool.query(
           'UPDATE schools SET image_id = $1 WHERE id = $2',
@@ -394,8 +409,8 @@ router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
       school: updatedSchool
     });
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
+    console.error('[PATCH /schools error]', err);
+    return res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
 
