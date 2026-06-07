@@ -969,6 +969,42 @@ async function ensureTables() {
     )
   `);
 
+  // school_images — Image storage (BYTEA binary format)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS school_images (
+      id          SERIAL PRIMARY KEY,
+      school_id   INTEGER NOT NULL UNIQUE REFERENCES schools(id) ON DELETE CASCADE,
+      image_data  BYTEA NOT NULL,
+      mime_type   VARCHAR(50) DEFAULT 'image/jpeg',
+      file_size   INTEGER,
+      uploaded_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  // system_admin — System-level administrators
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS system_admin (
+      id              SERIAL PRIMARY KEY,
+      username        VARCHAR(100) NOT NULL UNIQUE,
+      name            VARCHAR(200),
+      password_hash   VARCHAR(255) NOT NULL,
+      is_active       BOOLEAN DEFAULT TRUE,
+      created_at      TIMESTAMPTZ DEFAULT NOW(),
+      last_login      TIMESTAMPTZ
+    )
+  `);
+
+  // Add image_id column to schools if it doesn't exist
+  try {
+    await pool.query(`
+      ALTER TABLE schools ADD COLUMN image_id INTEGER REFERENCES school_images(id) ON DELETE SET NULL
+    `);
+  } catch (err) {
+    if (!err.message.includes('already exists')) {
+      console.warn('Note: image_id column may already exist or ALTER failed:', err.message);
+    }
+  }
+
   console.log('✅ All tables verified');
 }
 

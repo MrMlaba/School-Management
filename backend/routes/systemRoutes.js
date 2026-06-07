@@ -165,7 +165,7 @@ router.get('/schools/:schoolId/image', async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT si.image_data, si.mime_type
+      `SELECT si.image_data, si.mime_type, si.id as image_id
        FROM school_images si
        JOIN schools s ON s.image_id = si.id
        WHERE s.id = $1`,
@@ -176,10 +176,11 @@ router.get('/schools/:schoolId/image', async (req, res) => {
       return res.status(404).json({ error: 'Image not found' });
     }
 
-    const { image_data, mime_type } = result.rows[0];
+    const { image_data, mime_type, image_id } = result.rows[0];
 
     res.setHeader('Content-Type', mime_type);
-    res.setHeader('Cache-Control', 'public, max-age=604800'); // 1 week cache
+    res.setHeader('Cache-Control', 'public, max-age=86400, immutable'); // 24h cache + immutable for versioned URLs
+    res.setHeader('ETag', `"${image_id}"`); // Add ETag for better cache validation
     return res.send(image_data);
   } catch (err) {
     console.error('[get-image error]', err);
@@ -345,6 +346,9 @@ router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
       return res.status(404).json({ error: 'School not found' });
     }
 
+    let updatedSchool = result.rows[0];
+    let newImageId = null;
+
     // Handle image upload if provided
     if (imageBase64) {
       try {
@@ -370,10 +374,15 @@ router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
           [schoolId, imageBuffer, mimeType, imageBuffer.length]
         );
 
+        newImageId = imgResult.rows[0].id;
+
         await pool.query(
           'UPDATE schools SET image_id = $1 WHERE id = $2',
-          [imgResult.rows[0].id, schoolId]
+          [newImageId, schoolId]
         );
+
+        // Update the returned school object with the new image_id
+        updatedSchool = { ...updatedSchool, image_id: newImageId };
       } catch (imgErr) {
         console.error('[image update error]', imgErr);
         // Continue even if image fails
@@ -382,7 +391,7 @@ router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
 
     return res.json({
       success: true,
-      school: result.rows[0]
+      school: updatedSchool
     });
   } catch (err) {
     console.error(err);

@@ -57,10 +57,13 @@ const ImageUploader = ({ schoolId, imageId, currentBase64, onImageSelect }) => {
 
   useEffect(() => {
     if (currentBase64) {
+      // Newly selected image - show base64 directly
       setPreview(currentBase64);
     } else if (imageId && schoolId) {
-      setPreview(`${API}/api/system/schools/${schoolId}/image?t=${Date.now()}`);
+      // Existing image - fetch from server with version parameter for cache-busting
+      setPreview(`${API}/api/system/schools/${schoolId}/image?v=${imageId}`);
     } else {
+      // No image
       setPreview(null);
     }
   }, [imageId, schoolId, currentBase64]);

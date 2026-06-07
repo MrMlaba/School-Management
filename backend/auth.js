@@ -247,63 +247,12 @@ router.delete('/api/system/admins/:id', requireSystemAdmin, async (req, res) => 
   }
 });
 
-// GET /api/system/schools
-router.get('/api/system/schools', requireSystemAdmin, async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT s.*, COUNT(sa.id) AS admin_count, COUNT(a.id) AS application_count
-       FROM schools s
-       LEFT JOIN school_admins sa ON sa.school_id = s.id AND sa.is_active = true
-       LEFT JOIN applications a ON a.school = s.name
-       GROUP BY s.id ORDER BY s.name`
-    );
-    return res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// POST /api/system/schools
-router.post('/api/system/schools', requireSystemAdmin, async (req, res) => {
-  const { name, location, image, grades, streams, phone, email, principal } = req.body;
-  if (!name || !location) return res.status(400).json({ error: 'name and location are required' });
-  try {
-    const result = await pool.query(
-      `INSERT INTO schools (name, location, image, grades, streams, phone, email, principal)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [name, location, image || null, JSON.stringify(grades || ['Grade 8','Grade 9','Grade 10','Grade 11','Grade 12']), JSON.stringify(streams || ['Physics','Commerce','Humanities']), phone || null, email || null, principal || null]
-    );
-    await logAudit(pool, { actor: req.sysAdmin.username, actorRole: 'system_admin', action: 'CREATE_SCHOOL', target: name, school: name });
-    return res.status(201).json({ success: true, school: result.rows[0] });
-  } catch (err) {
-    if (err.code === '23505') return res.status(409).json({ error: 'School name already exists' });
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// PATCH /api/system/schools/:id
-router.patch('/api/system/schools/:id', requireSystemAdmin, async (req, res) => {
-  const { name, location, image, grades, streams, phone, email, principal, isActive } = req.body;
-  try {
-    const result = await pool.query(
-      `UPDATE schools SET
-         name=COALESCE($1,name), location=COALESCE($2,location), image=COALESCE($3,image),
-         grades=COALESCE($4::jsonb,grades), streams=COALESCE($5::jsonb,streams),
-         phone=COALESCE($6,phone), email=COALESCE($7,email), principal=COALESCE($8,principal),
-         is_active=COALESCE($9,is_active)
-       WHERE id=$10 RETURNING *`,
-      [name||null, location||null, image||null, grades?JSON.stringify(grades):null, streams?JSON.stringify(streams):null, phone||null, email||null, principal||null, isActive!==undefined?isActive:null, req.params.id]
-    );
-    if (!result.rows[0]) return res.status(404).json({ error: 'School not found' });
-    await logAudit(pool, { actor: req.sysAdmin.username, actorRole: 'system_admin', action: 'UPDATE_SCHOOL', target: result.rows[0].name, school: result.rows[0].name });
-    return res.json({ success: true, school: result.rows[0] });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
-  }
-});
+// NOTE: School endpoints (GET, POST, PATCH) now handled by systemRoutes.js
+// These were removed to avoid routing conflicts and use proper image_id + school_images table
+// The new endpoints in systemRoutes.js handle:
+// - GET /api/system/schools with admin_count
+// - POST /api/system/schools with imageBase64 → school_images table
+// - PATCH /api/system/schools/:schoolId with image updates
 
 // GET /api/system/overview
 router.get('/api/system/overview', requireSystemAdmin, async (req, res) => {
