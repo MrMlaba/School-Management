@@ -689,9 +689,22 @@ app.post('/api/admin/change-password', requireSchoolAdmin, async (req, res) => {
 // ─── Schools (public) ─────────────────────────────────────────────────────────
 app.get('/api/schools', async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM schools WHERE is_active = true ORDER BY id ASC');
+    const baseUrl = process.env.API_BASE || `${req.protocol}://${req.get('host')}`;
+    const { rows } = await pool.query(
+      `SELECT 
+        id, name, location, phone, email, principal, grades, streams, is_active, created_at, image_id,
+        CASE 
+          WHEN image_id IS NOT NULL THEN $1 || '/api/system/schools/' || id || '/image?v=' || image_id
+          ELSE NULL 
+        END as image
+       FROM schools 
+       WHERE is_active = true 
+       ORDER BY id ASC`,
+      [baseUrl]
+    );
     res.json(rows);
   } catch (err) {
+    console.error('GET /api/schools error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
