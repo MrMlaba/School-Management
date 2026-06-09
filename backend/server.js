@@ -152,18 +152,8 @@ app.use('/api/teacher',    requireTeacher,     teacherQuizRouter);
 app.use('/api/student',    requireStudent,     studentQuizRouter);
 app.use('/api/student',    requireStudent,     chatRoutes);
 
-// ─── File Uploads ─────────────────────────────────────────────────────────────
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename:    (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${crypto.randomBytes(16).toString('hex')}${ext}`);
-  },
-});
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
-
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+// ─── File Uploads — stored in PostgreSQL, not on disk ────────────────────────
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const allowedFileTypes = {
   id:          ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'],
@@ -190,23 +180,11 @@ function validateFile(file, expectedType) {
 const schoolImgDir = path.join(__dirname, 'uploads', 'schools');
 if (!fs.existsSync(schoolImgDir)) fs.mkdirSync(schoolImgDir, { recursive: true });
 
-// ─── School application form template upload ─────────────────────────────────
-const schoolFormDir = path.join(__dirname, 'uploads', 'school-forms');
-if (!fs.existsSync(schoolFormDir)) fs.mkdirSync(schoolFormDir, { recursive: true });
-
-const schoolFormStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, schoolFormDir),
-  filename:    (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, 'form_' + crypto.randomBytes(12).toString('hex') + ext);
-  },
-});
+// ─── School application form template upload — stored in PostgreSQL ───────────
 const uploadSchoolForm = multer({
-  storage:    schoolFormStorage,
+  storage:    multer.memoryStorage(),
   limits:     { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    cb(null, file.mimetype === 'application/pdf');
-  },
+  fileFilter: (req, file, cb) => { cb(null, file.mimetype === 'application/pdf'); },
 });
 
 const schoolImageStorage = multer.diskStorage({
@@ -261,22 +239,35 @@ const requireAnyAuth = (req, res, next) => {
 };
 
 // ─── Serve uploaded documents ─────────────────────────────────────────────────
-app.get('/api/documents/:filename', requireAnyAuth, (req, res) => {
+app.get('/api/documents/:filename', requireAnyAuth, async (req, res) => {
   const filename = path.basename(req.params.filename);
   if (!filename || !/^[a-zA-Z0-9_.-]+$/.test(filename))
     return res.status(400).json({ success: false, message: 'Invalid filename' });
-  const uploadRoot = path.resolve(__dirname, 'uploads');
-  const candidates = [
-    path.join(uploadRoot, filename),
-    path.join(uploadRoot, 'assignments',  filename),
-    path.join(uploadRoot, 'submissions',  filename),
-  ];
-  const found = candidates.find(p => {
-    const resolved = path.resolve(p);
-    return resolved.startsWith(uploadRoot + path.sep) && fs.existsSync(resolved);
-  });
-  if (found) res.sendFile(path.resolve(found));
-  else res.status(404).json({ success: false, message: 'File not found' });
+  try {
+    // Primary: read from PostgreSQL (application documents & school forms)
+    const { rows } = await pool.query(
+      'SELECT data, mimetype, original_name FROM document_files WHERE filename = $1',
+      [filename]
+    );
+    if (rows.length) {
+      res.setHeader('Content-Type', rows[0].mimetype || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `inline; filename="${rows[0].original_name || filename}"`);
+      return res.send(rows[0].data);
+    }
+    // Fallback: disk (legacy assignment/submission files)
+    const uploadRoot = path.resolve(__dirname, 'uploads');
+    const candidates = [
+      path.join(uploadRoot, filename),
+      path.join(uploadRoot, 'assignments', filename),
+      path.join(uploadRoot, 'submissions', filename),
+    ];
+    const found = candidates.find(p => path.resolve(p).startsWith(uploadRoot + path.sep) && fs.existsSync(p));
+    if (found) return res.sendFile(path.resolve(found));
+    res.status(404).json({ success: false, message: 'File not found' });
+  } catch (err) {
+    console.error('GET /api/documents error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 // ─── Student endpoints ────────────────────────────────────────────────────────
@@ -761,15 +752,15 @@ app.patch('/api/admin/schools/application-form', requireSchoolAdmin, uploadSchoo
     const enabled  = req.body.enabled === 'true' || req.body.enabled === true;
 
     if (req.file) {
-      // New template uploaded — delete old file if it exists
-      const { rows } = await pool.query('SELECT application_form_filename FROM schools WHERE id = $1', [schoolId]);
-      if (rows[0]?.application_form_filename) {
-        const old = path.join(schoolFormDir, rows[0].application_form_filename);
-        if (fs.existsSync(old)) fs.unlinkSync(old);
-      }
+      const ext      = path.extname(req.file.originalname).toLowerCase();
+      const filename = crypto.randomBytes(16).toString('hex') + ext;
+      await pool.query(
+        'INSERT INTO document_files (filename, original_name, mimetype, file_size, data) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (filename) DO NOTHING',
+        [filename, req.file.originalname, req.file.mimetype, req.file.size, req.file.buffer]
+      );
       await pool.query(
         `UPDATE schools SET application_form_required=$1, application_form_filename=$2, application_form_originalname=$3 WHERE id=$4`,
-        [enabled, req.file.filename, req.file.originalname, schoolId]
+        [enabled, filename, req.file.originalname, schoolId]
       );
     } else {
       await pool.query(
@@ -793,12 +784,15 @@ app.get('/api/schools/application-form/:schoolId', async (req, res) => {
     );
     if (!rows[0]?.application_form_filename)
       return res.status(404).json({ message: 'No application form available' });
-    const filePath = path.join(schoolFormDir, rows[0].application_form_filename);
-    if (!fs.existsSync(filePath))
+    const { rows: fileRows } = await pool.query(
+      'SELECT data, mimetype, original_name FROM document_files WHERE filename = $1',
+      [rows[0].application_form_filename]
+    );
+    if (!fileRows.length)
       return res.status(404).json({ message: 'Form file not found' });
-    res.setHeader('Content-Disposition', `attachment; filename="${rows[0].application_form_originalname}"`);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.sendFile(filePath);
+    res.setHeader('Content-Disposition', `attachment; filename="${rows[0].application_form_originalname || fileRows[0].original_name}"`);
+    res.setHeader('Content-Type', fileRows[0].mimetype || 'application/pdf');
+    res.send(fileRows[0].data);
   } catch (err) {
     console.error('GET /api/schools/application-form error:', err);
     res.status(500).json({ message: 'Server error' });
@@ -824,15 +818,26 @@ app.post('/api/applications', upload.array('documents', 10), async (req, res) =>
     if (!v.valid) return res.status(400).json({ success: false, message: `File validation failed: ${v.error}` });
   }
   const DOC_NAMES = { id: 'SA ID Copy', parentId: 'Parent/Guardian ID Copy', removal: 'School Removal Letter', gradeResult: 'Previous Grade Result', gradeReport: 'Grade Report' };
-  const baseRequired      = grade === 'Grade 8' ? ['id', 'parentId', 'gradeResult', 'gradeReport'] : ['id', 'parentId', 'removal', 'gradeResult', 'gradeReport'];
-  const uploadedTypes     = documentTypes.map((type, i) => ({ type, filename: documents[i]?.filename || null, originalname: documents[i]?.originalname || null, mimetype: documents[i]?.mimetype || null }));
-  const missing           = baseRequired.filter(r => !uploadedTypes.some(u => u.type === r));
+  const baseRequired  = grade === 'Grade 8' ? ['id', 'parentId', 'gradeResult', 'gradeReport'] : ['id', 'parentId', 'removal', 'gradeResult', 'gradeReport'];
+  // Generate stable filenames and build uploadedTypes
+  const uploadedTypes = documents.map((file, i) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    return { type: documentTypes[i] || 'additional', filename: crypto.randomBytes(16).toString('hex') + ext, originalname: file.originalname, mimetype: file.mimetype };
+  });
+  const missing = baseRequired.filter(r => !uploadedTypes.some(u => u.type === r));
   if (missing.length > 0) {
     const names = missing.map(t => DOC_NAMES[t] || t);
     return res.status(400).json({ success: false, message: `Missing required documents: ${names.join(', ')}` });
   }
   const requiredDocuments = baseRequired;
   try {
+    // Save file buffers to PostgreSQL
+    for (let i = 0; i < documents.length; i++) {
+      await pool.query(
+        'INSERT INTO document_files (filename, original_name, mimetype, file_size, data) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (filename) DO NOTHING',
+        [uploadedTypes[i].filename, documents[i].originalname, documents[i].mimetype, documents[i].size, documents[i].buffer]
+      );
+    }
     const insertedApps = [];
     for (const school of schools) {
       const { rows } = await pool.query(
@@ -934,7 +939,17 @@ app.put('/api/applications/:id', upload.array('documents', 10), async (req, res)
     }
     const DOC_NAMES_PUT    = { id: 'SA ID Copy', parentId: 'Parent/Guardian ID Copy', removal: 'School Removal Letter', gradeResult: 'Previous Grade Result', gradeReport: 'Grade Report' };
     const requiredDocuments = grade === 'Grade 8' ? ['id', 'parentId', 'gradeResult', 'gradeReport'] : ['id', 'parentId', 'removal', 'gradeResult', 'gradeReport'];
-    const newUploaded  = documentTypes.map((type, i) => ({ type, filename: newFiles[i]?.filename || null, originalname: newFiles[i]?.originalname || null, mimetype: newFiles[i]?.mimetype || null }));
+    const newUploaded = newFiles.map((file, i) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      return { type: documentTypes[i] || 'additional', filename: crypto.randomBytes(16).toString('hex') + ext, originalname: file.originalname, mimetype: file.mimetype };
+    });
+    // Save new file buffers to PostgreSQL
+    for (let i = 0; i < newFiles.length; i++) {
+      await pool.query(
+        'INSERT INTO document_files (filename, original_name, mimetype, file_size, data) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (filename) DO NOTHING',
+        [newUploaded[i].filename, newFiles[i].originalname, newFiles[i].mimetype, newFiles[i].size, newFiles[i].buffer]
+      );
+    }
     const existingDocs = Array.isArray(existing.rows[0].documents) ? existing.rows[0].documents : JSON.parse(existing.rows[0].documents || '[]');
     const allDocuments = [...existingDocs, ...newUploaded];
     const missing      = requiredDocuments.filter(r => !allDocuments.some(u => u.type === r));
@@ -1116,6 +1131,19 @@ async function ensureTables() {
       console.warn('Note: image_id column may already exist or ALTER failed:', err.message);
     }
   }
+
+  // document_files — persistent binary storage for uploaded documents (replaces ephemeral disk)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS document_files (
+      id            SERIAL PRIMARY KEY,
+      filename      VARCHAR(255) NOT NULL UNIQUE,
+      original_name VARCHAR(255),
+      mimetype      VARCHAR(100),
+      file_size     INTEGER,
+      data          BYTEA NOT NULL,
+      uploaded_at   TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
 
   // Add application form columns to schools
   for (const col of [
