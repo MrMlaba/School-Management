@@ -331,6 +331,28 @@ const AdminPage = () => {
   const handleViewDocument   = doc => { setSelectedDocument(doc); setDocumentViewerOpen(true); };
   const handleCloseDocViewer = () => { setDocumentViewerOpen(false); setSelectedDocument(null); };
 
+  const openDocument = async (filename, download = false) => {
+    const token = sessionStorage.getItem('adminToken');
+    try {
+      const res = await fetch(
+        `https://school-management-production-6167.up.railway.app/api/documents/${filename}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) throw new Error('Failed');
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      if (download) {
+        const a = document.createElement('a');
+        a.href = url; a.download = filename; a.click();
+      } else {
+        window.open(url, '_blank');
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      setSnackbar({ open: true, message: 'Could not open document. Please try again.', severity: 'error' });
+    }
+  };
+
   const getDocumentTypeName = type => {
     if (!type) return 'Unknown Document';
     if (type.startsWith('schoolForm_')) return `School Form — ${type.replace('schoolForm_', '')}`;
@@ -1007,10 +1029,10 @@ const AdminPage = () => {
                               <Stack direction="row" spacing={0.75}>
                                 <Button size="small" variant="outlined" startIcon={<VisibilityIcon />} onClick={() => handleViewDocument(doc)}>View</Button>
                                 {doc.filename && (
-                                  <Button size="small" variant="contained" startIcon={<DownloadIcon />} onClick={() => window.open(`https://school-management-production-6167.up.railway.app/api/documents/${doc.filename}`, '_blank')}>Download</Button>
+                                  <Button size="small" variant="contained" startIcon={<DownloadIcon />} onClick={() => openDocument(doc.filename, true)}>Download</Button>
                                 )}
                                 {doc.filename && (
-                                  <IconButton size="small" onClick={() => window.open(`https://school-management-production-6167.up.railway.app/api/documents/${doc.filename}`, '_blank')}><OpenInNewIcon fontSize="small" /></IconButton>
+                                  <IconButton size="small" onClick={() => openDocument(doc.filename)}><OpenInNewIcon fontSize="small" /></IconButton>
                                 )}
                               </Stack>
                             </Paper>
@@ -1170,10 +1192,10 @@ const AdminPage = () => {
                 <Stack spacing={1}>
                   {selectedDocument.filename && (
                     <>
-                      <Button variant="contained" startIcon={<OpenInNewIcon />} onClick={() => window.open(`https://school-management-production-6167.up.railway.app/api/documents/${selectedDocument.filename}`, '_blank')}>Open in New Tab</Button>
-                      <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => { const l = document.createElement('a'); l.href = `https://school-management-production-6167.up.railway.app/api/documents/${selectedDocument.filename}`; l.download = selectedDocument.filename; l.click(); }}>Download</Button>
+                      <Button variant="contained" startIcon={<OpenInNewIcon />} onClick={() => openDocument(selectedDocument.filename)}>Open in New Tab</Button>
+                      <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => openDocument(selectedDocument.filename, true)}>Download</Button>
                       {selectedDocument.filename.toLowerCase().endsWith('.pdf') && (
-                        <Button variant="outlined" onClick={() => window.open(`https://school-management-production-6167.up.railway.app/api/documents/${selectedDocument.filename}#toolbar=1`, '_blank')}>Open PDF with Reader</Button>
+                        <Button variant="outlined" onClick={() => openDocument(selectedDocument.filename)}>Open PDF with Reader</Button>
                       )}
                     </>
                   )}

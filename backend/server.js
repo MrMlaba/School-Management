@@ -242,8 +242,26 @@ app.get('/api/school-images/:filename', (req, res) => {
   res.sendFile(filePath);
 });
 
+// ─── Accept any valid token (school admin / student / teacher / system) ──────
+const requireAnyAuth = (req, res, next) => {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer '))
+    return res.status(401).json({ message: 'No token provided' });
+  const token = header.slice(7);
+  const secrets = [
+    process.env.JWT_SECRET         || 'change_me_school',
+    process.env.STUDENT_JWT_SECRET || 'change_me_student',
+    process.env.TEACHER_JWT_SECRET || 'change_me_teacher',
+    process.env.SYSTEM_JWT_SECRET  || 'change_me_system',
+  ];
+  for (const secret of secrets) {
+    try { jwt.verify(token, secret); return next(); } catch {}
+  }
+  return res.status(401).json({ message: 'Invalid or expired token' });
+};
+
 // ─── Serve uploaded documents ─────────────────────────────────────────────────
-app.get('/api/documents/:filename', requireStudent, (req, res) => {
+app.get('/api/documents/:filename', requireAnyAuth, (req, res) => {
   const filename = path.basename(req.params.filename);
   if (!filename || !/^[a-zA-Z0-9_.-]+$/.test(filename))
     return res.status(400).json({ success: false, message: 'Invalid filename' });
