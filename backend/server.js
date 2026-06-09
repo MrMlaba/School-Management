@@ -967,6 +967,43 @@ app.put('/api/applications/:id', upload.array('documents', 10), async (req, res)
   }
 });
 
+// ─── Delete Applications ──────────────────────────────────────────────────────
+app.delete('/api/applications', requireSchoolAdmin, async (req, res) => {
+  const { ids } = req.body;
+  try {
+    let result;
+    if (ids === 'all') {
+      result = await pool.query('DELETE FROM applications WHERE school = $1', [req.admin.school]);
+    } else if (Array.isArray(ids) && ids.length > 0) {
+      result = await pool.query(
+        'DELETE FROM applications WHERE id = ANY($1::int[]) AND school = $2',
+        [ids, req.admin.school]
+      );
+    } else {
+      return res.status(400).json({ success: false, message: 'No IDs provided' });
+    }
+    res.json({ success: true, deleted: result.rowCount });
+  } catch (err) {
+    console.error('DELETE /api/applications error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+app.delete('/api/applications/:id', requireSchoolAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id FROM applications WHERE id = $1 AND school = $2',
+      [req.params.id, req.admin.school]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Application not found' });
+    await pool.query('DELETE FROM applications WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/applications/:id error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 app.get('/api/document-stats', requireSchoolAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM applications WHERE school = $1', [req.admin.school]);

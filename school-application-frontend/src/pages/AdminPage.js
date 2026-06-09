@@ -16,6 +16,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import RestoreIcon from '@mui/icons-material/Restore';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
 import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
@@ -183,6 +184,9 @@ const AdminPage = () => {
   const [formTemplateFile, setFormTemplateFile]     = useState(null);
   const [formTemplateUrl, setFormTemplateUrl]       = useState(null);
   const [formSettingsSaving, setFormSettingsSaving] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen]   = useState(false);
+  const [deleteTarget, setDeleteTarget]             = useState(null); // { type: 'selected'|'all'|'one', ids: [], label: '' }
+  const [deleteLoading, setDeleteLoading]           = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -323,6 +327,55 @@ const AdminPage = () => {
     setSnackbar({ open: true, message: `Bulk ${status} complete`, severity: 'success' });
     setSelectedIds([]);
     await fetchApplications();
+  };
+
+  const confirmDelete = (type, ids = []) => {
+    const label = type === 'all'
+      ? `all ${applications.length} application${applications.length !== 1 ? 's' : ''}`
+      : type === 'one'
+      ? '1 application'
+      : `${ids.length} selected application${ids.length !== 1 ? 's' : ''}`;
+    setDeleteTarget({ type, ids, label });
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirmed = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    const token = sessionStorage.getItem('adminToken');
+    try {
+      let res;
+      if (deleteTarget.type === 'one') {
+        res = await fetch(
+          `https://school-management-production-6167.up.railway.app/api/applications/${deleteTarget.ids[0]}`,
+          { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
+        );
+      } else {
+        res = await fetch(
+          'https://school-management-production-6167.up.railway.app/api/applications',
+          {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ ids: deleteTarget.type === 'all' ? 'all' : deleteTarget.ids }),
+          }
+        );
+      }
+      const data = await res.json();
+      if (data.success) {
+        const count = data.deleted ?? 1;
+        setSnackbar({ open: true, message: `${count} application${count !== 1 ? 's' : ''} deleted.`, severity: 'success' });
+        setSelectedIds([]);
+        setDeleteConfirmOpen(false);
+        setDeleteTarget(null);
+        await fetchApplications();
+      } else {
+        setSnackbar({ open: true, message: 'Failed to delete applications.', severity: 'error' });
+      }
+    } catch {
+      setSnackbar({ open: true, message: 'Network error.', severity: 'error' });
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   useEffect(() => { setPage(1); if (!bulkMode) setSelectedIds([]); }, [bulkMode]);
@@ -473,6 +526,19 @@ const AdminPage = () => {
           </IconButton>
         </span>
       </Tooltip>
+      <Tooltip title="Delete">
+        <IconButton
+          className="action-btn" size="small"
+          onClick={e => { e.stopPropagation(); confirmDelete('one', [app.id]); }}
+          sx={{
+            width: 28, height: 28, borderRadius: '4px',
+            bgcolor: '#FFF1F2', color: '#B91C1C', border: '1px solid #FECDD3',
+            '&:hover': { bgcolor: '#B91C1C', color: '#fff', borderColor: '#B91C1C' },
+          }}
+        >
+          <DeleteOutlineIcon sx={{ fontSize: 15 }} />
+        </IconButton>
+      </Tooltip>
     </Stack>
   );
 
@@ -614,8 +680,31 @@ const AdminPage = () => {
                   >
                     Reject All
                   </Button>
+                  <Button
+                    size="small" variant="contained"
+                    startIcon={<DeleteOutlineIcon />}
+                    onClick={() => confirmDelete('selected', selectedIds)}
+                    sx={{ bgcolor: '#B91C1C', '&:hover': { bgcolor: '#991B1B' }, fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.8rem' }}
+                  >
+                    Delete Selected
+                  </Button>
                 </>
               )}
+              <Button
+                variant="outlined"
+                startIcon={<DeleteOutlineIcon />}
+                onClick={() => confirmDelete('all')}
+                disabled={applications.length === 0}
+                sx={{
+                  borderColor: '#FECDD3', color: '#B91C1C', fontWeight: 700, fontSize: '0.82rem',
+                  textTransform: 'none', borderRadius: '6px', px: '16px', py: '9px',
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  '&:hover': { bgcolor: '#FFF1F2', borderColor: '#B91C1C' },
+                  '&.Mui-disabled': { borderColor: '#E2E8F0', color: T.muted },
+                }}
+              >
+                Delete All
+              </Button>
               <Button
                 variant="contained"
                 startIcon={<FileDownloadOutlinedIcon />}
@@ -1251,6 +1340,47 @@ const AdminPage = () => {
               </Box>
             )}
           </DialogContent>
+        </Dialog>
+
+        {/* ── Delete Confirmation Dialog ──────────────────────────────── */}
+        <Dialog open={deleteConfirmOpen} onClose={() => !deleteLoading && setDeleteConfirmOpen(false)} maxWidth="xs" fullWidth>
+          <DialogTitle sx={{ borderBottom: '1px solid #e2e8f0', pb: 2 }}>
+            <Stack direction="row" alignItems="center" spacing={1.25}>
+              <Avatar sx={{ bgcolor: '#FFF1F2', color: '#B91C1C', width: 36, height: 36 }}>
+                <DeleteOutlineIcon fontSize="small" />
+              </Avatar>
+              <Typography variant="h6" sx={{ color: '#B91C1C' }}>Delete Applications</Typography>
+            </Stack>
+          </DialogTitle>
+          <DialogContent sx={{ pt: 2.5 }}>
+            <Typography variant="body2" sx={{ mb: 1.5 }}>
+              You are about to permanently delete <strong>{deleteTarget?.label}</strong>.
+            </Typography>
+            <Box sx={{ p: 1.5, bgcolor: '#FFF1F2', border: '1px solid #FECDD3', borderLeft: '4px solid #B91C1C', borderRadius: '6px' }}>
+              <Typography variant="body2" sx={{ color: '#991B1B', fontWeight: 600 }}>
+                This action cannot be undone. All application data and associated records will be removed.
+              </Typography>
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+            <Button
+              variant="outlined"
+              onClick={() => setDeleteConfirmOpen(false)}
+              disabled={deleteLoading}
+              sx={{ fontFamily: "'IBM Plex Sans', sans-serif" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleDeleteConfirmed}
+              disabled={deleteLoading}
+              startIcon={deleteLoading ? <CircularProgress size={14} sx={{ color: 'inherit' }} /> : <DeleteOutlineIcon />}
+              sx={{ bgcolor: '#B91C1C', '&:hover': { bgcolor: '#991B1B' }, fontFamily: "'IBM Plex Sans', sans-serif" }}
+            >
+              {deleteLoading ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogActions>
         </Dialog>
 
         <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
