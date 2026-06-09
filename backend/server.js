@@ -166,18 +166,21 @@ const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 const allowedFileTypes = {
-  id:          ['application/pdf'],
+  id:          ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'],
+  parentId:    ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'],
   removal:     ['application/pdf'],
   gradeResult: ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'],
   gradeReport: ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'],
   additional:  ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'],
+  schoolForm:  ['application/pdf'],
 };
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 function validateFile(file, expectedType) {
   if (file.size > MAX_FILE_SIZE)
     return { valid: false, error: 'File size exceeds 5 MB limit' };
-  const allowed = allowedFileTypes[expectedType] || allowedFileTypes.additional;
+  const typeKey = expectedType?.startsWith('schoolForm_') ? 'schoolForm' : expectedType;
+  const allowed = allowedFileTypes[typeKey] || allowedFileTypes.additional;
   if (!allowed.includes(file.mimetype))
     return { valid: false, error: `Invalid file type. Allowed: ${allowed.join(', ')}` };
   return { valid: true };
@@ -911,13 +914,14 @@ app.put('/api/applications/:id', upload.array('documents', 10), async (req, res)
       const v = validateFile(newFiles[i], documentTypes[i] || 'additional');
       if (!v.valid) return res.status(400).json({ success: false, message: `File validation failed: ${v.error}` });
     }
-    const requiredDocuments = grade === 'Grade 8' ? ['id', 'gradeResult', 'gradeReport'] : ['id', 'removal', 'gradeResult', 'gradeReport'];
+    const DOC_NAMES_PUT    = { id: 'SA ID Copy', parentId: 'Parent/Guardian ID Copy', removal: 'School Removal Letter', gradeResult: 'Previous Grade Result', gradeReport: 'Grade Report' };
+    const requiredDocuments = grade === 'Grade 8' ? ['id', 'parentId', 'gradeResult', 'gradeReport'] : ['id', 'parentId', 'removal', 'gradeResult', 'gradeReport'];
     const newUploaded  = documentTypes.map((type, i) => ({ type, filename: newFiles[i]?.filename || null, originalname: newFiles[i]?.originalname || null, mimetype: newFiles[i]?.mimetype || null }));
     const existingDocs = Array.isArray(existing.rows[0].documents) ? existing.rows[0].documents : JSON.parse(existing.rows[0].documents || '[]');
     const allDocuments = [...existingDocs, ...newUploaded];
     const missing      = requiredDocuments.filter(r => !allDocuments.some(u => u.type === r));
     if (missing.length > 0) {
-      const names = missing.map(t => t === 'id' ? 'SA ID Copy' : t === 'removal' ? 'School Removal Letter' : t === 'gradeResult' ? 'Previous Grade Result' : 'Grade Report');
+      const names = missing.map(t => DOC_NAMES_PUT[t] || t);
       return res.status(400).json({ success: false, message: `Missing required documents: ${names.join(', ')}` });
     }
     const { rows } = await pool.query(
