@@ -24,6 +24,7 @@ import DashboardIcon          from '@mui/icons-material/Dashboard';
 import BarChartIcon           from '@mui/icons-material/BarChart';
 import ScheduleIcon           from '@mui/icons-material/Schedule';
 import SchoolIcon from '@mui/icons-material/School';
+import SchoolLogoHeader from '../components/SchoolLogoHeader';
 
 /* ─── Google Fonts ─────────────────────────────────────────────────────── */
 const _fl = document.createElement('link');
@@ -331,6 +332,14 @@ function Sidebar({student,desktopTab,setDesktopTab,overdueCount,pendingQuizzesCo
             <Typography sx={{color:'rgba(255,255,255,0.28)',fontSize:'0.6rem',fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Learning Management</Typography>
           </Box>
         </Box>
+        {student?.schoolId && (
+          <SchoolLogoHeader
+            schoolId={student.schoolId}
+            token={localStorage.getItem('studentToken') || ''}
+            logoHeight={30}
+            sx={{ mt:1.5, p:0.75, background:'#fff', borderRadius:'8px', display:'inline-flex' }}
+          />
+        )}
       </Box>
       {student && (
         <Box sx={{mx:1.5,mt:2,mb:0.5,p:1.5,borderRadius:'12px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.07)',flexShrink:0}}>
@@ -715,6 +724,14 @@ export default function StudentDashboard() {
             </Box>
             <Typography sx={{color:'#fff',fontWeight:700,fontSize:'0.92rem',fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Student Portal</Typography>
           </Box>
+          {student?.schoolId && (
+            <SchoolLogoHeader
+              schoolId={student.schoolId}
+              token={localStorage.getItem('studentToken') || ''}
+              logoHeight={26}
+              sx={{ ml:1, p:0.5, background:'#fff', borderRadius:'6px', display:'inline-flex' }}
+            />
+          )}
           {student&&(
             <Box sx={{display:'flex',alignItems:'center',gap:1}}>
               {overdueCount>0&&<Box sx={{px:1.25,py:'5px',borderRadius:'7px',background:'rgba(220,38,38,0.2)',border:'1px solid rgba(220,38,38,0.3)',display:'flex',alignItems:'center',gap:'5px',animation:'sd-pulse 2.5s ease infinite'}}>

@@ -6,6 +6,9 @@
 //  NEW: GET /api/management/reports/results?classId=X&termId=Y
 //  NEW: GET /api/management/reports/student/:studentId/pdf  (individual report card)
 //  NEW: GET /api/management/reports/class/:classId/pdf      (full class PDF)
+//
+//  UPDATED: Report cards now show the school logo in the header when the school
+//  has one (optional — falls back to the 🏫 emoji when no logo is set).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const express = require('express');
@@ -564,6 +567,28 @@ function getBarColor(pct) {
   return '#C62828';
 }
 
+// ── NEW: school logo lookup ───────────────────────────────────────────────────
+// Returns the public URL of a school's LOGO (from the school_logos table — NOT the
+// home-page picture in school_images), or null if the school has none.
+// The logo is optional — when null, the report header falls back to an emoji.
+// We return a URL (not embedded base64) because the logo endpoint is public and
+// sends cache + ETag headers, so the browser fetches the logo once and reuses it
+// across every page of a class report instead of duplicating the image per student.
+async function getSchoolLogoUrl(req, schoolId) {
+  try {
+    const { rows } = await pool.query(
+      'SELECT 1 FROM school_logos WHERE school_id = $1 LIMIT 1',
+      [schoolId]
+    );
+    if (!rows.length) return null;
+    const base = process.env.API_BASE || `${req.protocol}://${req.get('host')}`;
+    return `${base}/api/system/schools/${schoolId}/logo`;
+  } catch (err) {
+    console.error('[getSchoolLogoUrl]', err);
+    return null; // never block a report because of a logo
+  }
+}
+
 // Build HTML report card for one student
 function buildReportCardHTML(data, schoolLogoUrl) {
   const { student, parents, subjectResults, average, attendance } = data;
@@ -597,6 +622,11 @@ function buildReportCardHTML(data, schoolLogoUrl) {
   const avgColor  = getBarColor(average);
   const avgSym    = getSymbol(average);
 
+  // NEW: school logo (optional). Falls back to the 🏫 emoji when no logo is set.
+  const headerLogo = schoolLogoUrl
+    ? `<img src="${schoolLogoUrl}" alt="School logo" style="width:100%;height:100%;object-fit:contain;border-radius:8px;background:#fff;padding:4px;" />`
+    : '🏫';
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -611,7 +641,7 @@ function buildReportCardHTML(data, schoolLogoUrl) {
 
   /* Header */
   .header{background:#1A3557;color:#fff;padding:28px 36px;display:flex;align-items:center;gap:20px;}
-  .header-logo{width:64px;height:64px;background:rgba(255,255,255,0.15);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;}
+  .header-logo{width:64px;height:64px;background:rgba(255,255,255,0.15);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;overflow:hidden;}
   .header-school{font-size:18px;font-weight:800;letter-spacing:0.02em;}
   .header-sub{font-size:12px;color:rgba(255,255,255,0.65);margin-top:3px;}
   .header-right{margin-left:auto;text-align:right;}
@@ -692,7 +722,7 @@ function buildReportCardHTML(data, schoolLogoUrl) {
 
   <!-- Header -->
   <div class="header">
-    <div class="header-logo">🏫</div>
+    <div class="header-logo">${headerLogo}</div>
     <div>
       <div class="header-school">${student.schoolName}</div>
       <div class="header-sub">Official Student Report Card</div>
@@ -817,7 +847,8 @@ router.get('/reports/student/:studentId/pdf', async (req, res) => {
     const data = await getStudentReportData(schoolId, studentId, termId || null);
     if (!data) return res.status(404).json({ message: 'Student not found' });
 
-    const html = buildReportCardHTML(data);
+    const logo = await getSchoolLogoUrl(req, schoolId);
+    const html = buildReportCardHTML(data, logo);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Content-Disposition', `inline; filename="report_${data.student.studentNumber}.html"`);
     res.send(html);
@@ -862,9 +893,12 @@ router.get('/reports/class/:classId/pdf', async (req, res) => {
     if (!validData.length)
       return res.status(404).json({ message: 'No report data found' });
 
+    // Fetch the school logo once and reuse it for every student's report card
+    const logo = await getSchoolLogoUrl(req, schoolId);
+
     // Combine all into one HTML document — each student is a page break
     const pages = validData.map((data, idx) => {
-      const html = buildReportCardHTML(data);
+      const html = buildReportCardHTML(data, logo);
       // Extract just the body content (between <body> and </body>)
       const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
       const bodyContent = bodyMatch ? bodyMatch[1] : '';
@@ -884,7 +918,7 @@ router.get('/reports/class/:classId/pdf', async (req, res) => {
   body{font-family:'Inter',sans-serif;font-size:13px;color:#1A2332;background:#F0F4F8;padding:20px;}
   .page{background:#fff;max-width:800px;margin:0 auto 32px;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.1);}
   .header{background:#1A3557;color:#fff;padding:28px 36px;display:flex;align-items:center;gap:20px;}
-  .header-logo{width:64px;height:64px;background:rgba(255,255,255,0.15);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;}
+  .header-logo{width:64px;height:64px;background:rgba(255,255,255,0.15);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;overflow:hidden;}
   .header-school{font-size:18px;font-weight:800;letter-spacing:0.02em;}
   .header-sub{font-size:12px;color:rgba(255,255,255,0.65);margin-top:3px;}
   .header-right{margin-left:auto;text-align:right;}

@@ -25,6 +25,7 @@ import TableChartIcon     from '@mui/icons-material/TableChart';
 import ListAltIcon        from '@mui/icons-material/ListAlt';
 import QuizIcon from '@mui/icons-material/Quiz';
 import QuizTab  from './QuizTab';
+import SchoolLogoHeader from '../components/SchoolLogoHeader';
 
 /* ─── Tokens ─────────────────────────────────────────────────────────── */
 const C = {
@@ -1361,6 +1362,13 @@ const TeacherDashboard = () => {
   const firstName = localStorage.getItem('teacherFirstName') || '';
   const lastName  = localStorage.getItem('teacherLastName')  || '';
   const school    = localStorage.getItem('teacherSchool')    || '';
+  const teacherToken = localStorage.getItem('teacherToken') || '';
+  const schoolId = (() => {
+    try {
+      const payload = teacherToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(atob(payload)).schoolId || '';
+    } catch { return ''; }
+  })();
 
   useEffect(() => { if (!localStorage.getItem('teacherToken')) navigate('/teacher-login'); }, [navigate]);
 
@@ -1401,6 +1409,12 @@ const TeacherDashboard = () => {
           <Typography sx={{ color:'rgba(255,255,255,0.4)', fontSize:'0.7rem', ml:'44px', fontFamily:"'IBM Plex Sans', sans-serif" }}>PORTAL</Typography>
         </Box>
         <Box sx={{ px:2.5, py:1.5, borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+          <SchoolLogoHeader
+            schoolId={schoolId}
+            token={teacherToken}
+            logoHeight={34}
+            sx={{ mb:1.25, p:0.75, background:'#fff', borderRadius:'8px', display:'inline-flex' }}
+          />
           <Typography sx={{ color:'rgba(255,255,255,0.35)', fontSize:'0.65rem', fontWeight:700, letterSpacing:'0.1em', textTransform:'uppercase', fontFamily:"'IBM Plex Sans', sans-serif" }}>School</Typography>
           <Typography sx={{ color:'rgba(255,255,255,0.75)', fontSize:'0.78rem', fontWeight:600, mt:0.25, fontFamily:"'IBM Plex Sans', sans-serif" }}>{school||'—'}</Typography>
         </Box>

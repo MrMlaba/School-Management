@@ -1,6 +1,10 @@
 // ============================================================
 //  system-routes.js — System admin school & admin management
 //  Features: School management, admin assignment, DB image storage
+//
+//  UPDATED: School LOGO is now a separate image from the home-page
+//  PICTURE. Pictures live in school_images (schools.image_id);
+//  logos live in school_logos (schools.logo_id). Both are optional.
 // ============================================================
 
 const express = require('express');
@@ -29,10 +33,46 @@ const requireSystemAdmin = (req, res, next) => {
 };
 
 // ─────────────────────────────────────────────────────────────
+//  HELPERS: base64 → buffer storage for picture & logo
+// ─────────────────────────────────────────────────────────────
+
+// Convert a base64 string (with or without a data: prefix) into a buffer + mime.
+function decodeBase64Image(base64, fallbackMime) {
+  let mimeType = fallbackMime;
+  let buffer;
+  const matches = base64.match(/^data:([^;]+);base64,(.+)$/);
+  if (matches) {
+    mimeType = matches[1];
+    buffer = Buffer.from(matches[2], 'base64');
+  } else {
+    buffer = Buffer.from(base64, 'base64');
+  }
+  return { buffer, mimeType };
+}
+
+// Store (or replace) a school's LOGO in school_logos and point schools.logo_id at it.
+async function storeSchoolLogo(schoolId, logoBase64) {
+  const { buffer, mimeType } = decodeBase64Image(logoBase64, 'image/png');
+
+  // Replace any existing logo for this school
+  await pool.query('DELETE FROM school_logos WHERE school_id = $1', [schoolId]);
+
+  const result = await pool.query(
+    `INSERT INTO school_logos (school_id, image_data, mime_type, file_size)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id`,
+    [schoolId, buffer, mimeType, buffer.length]
+  );
+
+  const logoId = result.rows[0].id;
+  await pool.query('UPDATE schools SET logo_id = $1 WHERE id = $2', [logoId, schoolId]);
+  return logoId;
+}
+
+// ─────────────────────────────────────────────────────────────
 //  SYSTEM ADMIN AUTHENTICATION
 // ─────────────────────────────────────────────────────────────
 
-// POST /api/system/login - System admin login
 // POST /api/system/login - System admin login
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
@@ -83,12 +123,13 @@ router.post('/login', async (req, res) => {
     return res.status(500).json({ error: 'Server error' });
   }
 });
+
 // ─────────────────────────────────────────────────────────────
-//  IMAGE MANAGEMENT
+//  IMAGE MANAGEMENT (home-page picture)
 // ─────────────────────────────────────────────────────────────
 
 // POST /api/system/schools/:schoolId/upload-image
-// Upload school image to database (binary storage)
+// Upload school PICTURE to database (binary storage)
 router.post('/schools/:schoolId/upload-image', requireSystemAdmin, async (req, res) => {
   const { schoolId } = req.params;
   if (!req.body || !req.body.image) {
@@ -159,7 +200,7 @@ router.post('/schools/:schoolId/upload-image', requireSystemAdmin, async (req, r
 });
 
 // GET /api/system/schools/:schoolId/image
-// Retrieve school image from database
+// Retrieve school PICTURE from database (public — used on home page)
 router.get('/schools/:schoolId/image', async (req, res) => {
   const { schoolId } = req.params;
 
@@ -189,6 +230,82 @@ router.get('/schools/:schoolId/image', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
+//  LOGO MANAGEMENT (separate from the home-page picture)
+// ─────────────────────────────────────────────────────────────
+
+// POST /api/system/schools/:schoolId/upload-logo
+// Upload school LOGO to database (binary storage)
+router.post('/schools/:schoolId/upload-logo', requireSystemAdmin, async (req, res) => {
+  const { schoolId } = req.params;
+  const logoBase64 = req.body && (req.body.logo || req.body.image);
+  if (!logoBase64) {
+    return res.status(400).json({ error: 'Logo data required' });
+  }
+
+  try {
+    const school = await pool.query('SELECT id FROM schools WHERE id = $1', [schoolId]);
+    if (!school.rows[0]) {
+      return res.status(404).json({ error: 'School not found' });
+    }
+
+    const logoId = await storeSchoolLogo(schoolId, logoBase64);
+
+    return res.json({
+      success: true,
+      logoId,
+      message: 'Logo uploaded successfully'
+    });
+  } catch (err) {
+    console.error('[upload-logo error]', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/system/schools/:schoolId/logo
+// Retrieve school LOGO from database (public — used in dashboards & PDF reports).
+// Looked up directly by school_id (UNIQUE) so it can't desync from schools.logo_id.
+router.get('/schools/:schoolId/logo', async (req, res) => {
+  const { schoolId } = req.params;
+
+  try {
+    const result = await pool.query(
+      `SELECT image_data, mime_type, id AS image_id
+       FROM school_logos
+       WHERE school_id = $1`,
+      [schoolId]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({ error: 'Logo not found' });
+    }
+
+    const { image_data, mime_type, image_id } = result.rows[0];
+
+    res.setHeader('Content-Type', mime_type);
+    res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+    res.setHeader('ETag', `"logo-${image_id}"`);
+    return res.send(image_data);
+  } catch (err) {
+    console.error('[get-logo error]', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE /api/system/schools/:schoolId/logo
+// Remove a school's logo (logo is optional)
+router.delete('/schools/:schoolId/logo', requireSystemAdmin, async (req, res) => {
+  const { schoolId } = req.params;
+  try {
+    await pool.query('UPDATE schools SET logo_id = NULL WHERE id = $1', [schoolId]);
+    await pool.query('DELETE FROM school_logos WHERE school_id = $1', [schoolId]);
+    return res.json({ success: true, message: 'Logo removed' });
+  } catch (err) {
+    console.error('[delete-logo error]', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
 //  SCHOOL MANAGEMENT
 // ─────────────────────────────────────────────────────────────
 
@@ -198,7 +315,7 @@ router.get('/schools', requireSystemAdmin, async (req, res) => {
     const result = await pool.query(
       `SELECT 
          s.id, s.name, s.location, s.phone, s.email, s.principal,
-         s.grades, s.streams, s.is_active, s.created_at, s.image_id,
+         s.grades, s.streams, s.is_active, s.created_at, s.image_id, s.logo_id,
          COUNT(DISTINCT sa.id) AS admin_count,
          COUNT(DISTINCT a.id) AS application_count
        FROM schools s
@@ -217,7 +334,7 @@ router.get('/schools', requireSystemAdmin, async (req, res) => {
 
 // POST /api/system/schools - Create new school
 router.post('/schools', requireSystemAdmin, async (req, res) => {
-  const { name, location, phone, email, principal, grades, streams, imageBase64 } = req.body;
+  const { name, location, phone, email, principal, grades, streams, imageBase64, logoBase64 } = req.body;
 
   if (!name?.trim() || !location?.trim()) {
     return res.status(400).json({ error: 'School name and location are required' });
@@ -242,26 +359,18 @@ router.post('/schools', requireSystemAdmin, async (req, res) => {
 
     const school = schoolResult.rows[0];
     let imageId = null;
+    let logoId = null;
 
-    // Upload image if provided
+    // Upload PICTURE if provided
     if (imageBase64) {
       try {
-        let imageBuffer;
-        let mimeType = 'image/jpeg';
-
-        const matches = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
-        if (matches) {
-          mimeType = matches[1];
-          imageBuffer = Buffer.from(matches[2], 'base64');
-        } else {
-          imageBuffer = Buffer.from(imageBase64, 'base64');
-        }
+        const { buffer, mimeType } = decodeBase64Image(imageBase64, 'image/jpeg');
 
         const imgResult = await pool.query(
           `INSERT INTO school_images (school_id, image_data, mime_type, file_size)
            VALUES ($1, $2, $3, $4)
            RETURNING id`,
-          [school.id, imageBuffer, mimeType, imageBuffer.length]
+          [school.id, buffer, mimeType, buffer.length]
         );
 
         imageId = imgResult.rows[0].id;
@@ -277,9 +386,19 @@ router.post('/schools', requireSystemAdmin, async (req, res) => {
       }
     }
 
+    // Upload LOGO if provided
+    if (logoBase64) {
+      try {
+        logoId = await storeSchoolLogo(school.id, logoBase64);
+      } catch (logoErr) {
+        console.error('[logo upload error]', logoErr);
+        // Continue even if logo fails
+      }
+    }
+
     return res.status(201).json({
       success: true,
-      school: { ...school, image_id: imageId }
+      school: { ...school, image_id: imageId, logo_id: logoId }
     });
   } catch (err) {
     if (err.code === '23505') {
@@ -293,7 +412,7 @@ router.post('/schools', requireSystemAdmin, async (req, res) => {
 // PATCH /api/system/schools/:schoolId - Update school
 router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
   const { schoolId } = req.params;
-  const { name, location, phone, email, principal, grades, streams, imageBase64, isActive } = req.body;
+  const { name, location, phone, email, principal, grades, streams, imageBase64, logoBase64, isActive } = req.body;
 
   try {
     const updateFields = [];
@@ -333,13 +452,13 @@ router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
       values.push(isActive);
     }
 
-    // If no fields to update except possibly the image, still allow the request
-    if (updateFields.length === 0 && !imageBase64) {
+    // If no fields to update except possibly an image/logo, still allow the request
+    if (updateFields.length === 0 && !imageBase64 && !logoBase64) {
       return res.status(400).json({ error: 'No fields to update' });
     }
 
     let result = { rows: [{}] };
-    
+
     if (updateFields.length > 0) {
       values.push(schoolId);
       result = await pool.query(
@@ -352,7 +471,7 @@ router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
         return res.status(404).json({ error: 'School not found' });
       }
     } else {
-      // If only updating image, fetch current school
+      // If only updating image/logo, fetch current school
       result = await pool.query(
         `SELECT * FROM schools WHERE id = $1`,
         [schoolId]
@@ -364,19 +483,10 @@ router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
 
     let updatedSchool = result.rows[0];
 
-    // Handle image upload if provided
+    // Handle PICTURE upload if provided
     if (imageBase64) {
       try {
-        let imageBuffer;
-        let mimeType = 'image/jpeg';
-
-        const matches = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
-        if (matches) {
-          mimeType = matches[1];
-          imageBuffer = Buffer.from(matches[2], 'base64');
-        } else {
-          imageBuffer = Buffer.from(imageBase64, 'base64');
-        }
+        const { buffer, mimeType } = decodeBase64Image(imageBase64, 'image/jpeg');
 
         // Delete old image
         await pool.query('DELETE FROM school_images WHERE school_id = $1', [schoolId]);
@@ -386,7 +496,7 @@ router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
           `INSERT INTO school_images (school_id, image_data, mime_type, file_size)
            VALUES ($1, $2, $3, $4)
            RETURNING id`,
-          [schoolId, imageBuffer, mimeType, imageBuffer.length]
+          [schoolId, buffer, mimeType, buffer.length]
         );
 
         const newImageId = imgResult.rows[0].id;
@@ -401,6 +511,17 @@ router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
       } catch (imgErr) {
         console.error('[image update error]', imgErr);
         // Continue even if image fails
+      }
+    }
+
+    // Handle LOGO upload if provided
+    if (logoBase64) {
+      try {
+        const newLogoId = await storeSchoolLogo(schoolId, logoBase64);
+        updatedSchool = { ...updatedSchool, logo_id: newLogoId };
+      } catch (logoErr) {
+        console.error('[logo update error]', logoErr);
+        // Continue even if logo fails
       }
     }
 

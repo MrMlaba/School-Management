@@ -2145,8 +2145,14 @@ const ManagementDashboard = () => {
   const [collapsed, setCollapsed] = useState(false);
   const school    = localStorage.getItem('adminSchool') || 'School';
   const adminName = localStorage.getItem('adminName')   || 'Admin';
-  const schoolId  = localStorage.getItem('schoolId') || '';
+  
   const adminToken = localStorage.getItem('adminToken') || '';
+  const schoolId = (() => {
+    try {
+      const payload = adminToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(atob(payload)).schoolId || '';
+    } catch { return ''; }
+  })();
 
   useEffect(()=>{ if(!localStorage.getItem('adminToken')) navigate('/login'); },[navigate]);
 

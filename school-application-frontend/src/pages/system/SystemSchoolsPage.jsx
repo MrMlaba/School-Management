@@ -28,7 +28,8 @@ const ALL_GRADES  = ['Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
 const ALL_STREAMS = ['Physics', 'Commerce', 'Humanities'];
 
 const EMPTY_FORM = {
-  name: '', location: '', phone: '', email: '', principal: '', imageBase64: null,
+  name: '', location: '', phone: '', email: '', principal: '',
+  imageBase64: null, logoBase64: null,
   grades:  [...ALL_GRADES],
   streams: [...ALL_STREAMS],
 };
@@ -49,9 +50,20 @@ const fieldSx = {
   '& .MuiInputBase-input':             { fontFamily: FONT, color: '#1e293b' },
 };
 
-// ── Image upload component (Database storage via base64) ─────────────────────
-// ── Image upload component (stores base64 in form, saved on submit) ──────────
-const ImageUploader = ({ schoolId, imageId, currentBase64, onImageSelect }) => {
+// ── Reusable image uploader (Database storage via base64) ─────────────────────
+// Used for BOTH the home-page picture (endpoint="image") and the logo (endpoint="logo").
+// Newly selected files are stored as base64 in the parent form and saved on submit.
+const ImageUploader = ({
+  schoolId,
+  imageId,
+  currentBase64,
+  onImageSelect,
+  title = 'School Image',
+  endpoint = 'image',
+  helper = 'JPG, PNG or WebP · max 5MB',
+  objectFit = 'cover',
+  height = 180,
+}) => {
   const inputRef = useRef(null);
   const [preview, setPreview] = useState(null);
 
@@ -61,12 +73,12 @@ const ImageUploader = ({ schoolId, imageId, currentBase64, onImageSelect }) => {
       setPreview(currentBase64);
     } else if (imageId && schoolId) {
       // Existing image - fetch from server with version parameter for cache-busting
-      setPreview(`${API}/api/system/schools/${schoolId}/image?v=${imageId}`);
+      setPreview(`${API}/api/system/schools/${schoolId}/${endpoint}?v=${imageId}`);
     } else {
       // No image
       setPreview(null);
     }
-  }, [imageId, schoolId, currentBase64]);
+  }, [imageId, schoolId, currentBase64, endpoint]);
 
   const handleFile = (e) => {
     const file = e.target.files[0];
@@ -88,13 +100,13 @@ const ImageUploader = ({ schoolId, imageId, currentBase64, onImageSelect }) => {
   return (
     <Box>
       <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.8rem', color: '#475569', mb: 1 }}>
-        School Image
+        {title}
       </Typography>
 
       <Box
         onClick={() => inputRef.current?.click()}
         sx={{
-          width: '100%', height: 180,
+          width: '100%', height,
           border: `2px dashed ${preview ? BLUE : '#e2e8f0'}`,
           borderRadius: '10px', overflow: 'hidden', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -108,8 +120,8 @@ const ImageUploader = ({ schoolId, imageId, currentBase64, onImageSelect }) => {
             <Box
               component="img"
               src={preview}
-              alt="School"
-              sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              alt={title}
+              sx={{ width: '100%', height: '100%', objectFit }}
               onError={(e) => { e.target.style.display = 'none'; }}
             />
             <Box sx={{
@@ -128,10 +140,10 @@ const ImageUploader = ({ schoolId, imageId, currentBase64, onImageSelect }) => {
           <Stack alignItems="center" spacing={1}>
             <ImageIcon sx={{ fontSize: 36, color: '#cbd5e1' }} />
             <Typography sx={{ fontFamily: FONT, fontSize: '0.8rem', color: '#94a3b8', fontWeight: 500 }}>
-              Click to upload image
+              Click to upload
             </Typography>
-            <Typography sx={{ fontFamily: FONT, fontSize: '0.7rem', color: '#cbd5e1' }}>
-              JPG, PNG or WebP · max 5MB
+            <Typography sx={{ fontFamily: FONT, fontSize: '0.7rem', color: '#cbd5e1', textAlign: 'center', px: 1 }}>
+              {helper}
             </Typography>
           </Stack>
         )}
@@ -246,6 +258,7 @@ const SystemSchoolsPage = () => {
       email: school.email || '',
       principal: school.principal || '',
       imageBase64: null,
+      logoBase64: null,
       grades: Array.isArray(school.grades)
         ? school.grades
         : (typeof school.grades === 'string' ? JSON.parse(school.grades || '[]') : [...ALL_GRADES]),
@@ -279,6 +292,7 @@ const SystemSchoolsPage = () => {
       grades: form.grades,
       streams: form.streams,
       imageBase64: form.imageBase64 || null,
+      logoBase64: form.logoBase64 || null,
     };
 
     try {
@@ -441,7 +455,15 @@ const SystemSchoolsPage = () => {
                         sx={{ '& td': { py: 1.5 }, '&:last-child td': { border: 0 } }}>
                         <TableCell>
                           <Stack direction="row" alignItems="center" spacing={1.25}>
-                            {s.image_id ? (
+                            {s.logo_id ? (
+                              <Box
+                                component="img"
+                                src={`${API}/api/system/schools/${s.id}/logo?v=${s.logo_id}`}
+                                alt={s.name}
+                                sx={{ width: 34, height: 34, borderRadius: '8px', objectFit: 'contain', bgcolor: '#fff', border: '1px solid #e2e8f0', flexShrink: 0 }}
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                            ) : s.image_id ? (
                               <Box
                                 component="img"
                                 src={`${API}/api/system/schools/${s.id}/image?v=${s.image_id}`}
@@ -560,14 +582,31 @@ const SystemSchoolsPage = () => {
 
         <DialogContent sx={{ pt: 3, pb: 2 }}>
           <Grid container spacing={3}>
-            {/* Left column: image */}
+            {/* Left column: picture + logo */}
             <Grid item xs={12} md={4}>
-              <ImageUploader
-                schoolId={editSchool?.id}
-                imageId={editSchool?.image_id}
-                currentBase64={form.imageBase64}
-                onImageSelect={(base64) => setForm(p => ({ ...p, imageBase64: base64 }))}
-              />
+              <Stack spacing={2.5}>
+                <ImageUploader
+                  schoolId={editSchool?.id}
+                  imageId={editSchool?.image_id}
+                  currentBase64={form.imageBase64}
+                  onImageSelect={(base64) => setForm(p => ({ ...p, imageBase64: base64 }))}
+                  title="School Picture (home page)"
+                  endpoint="image"
+                  helper="Campus / building photo · JPG, PNG, WebP · max 5MB"
+                  objectFit="cover"
+                />
+                <ImageUploader
+                  schoolId={editSchool?.id}
+                  imageId={editSchool?.logo_id}
+                  currentBase64={form.logoBase64}
+                  onImageSelect={(base64) => setForm(p => ({ ...p, logoBase64: base64 }))}
+                  title="School Logo (dashboards & reports) — optional"
+                  endpoint="logo"
+                  helper="PNG with transparent background works best · max 5MB"
+                  objectFit="contain"
+                  height={140}
+                />
+              </Stack>
             </Grid>
 
             {/* Right column: fields */}
