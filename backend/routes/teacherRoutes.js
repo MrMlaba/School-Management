@@ -34,23 +34,20 @@ const requireTeacher = (req, res, next) => {
 
 const router = express.Router();
 
-const uploadsRoot    = path.join(__dirname, '..', 'uploads');
-const assignmentsDir = path.join(uploadsRoot, 'assignments');
-const submissionsDir = path.join(uploadsRoot, 'submissions');
-if (!fs.existsSync(assignmentsDir)) fs.mkdirSync(assignmentsDir, { recursive: true });
-if (!fs.existsSync(submissionsDir)) fs.mkdirSync(submissionsDir, { recursive: true });
-
-const diskStorage = (destDir) => multer.diskStorage({
-  destination: (req, file, cb) => cb(null, destDir),
-  filename:    (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${crypto.randomBytes(16).toString('hex')}${ext}`);
-  },
-});
-
-const uploadAssignmentFile = multer({ storage: diskStorage(assignmentsDir), limits: { fileSize: 10 * 1024 * 1024 } });
-const uploadSubmissionFile = multer({ storage: diskStorage(submissionsDir), limits: { fileSize: 10 * 1024 * 1024 } });
+// All uploads go to PostgreSQL BYTEA via document_files — no disk writes for assignments/submissions
+const uploadAssignmentFile = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const uploadSubmissionFile = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const memoryUpload         = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+
+async function saveFileToDb(file) {
+  const ext      = path.extname(file.originalname).toLowerCase();
+  const filename = crypto.randomBytes(16).toString('hex') + ext;
+  await pool.query(
+    'INSERT INTO document_files (filename, original_name, mimetype, file_size, data) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (filename) DO NOTHING',
+    [filename, file.originalname, file.mimetype, file.size, file.buffer]
+  );
+  return filename;
+}
 
 async function ensureSupportTables() {
   await pool.query(`
@@ -70,6 +67,12 @@ async function ensureSupportTables() {
       submitted_at TIMESTAMP DEFAULT NOW(), graded_at TIMESTAMP, graded_by INTEGER
     )
   `);
+  // Add term_id to exams table
+  try {
+    await pool.query(`ALTER TABLE exams ADD COLUMN term_id INTEGER REFERENCES terms(id) ON DELETE SET NULL`);
+  } catch (err) {
+    if (!err.message.includes('already exists')) console.warn('[ensureSupportTables] exams.term_id:', err.message);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -553,10 +556,11 @@ router.post('/assignments', async (req, res) => {
     if (req.file) {
       await ensureSupportTables();
       try {
+        const savedFilename = await saveFileToDb(req.file);
         await pool.query(
           `INSERT INTO assignment_files (assignment_id, filename, originalname, mimetype, uploader_id)
            VALUES ($1,$2,$3,$4,$5)`,
-          [assignment.id, req.file.filename, req.file.originalname, req.file.mimetype, teacherId]
+          [assignment.id, savedFilename, req.file.originalname, req.file.mimetype, teacherId]
         );
       } catch (e) { console.error('[assignment file insert]', e); }
     }
@@ -739,12 +743,13 @@ router.post('/assignments/:id/submit', uploadSubmissionFile.single('file'), asyn
   if (!req.file) return res.status(400).json({ message: 'File is required' });
   try {
     await ensureSupportTables();
+    const filename = await saveFileToDb(req.file);
     const { rows } = await pool.query(
       `INSERT INTO assignment_submissions (assignment_id, student_id, filename, originalname, mimetype)
        VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-      [assignmentId, studentId || null, req.file.filename, req.file.originalname, req.file.mimetype]
+      [assignmentId, studentId || null, filename, req.file.originalname, req.file.mimetype]
     );
-    res.status(201).json({ success: true, submissionId: rows[0].id, url: '/api/documents/' + req.file.filename });
+    res.status(201).json({ success: true, submissionId: rows[0].id, url: '/api/documents/' + filename });
   } catch (err) {
     console.error('[submit assignment]', err);
     res.status(500).json({ message: 'Failed to submit' });
@@ -787,7 +792,8 @@ router.get('/exams', async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT e.id, e.title, e.type, e.exam_date AS "examDate", e.total_marks AS "totalMarks",
-              e.created_at AS "createdAt", c.name AS "className", ss.name AS "subjectName",
+              e.term_id AS "termId", e.created_at AS "createdAt",
+              c.name AS "className", ss.name AS "subjectName",
               (SELECT COUNT(*) FROM results r WHERE r.exam_id = e.id) AS "resultsCaptured"
        FROM exams e
        JOIN classes c ON c.id = e.class_id
@@ -806,21 +812,90 @@ router.get('/exams', async (req, res) => {
 router.post('/exams', async (req, res) => {
   const teacherId = req.teacher.id;
   const schoolId  = req.teacher.schoolId;
-  const { classId, subjectId, title, examDate, totalMarks, type } = req.body;
+  const { classId, subjectId, title, examDate, totalMarks, type, termId } = req.body;
   if (!classId || !subjectId || !title || !examDate)
     return res.status(400).json({ message: 'classId, subjectId, title and examDate are required' });
   try {
+    await ensureSupportTables();
     const { rows: cls } = await pool.query('SELECT academic_year_id FROM classes WHERE id = $1', [classId]);
     const { rows } = await pool.query(
-      `INSERT INTO exams (school_id, class_id, subject_id, teacher_id, title, exam_date, total_marks, type, academic_year_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       RETURNING id, title, exam_date AS "examDate", total_marks AS "totalMarks", type`,
-      [schoolId, classId, subjectId, teacherId, title, examDate, totalMarks || 100, type || 'test', cls[0]?.academic_year_id]
+      `INSERT INTO exams (school_id, class_id, subject_id, teacher_id, title, exam_date, total_marks, type, academic_year_id, term_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       RETURNING id, title, exam_date AS "examDate", total_marks AS "totalMarks", type, term_id AS "termId"`,
+      [schoolId, classId, subjectId, teacherId, title, examDate, totalMarks || 100, type || 'test', cls[0]?.academic_year_id, termId || null]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error('[teacher exams POST]', err);
     res.status(500).json({ message: 'Failed to create exam' });
+  }
+});
+
+// ── Exam marks table — must come BEFORE /:examId routes ──────────────────────
+router.get('/exams/marks-table', async (req, res) => {
+  const schoolId = req.teacher.schoolId;
+  const { classId, termId } = req.query;
+  if (!classId) return res.status(400).json({ message: 'classId is required' });
+  try {
+    const { rows: cls } = await pool.query(
+      'SELECT id, name, grade, stream, academic_year_id FROM classes WHERE id = $1 AND school_id = $2',
+      [classId, schoolId]
+    );
+    if (!cls.length) return res.status(404).json({ message: 'Class not found' });
+    const classRow = cls[0];
+
+    const eParams = [classId];
+    let eQ = `SELECT id, title, total_marks AS "totalMarks", exam_date AS "examDate", term_id AS "termId"
+              FROM exams WHERE class_id = $1`;
+    if (termId) { eParams.push(termId); eQ += ` AND term_id = $${eParams.length}`; }
+    eQ += ' ORDER BY exam_date DESC';
+    const { rows: exams } = await pool.query(eQ, eParams);
+
+    const { rows: students } = await pool.query(
+      `SELECT es.id, es.student_number AS "studentNumber",
+              es.first_name AS "firstName", es.last_name AS "lastName"
+       FROM enrolled_students es
+       WHERE es.school_id = $1 AND ${gradeWhereClause(2)} AND es.is_active = true
+       ORDER BY es.last_name, es.first_name`,
+      [schoolId, String(classRow.grade)]
+    );
+
+    let examResults = [];
+    if (exams.length > 0) {
+      const ids = exams.map(e => e.id);
+      const { rows: rr } = await pool.query(
+        `SELECT exam_id AS "examId", student_id AS "studentId", marks_obtained AS "marksObtained", percentage
+         FROM results WHERE exam_id = ANY($1)`,
+        [ids]
+      );
+      examResults = rr;
+    }
+
+    const resMap = {};
+    examResults.forEach(r => { resMap[`${r.studentId}-${r.examId}`] = r; });
+
+    const studentsWithMarks = students.map(s => ({
+      id: s.id, studentNumber: s.studentNumber, firstName: s.firstName, lastName: s.lastName,
+      marks: exams.reduce((acc, e) => {
+        const r = resMap[`${s.id}-${e.id}`];
+        if (r) acc[String(e.id)] = { marksObtained: r.marksObtained, percentage: r.percentage, graded: true };
+        return acc;
+      }, {}),
+    }));
+
+    let terms = [];
+    if (classRow.academic_year_id) {
+      const { rows: trows } = await pool.query(
+        'SELECT id, term_number AS "termNumber" FROM terms WHERE academic_year_id = $1 ORDER BY term_number',
+        [classRow.academic_year_id]
+      );
+      terms = trows;
+    }
+
+    res.json({ class: classRow, terms, exams, students: studentsWithMarks });
+  } catch (err) {
+    console.error('[teacher exams marks-table GET]', err);
+    res.status(500).json({ message: 'Failed to load exam marks' });
   }
 });
 

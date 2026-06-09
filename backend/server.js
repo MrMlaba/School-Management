@@ -610,11 +610,16 @@ app.post('/api/exams/upload', requireTeacher, upload.single('file'), async (req,
       return res.status(404).json({ message: `Assessment ${assessmentId} not found. Create it first via POST /api/assessments.` });
     }
 
-    const filepath = path.join('uploads', req.file.filename);
+    const ext      = path.extname(req.file.originalname).toLowerCase();
+    const filename = crypto.randomBytes(16).toString('hex') + ext;
+    await pool.query(
+      'INSERT INTO document_files (filename, original_name, mimetype, file_size, data) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (filename) DO NOTHING',
+      [filename, req.file.originalname, req.file.mimetype, req.file.size, req.file.buffer]
+    );
     const { rows } = await pool.query(
       `INSERT INTO exam_submissions (assessment_id, student_id, filename, filepath, status)
        VALUES ($1,$2,$3,$4,'uploaded') RETURNING *`,
-      [assessmentId, studentId, req.file.originalname, filepath]
+      [assessmentId, studentId, filename, '/api/documents/' + filename]
     );
     await logAudit(pool, { actor: req.teacher.username || req.teacher.id, actorRole: 'teacher', action: 'UPLOAD_EXAM_SCAN', target: rows[0].id, school: req.teacher.school || null, detail: JSON.stringify({ filename: req.file.originalname }) });
     res.json({ success: true, submission: rows[0] });

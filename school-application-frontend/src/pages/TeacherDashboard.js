@@ -59,6 +59,17 @@ const C = {
 const BASE  = 'https://school-management-production-6167.up.railway.app';
 const authH = () => ({ Authorization: `Bearer ${sessionStorage.getItem('teacherToken')}` });
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
+
+const openDoc = async (filename, onError) => {
+  try {
+    const res  = await fetch(`${BASE}/api/documents/${filename}`, { headers: authH() });
+    if (!res.ok) throw new Error('Not found');
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch { if (onError) onError('Could not open document.'); }
+};
 const DAYS  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const DAY_S = { Monday:'Mon', Tuesday:'Tue', Wednesday:'Wed', Thursday:'Thu', Friday:'Fri' };
 const SIDEBAR_W = 220;
@@ -807,10 +818,11 @@ const AssignmentsTab = () => {
   const toast = (msg, sev='success') => setSnack({ open:true, msg, sev });
 
   const EMPTY = { classId:'', subjectId:'', title:'', description:'', dueDate:'', totalMarks:'', termId:'' };
-  const [form, setForm] = useState(EMPTY);
-  const [file, setFile] = useState(null);
-  const [slots, setSlots] = useState([]);
-  const [terms, setTerms] = useState([]);
+  const [form,       setForm]       = useState(EMPTY);
+  const [file,       setFile]       = useState(null);
+  const [slots,      setSlots]      = useState([]);
+  const [terms,      setTerms]      = useState([]);
+  const [filterTerm, setFilterTerm] = useState('');
 
   const [filesDialog,        setFilesDialog]        = useState(null);
   const [assignFiles,        setAssignFiles]         = useState([]);
@@ -917,13 +929,29 @@ const AssignmentsTab = () => {
 
         <Box sx={{ px:2.5, pt:2, pb:2.5 }}>
           {/* ══ LIST VIEW ══ */}
-          {view==='list' && (
-            assignments.length===0 ? (
-              <Box sx={{ textAlign:'center', py:6 }}>
-                <AssignmentIcon sx={{ color:C.border, fontSize:44, mb:1 }} />
-                <Typography sx={{ color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>No assignments yet. Create your first one.</Typography>
-              </Box>
-            ) : (
+          {view==='list' && assignments.length===0 && (
+            <Box sx={{ textAlign:'center', py:6 }}>
+              <AssignmentIcon sx={{ color:C.border, fontSize:44, mb:1 }} />
+              <Typography sx={{ color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>No assignments yet. Create your first one.</Typography>
+            </Box>
+          )}
+          {view==='list' && assignments.length>0 && (
+            <>
+              {terms.length > 0 && (
+                <Box sx={{ mb:1.5, display:'flex', alignItems:'center', gap:1, flexWrap:'wrap' }}>
+                  <Typography sx={{ fontSize:'0.8rem', fontWeight:600, color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif", mr:0.5 }}>Filter by term:</Typography>
+                  {[{ id:'', label:'All terms' }, ...terms.map(t=>({ id:String(t.id), label:`Term ${t.termNumber}` }))].map(opt => (
+                    <Button key={opt.id} size="small" onClick={()=>setFilterTerm(opt.id)}
+                      sx={{ textTransform:'none', fontWeight:700, fontFamily:"'IBM Plex Sans', sans-serif",
+                        fontSize:'0.78rem', px:1.5, py:0.4, borderRadius:'6px',
+                        background: filterTerm===opt.id ? C.brand : 'transparent',
+                        color:      filterTerm===opt.id ? C.white : C.muted,
+                        border:    `1px solid ${filterTerm===opt.id ? C.brand : C.border}`,
+                        '&:hover':{ background: filterTerm===opt.id ? C.brand : C.headerBg },
+                      }}>{opt.label}</Button>
+                  ))}
+                </Box>
+              )}
               <TableContainer component={Paper} elevation={0} sx={{ border:`1px solid ${C.border}`, borderRadius:'8px' }}>
                 <Table size="small" sx={{ borderCollapse:'collapse' }}>
                   <TableHead>
@@ -934,14 +962,16 @@ const AssignmentsTab = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {assignments.map((a, idx) => (
+                    {(filterTerm ? assignments.filter(a=>String(a.termId)===filterTerm) : assignments).length===0 ? (
+                      <TableRow><TableCell colSpan={7} sx={{ ...bodyCell, borderRight:'none', textAlign:'center', py:4, color:C.muted }}>No assignments for this term.</TableCell></TableRow>
+                    ) : (filterTerm ? assignments.filter(a=>String(a.termId)===filterTerm) : assignments).map((a, idx) => (
                       <TableRow key={a.id} sx={{ backgroundColor:idx%2===0?C.white:C.rowAlt, '&:hover':{ background:'#F0F7FF' } }}>
                         <TableCell sx={{ ...bodyCell, fontWeight:600 }}>{a.title}</TableCell>
                         <TableCell sx={bodyCell}>{a.className}</TableCell>
                         <TableCell sx={bodyCell}>{a.subjectName}</TableCell>
                         <TableCell sx={bodyCell}>
                           {a.termId ? (
-                            <Chip label={`Term ${terms.find(t=>t.id===a.termId)?.termNumber || terms.find(t=>t.id===a.termId)?.term_number || '?'}`} size="small"
+                            <Chip label={`Term ${terms.find(t=>String(t.id)===String(a.termId))?.termNumber||'?'}`} size="small"
                               sx={{ fontWeight:700, fontSize:'0.7rem', bgcolor:'#EEF2FF', color:'#3730A3' }} />
                           ) : <Typography sx={{ fontSize:'0.78rem', color:C.muted, fontStyle:'italic', fontFamily:"'IBM Plex Sans', sans-serif" }}>—</Typography>}
                         </TableCell>
@@ -959,7 +989,7 @@ const AssignmentsTab = () => {
                   </TableBody>
                 </Table>
               </TableContainer>
-            )
+            </>
           )}
 
           {/* ══ MARKS TABLE VIEW ══ */}
@@ -1021,7 +1051,7 @@ const AssignmentsTab = () => {
                 <Typography sx={{ fontWeight:600, fontSize:'0.875rem', color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>{f.originalname||f.filename}</Typography>
                 <Typography sx={{ fontSize:'0.75rem', color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>{f.mimetype} · {new Date(f.uploadedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</Typography>
               </Box>
-              <Button size="small" variant="contained" href={`${BASE}/api/documents/${f.filename}`} target="_blank" rel="noreferrer"
+              <Button size="small" variant="contained" onClick={() => openDoc(f.filename, toast)}
                 sx={{ background:C.brand, textTransform:'none', fontWeight:700, boxShadow:'none', borderRadius:'6px', fontFamily:"'IBM Plex Sans', sans-serif" }}>Open</Button>
             </Box>
           ))}
@@ -1049,7 +1079,7 @@ const AssignmentsTab = () => {
                   {submissions.map(s => (
                     <TableRow key={s.id}>
                       <TableCell sx={bodyCell}>{s.firstName?`${s.firstName} ${s.lastName}`:(s.studentId||'Guest')}</TableCell>
-                      <TableCell sx={bodyCell}>{s.filename?<a href={`${BASE}/api/documents/${s.filename}`} target="_blank" rel="noreferrer">{s.originalname||s.filename}</a>:'—'}</TableCell>
+                      <TableCell sx={bodyCell}>{s.filename?<Button size="small" variant="text" onClick={()=>openDoc(s.filename,toast)} sx={{ textTransform:'none', fontWeight:600, color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif", p:0, minWidth:0 }}>{s.originalname||s.filename}</Button>:'—'}</TableCell>
                       <TableCell sx={bodyCell}>{new Date(s.submittedAt).toLocaleString()}</TableCell>
                       <TableCell sx={bodyCell}>
                         <TextField size="small" type="number" defaultValue={s.marksObtained??''} onChange={e=>s.marksTmp=e.target.value} sx={{ width:80 }} />
@@ -1081,28 +1111,171 @@ const AssignmentsTab = () => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════
+   EXAM MARKS TABLE VIEW
+══════════════════════════════════════════════════════════════════════ */
+const ExamMarksTableView = () => {
+  const [classes,  setClasses]  = useState([]);
+  const [selClass, setSelClass] = useState('');
+  const [selTerm,  setSelTerm]  = useState('');
+  const [data,     setData]     = useState(null);
+  const [loading,  setLoading]  = useState(false);
+
+  useEffect(() => {
+    fetch(`${BASE}/api/teacher/dashboard`, { headers: authH() })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setClasses(d.myClasses || []); });
+  }, []);
+
+  useEffect(() => {
+    if (!selClass) return;
+    setLoading(true); setData(null);
+    const params = new URLSearchParams({ classId: selClass });
+    if (selTerm) params.append('termId', selTerm);
+    (async () => {
+      const res = await fetch(`${BASE}/api/teacher/exams/marks-table?${params}`, { headers: authH() });
+      if (res.status === 404) { setData({ exams:[], students:[], terms:[] }); setLoading(false); return; }
+      if (!res.ok) { setData(null); setLoading(false); return; }
+      setData(await res.json());
+      setLoading(false);
+    })();
+  }, [selClass, selTerm]);
+
+  const examAvg = (students, examId) => {
+    const graded = students.filter(s => s.marks[String(examId)]?.percentage != null);
+    if (!graded.length) return null;
+    return (graded.reduce((acc,s) => acc + parseFloat(s.marks[String(examId)].percentage), 0) / graded.length).toFixed(1);
+  };
+
+  const terms   = data?.terms   || [];
+  const exams   = data?.exams   || [];
+  const students = data?.students || [];
+
+  return (
+    <Box>
+      <Box sx={{ display:'flex', gap:2, mb:2, flexWrap:'wrap', alignItems:'center' }}>
+        <TextField select label="Class" value={selClass} onChange={e=>{ setSelClass(e.target.value); setSelTerm(''); }} size="small" sx={{ minWidth:200 }}>
+          <MenuItem value="">— Select class —</MenuItem>
+          {classes.map(c=><MenuItem key={c.id} value={c.id}>{c.name}{c.stream?` (${c.stream})`:''}</MenuItem>)}
+        </TextField>
+        {terms.length > 0 && (
+          <TextField select label="Term" value={selTerm} onChange={e=>setSelTerm(e.target.value)} size="small" sx={{ minWidth:160 }}>
+            <MenuItem value="">All terms</MenuItem>
+            {terms.map(t=><MenuItem key={t.id} value={t.id}>Term {t.termNumber}</MenuItem>)}
+          </TextField>
+        )}
+      </Box>
+
+      {!selClass && <Box sx={{ textAlign:'center', py:8 }}><GradeIcon sx={{ fontSize:52, color:C.border, mb:1.5 }} /><Typography sx={{ color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif", fontWeight:600 }}>Select a class to view exam marks</Typography></Box>}
+      {selClass && loading && <Box sx={{ display:'flex', justifyContent:'center', py:6 }}><CircularProgress sx={{ color:C.brand }} /></Box>}
+      {selClass && !loading && data && exams.length===0 && <Box sx={{ textAlign:'center', py:8 }}><GradeIcon sx={{ fontSize:52, color:C.border, mb:1.5 }} /><Typography sx={{ color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif", fontWeight:600 }}>No exams{selTerm?' for this term':''} yet</Typography></Box>}
+
+      {selClass && !loading && data && exams.length>0 && (
+        <>
+          <Box sx={{ display:'flex', gap:2, mb:1.5, p:1.5, borderRadius:'8px', background:C.headerBg, border:`1px solid ${C.border}` }}>
+            {[
+              { label:'Students',  value: students.length },
+              { label:'Exams',     value: exams.length },
+              { label:'Captured',  value: students.reduce((n,s) => n + exams.filter(e => s.marks[String(e.id)]?.graded).length, 0) },
+            ].map(stat => (
+              <Box key={stat.label} sx={{ px:2, py:1, borderRadius:'8px', background:C.white, border:`1px solid ${C.border}` }}>
+                <Typography sx={{ fontSize:'1.1rem', fontWeight:800, color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif", lineHeight:1 }}>{stat.value}</Typography>
+                <Typography sx={{ fontSize:'0.72rem', color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>{stat.label}</Typography>
+              </Box>
+            ))}
+          </Box>
+          <TableContainer component={Paper} elevation={0} sx={{ border:`1px solid ${C.border}`, borderRadius:'8px', overflowX:'auto' }}>
+            <Table size="small" sx={{ borderCollapse:'collapse', minWidth: 400 + exams.length * 110 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ ...headCell, minWidth:140 }}>Student</TableCell>
+                  {exams.map(e=>(
+                    <TableCell key={e.id} sx={{ ...headCell, textAlign:'center', minWidth:110, verticalAlign:'bottom', pb:1 }}>
+                      <Typography sx={{ fontSize:'0.72rem', fontWeight:700, color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif", lineHeight:1.3 }}>{e.title}</Typography>
+                      <Typography sx={{ fontSize:'0.65rem', color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>/{e.totalMarks}</Typography>
+                    </TableCell>
+                  ))}
+                  <TableCell sx={{ ...headCell, textAlign:'center', borderRight:'none', minWidth:80 }}>Avg %</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {students.map((s, idx) => {
+                  const marks = exams.map(e => s.marks[String(e.id)]);
+                  const graded = marks.filter(m => m?.percentage != null);
+                  const avg = graded.length ? (graded.reduce((a,m)=>a+parseFloat(m.percentage),0)/graded.length).toFixed(1) : null;
+                  const avgTheme = pctTheme(avg);
+                  return (
+                    <TableRow key={s.id} sx={{ backgroundColor:idx%2===0?C.white:C.rowAlt }}>
+                      <TableCell sx={{ ...bodyCell, fontWeight:600 }}>{s.firstName} {s.lastName}</TableCell>
+                      {exams.map(e => {
+                        const mark = s.marks[String(e.id)];
+                        const t    = pctTheme(mark?.percentage);
+                        return (
+                          <TableCell key={e.id} sx={{ ...bodyCell, textAlign:'center', p:'6px 8px' }}>
+                            {mark ? (
+                              <Box sx={{ display:'inline-flex', flexDirection:'column', alignItems:'center', px:1, py:0.5, borderRadius:'6px', bgcolor:t.bg, border:`1px solid ${t.border}`, minWidth:60 }}>
+                                <Typography sx={{ fontSize:'0.82rem', fontWeight:700, color:t.text, fontFamily:"'IBM Plex Sans', sans-serif", lineHeight:1 }}>{mark.marksObtained}</Typography>
+                                <Typography sx={{ fontSize:'0.65rem', color:t.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>{mark.percentage}%</Typography>
+                              </Box>
+                            ) : <Typography sx={{ fontSize:'0.75rem', color:C.muted, fontStyle:'italic' }}>—</Typography>}
+                          </TableCell>
+                        );
+                      })}
+                      <TableCell sx={{ ...bodyCell, textAlign:'center', borderRight:'none' }}>
+                        {avg ? <Box sx={{ display:'inline-flex', px:1.25, py:0.5, borderRadius:'6px', bgcolor:avgTheme.bg, border:`1px solid ${avgTheme.border}` }}><Typography sx={{ fontSize:'0.82rem', fontWeight:700, color:avgTheme.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>{avg}%</Typography></Box> : <Typography sx={{ fontSize:'0.75rem', color:C.muted }}>—</Typography>}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                <TableRow sx={{ background:C.headerBg }}>
+                  <TableCell sx={{ ...headCell, fontWeight:700 }}>Class Avg</TableCell>
+                  {exams.map(e => {
+                    const avg   = examAvg(students, e.id);
+                    const theme = pctTheme(avg);
+                    return (
+                      <TableCell key={e.id} sx={{ ...headCell, textAlign:'center' }}>
+                        {avg ? <Box sx={{ display:'inline-flex', px:1, py:0.4, borderRadius:'6px', bgcolor:theme.bg, border:`1px solid ${theme.border}` }}><Typography sx={{ fontSize:'0.78rem', fontWeight:700, color:theme.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>{avg}%</Typography></Box> : <Typography sx={{ fontSize:'0.75rem', color:C.muted }}>—</Typography>}
+                      </TableCell>
+                    );
+                  })}
+                  <TableCell sx={{ ...headCell, borderRight:'none' }} />
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </>
+      )}
+    </Box>
+  );
+};
+
+/* ══════════════════════════════════════════════════════════════════════
    EXAMS TAB
 ══════════════════════════════════════════════════════════════════════ */
 const ExamsTab = () => {
   const [exams,         setExams]         = useState([]);
   const [slots,         setSlots]         = useState([]);
+  const [terms,         setTerms]         = useState([]);
   const [dialog,        setDialog]        = useState(false);
   const [resultsDialog, setResultsDialog] = useState(null);
   const [resultsData,   setResultsData]   = useState(null);
   const [saving,        setSaving]        = useState(false);
+  const [filterTerm,    setFilterTerm]    = useState('');
+  const [view,          setView]          = useState('list'); // 'list' | 'marks'
   const [snack,         setSnack]         = useState({ open:false, msg:'', sev:'success' });
   const toast = (msg, sev='success') => setSnack({ open:true, msg, sev });
 
-  const EMPTY = { classId:'', subjectId:'', title:'', examDate:'', totalMarks:100, type:'test' };
+  const EMPTY = { classId:'', subjectId:'', title:'', examDate:'', totalMarks:100, type:'test', termId:'' };
   const [form, setForm] = useState(EMPTY);
 
   const fetchAll = useCallback(async () => {
-    const [eRes, tRes] = await Promise.all([
+    const [eRes, tRes, termsRes] = await Promise.all([
       fetch(`${BASE}/api/teacher/exams`,     { headers:authH() }),
       fetch(`${BASE}/api/teacher/timetable`, { headers:authH() }),
+      fetch(`${BASE}/api/teacher/terms`,     { headers:authH() }),
     ]);
-    if (eRes.ok) setExams(await eRes.json());
-    if (tRes.ok) { const d=await tRes.json(); setSlots(d.slots); }
+    if (eRes.ok)    setExams(await eRes.json());
+    if (tRes.ok)    { const d=await tRes.json(); setSlots(d.slots); }
+    if (termsRes.ok) setTerms(await termsRes.json());
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -1140,40 +1313,88 @@ const ExamsTab = () => {
   return (
     <>
       <Card>
-        <CardHeader title="Exams & Results" subtitle="Create exams and capture student results"
-          action={
-            <Button variant="contained" startIcon={<AddIcon />} onClick={()=>{ setForm(EMPTY); setDialog(true); }}
-              sx={{ background:C.brand, textTransform:'none', fontWeight:700, boxShadow:'none', borderRadius:'8px', fontFamily:"'IBM Plex Sans', sans-serif" }}>
-              New Exam
-            </Button>
-          } />
-        <Box sx={{ px:2.5, pb:2.5 }}>
-          {exams.length===0 ? (
+        <Box sx={{ px:2.5, pt:2.5, pb:0 }}>
+          <Box sx={{ display:'flex', justifyContent:'space-between', alignItems:'center', mb:1.5 }}>
+            <Box sx={{ display:'flex', gap:1 }}>
+              {[
+                { key:'list',  icon:<ListAltIcon sx={{ fontSize:17 }} />,   label:'Exam List'   },
+                { key:'marks', icon:<TableChartIcon sx={{ fontSize:17 }} />, label:'Marks Table' },
+              ].map(v => (
+                <Button key={v.key} size="small" startIcon={v.icon} onClick={()=>setView(v.key)} sx={{
+                  textTransform:'none', fontWeight:700, fontFamily:"'IBM Plex Sans', sans-serif",
+                  fontSize:'0.82rem', px:2, py:0.75, borderRadius:'8px',
+                  background: view===v.key ? C.brand : 'transparent',
+                  color:      view===v.key ? C.white : C.muted,
+                  border:    `1.5px solid ${view===v.key ? C.brand : C.border}`,
+                  '&:hover':{ background: view===v.key ? C.brand : C.headerBg },
+                }}>{v.label}</Button>
+              ))}
+            </Box>
+            {view==='list' && (
+              <Button variant="contained" startIcon={<AddIcon />} onClick={()=>{ setForm(EMPTY); setDialog(true); }}
+                sx={{ background:C.brand, textTransform:'none', fontWeight:700, boxShadow:'none', borderRadius:'8px', fontFamily:"'IBM Plex Sans', sans-serif" }}>
+                New Exam
+              </Button>
+            )}
+          </Box>
+          <Divider sx={{ borderColor:C.border }} />
+        </Box>
+
+        <Box sx={{ px:2.5, pt:2, pb:2.5 }}>
+          {/* ══ LIST VIEW ══ */}
+          {view==='list' && exams.length===0 && (
             <Box sx={{ textAlign:'center', py:6 }}><GradeIcon sx={{ color:C.border, fontSize:44, mb:1 }} /><Typography sx={{ color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>No exams yet.</Typography></Box>
-          ) : (
-            <TableContainer component={Paper} elevation={0} sx={{ border:`1px solid ${C.border}`, borderRadius:'8px' }}>
-              <Table size="small" sx={{ borderCollapse:'collapse' }}>
-                <TableHead>
-                  <TableRow>{['Title','Class','Subject','Type','Date','Results',''].map(h=><TableCell key={h} sx={{ ...headCell, ...(h===''?{borderRight:'none'}:{}) }}>{h}</TableCell>)}</TableRow>
-                </TableHead>
-                <TableBody>
-                  {exams.map((e, idx) => (
-                    <TableRow key={e.id} sx={{ backgroundColor:idx%2===0?C.white:C.rowAlt, '&:hover':{ background:'#F0F7FF' } }}>
-                      <TableCell sx={{ ...bodyCell, fontWeight:600 }}>{e.title}</TableCell>
-                      <TableCell sx={bodyCell}>{e.className}</TableCell>
-                      <TableCell sx={bodyCell}>{e.subjectName}</TableCell>
-                      <TableCell sx={bodyCell}><Chip label={e.type} size="small" sx={{ fontWeight:700, fontSize:'0.7rem', textTransform:'capitalize', bgcolor:'#EEF2FF', color:'#3730A3' }} /></TableCell>
-                      <TableCell sx={bodyCell}>{new Date(e.examDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</TableCell>
-                      <TableCell sx={bodyCell}><Typography sx={{ fontSize:'0.82rem', fontWeight:600, color:parseInt(e.resultsCaptured)>0?C.accent:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>{e.resultsCaptured} captured</Typography></TableCell>
-                      <TableCell sx={{ ...bodyCell, borderRight:'none' }}>
-                        <Button size="small" variant="outlined" onClick={()=>openResults(e)} sx={{ textTransform:'none', fontWeight:600, fontSize:'0.75rem', borderColor:C.brand, color:C.brand, borderRadius:'6px', fontFamily:"'IBM Plex Sans', sans-serif" }}>Enter Results</Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
           )}
+          {view==='list' && exams.length>0 && (
+            <>
+              {terms.length > 0 && (
+                <Box sx={{ mb:1.5, display:'flex', alignItems:'center', gap:1, flexWrap:'wrap' }}>
+                  <Typography sx={{ fontSize:'0.8rem', fontWeight:600, color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif", mr:0.5 }}>Filter by term:</Typography>
+                  {[{ id:'', label:'All terms' }, ...terms.map(t=>({ id:String(t.id), label:`Term ${t.termNumber}` }))].map(opt => (
+                    <Button key={opt.id} size="small" onClick={()=>setFilterTerm(opt.id)}
+                      sx={{ textTransform:'none', fontWeight:700, fontFamily:"'IBM Plex Sans', sans-serif",
+                        fontSize:'0.78rem', px:1.5, py:0.4, borderRadius:'6px',
+                        background: filterTerm===opt.id ? C.brand : 'transparent',
+                        color:      filterTerm===opt.id ? C.white : C.muted,
+                        border:    `1px solid ${filterTerm===opt.id ? C.brand : C.border}`,
+                        '&:hover':{ background: filterTerm===opt.id ? C.brand : C.headerBg },
+                      }}>{opt.label}</Button>
+                  ))}
+                </Box>
+              )}
+              <TableContainer component={Paper} elevation={0} sx={{ border:`1px solid ${C.border}`, borderRadius:'8px' }}>
+                <Table size="small" sx={{ borderCollapse:'collapse' }}>
+                  <TableHead>
+                    <TableRow>{['Title','Class','Subject','Term','Type','Date','Results',''].map(h=><TableCell key={h} sx={{ ...headCell, ...(h===''?{borderRight:'none'}:{}) }}>{h}</TableCell>)}</TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(filterTerm ? exams.filter(e=>String(e.termId)===filterTerm) : exams).length===0 ? (
+                      <TableRow><TableCell colSpan={8} sx={{ ...bodyCell, borderRight:'none', textAlign:'center', py:4, color:C.muted }}>No exams for this term.</TableCell></TableRow>
+                    ) : (filterTerm ? exams.filter(e=>String(e.termId)===filterTerm) : exams).map((e, idx) => (
+                      <TableRow key={e.id} sx={{ backgroundColor:idx%2===0?C.white:C.rowAlt, '&:hover':{ background:'#F0F7FF' } }}>
+                        <TableCell sx={{ ...bodyCell, fontWeight:600 }}>{e.title}</TableCell>
+                        <TableCell sx={bodyCell}>{e.className}</TableCell>
+                        <TableCell sx={bodyCell}>{e.subjectName}</TableCell>
+                        <TableCell sx={bodyCell}>
+                          {e.termId ? <Chip label={`Term ${terms.find(t=>String(t.id)===String(e.termId))?.termNumber||'?'}`} size="small" sx={{ fontWeight:700, fontSize:'0.7rem', bgcolor:'#EEF2FF', color:'#3730A3' }} />
+                            : <Typography sx={{ fontSize:'0.78rem', color:C.muted, fontStyle:'italic', fontFamily:"'IBM Plex Sans', sans-serif" }}>—</Typography>}
+                        </TableCell>
+                        <TableCell sx={bodyCell}><Chip label={e.type} size="small" sx={{ fontWeight:700, fontSize:'0.7rem', textTransform:'capitalize', bgcolor:'#EEF2FF', color:'#3730A3' }} /></TableCell>
+                        <TableCell sx={bodyCell}>{new Date(e.examDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</TableCell>
+                        <TableCell sx={bodyCell}><Typography sx={{ fontSize:'0.82rem', fontWeight:600, color:parseInt(e.resultsCaptured)>0?C.accent:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>{e.resultsCaptured} captured</Typography></TableCell>
+                        <TableCell sx={{ ...bodyCell, borderRight:'none' }}>
+                          <Button size="small" variant="outlined" onClick={()=>openResults(e)} sx={{ textTransform:'none', fontWeight:600, fontSize:'0.75rem', borderColor:C.brand, color:C.brand, borderRadius:'6px', fontFamily:"'IBM Plex Sans', sans-serif" }}>Enter Results</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </>
+          )}
+
+          {/* ══ MARKS TABLE VIEW ══ */}
+          {view==='marks' && <ExamMarksTableView />}
         </Box>
       </Card>
 
@@ -1199,6 +1420,10 @@ const ExamsTab = () => {
               {['test','exam','practical','assignment'].map(t=><MenuItem key={t} value={t} sx={{ textTransform:'capitalize' }}>{t}</MenuItem>)}
             </TextField>
           </Box>
+          <TextField select label="Term *" value={form.termId} onChange={e=>setForm(f=>({...f,termId:e.target.value}))} size="small" fullWidth helperText="Select the term this exam belongs to — used for report generation">
+            <MenuItem value="">— No specific term —</MenuItem>
+            {terms.map(t=><MenuItem key={t.id} value={t.id}>Term {t.termNumber}</MenuItem>)}
+          </TextField>
         </DialogContent>
         <Divider />
         <DialogActions sx={{ px:3, py:2, gap:1 }}>
