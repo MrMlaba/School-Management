@@ -38,6 +38,7 @@ import AssessmentIcon   from '@mui/icons-material/Assessment';
 import PushPinIcon      from '@mui/icons-material/PushPin';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import RestoreIcon from '@mui/icons-material/Restore';
+import SchoolLogoHeader from '../components/SchoolLogoHeader';
 /* ═══════════════════════════════════════════════════════════════
    TOKENS
 ═══════════════════════════════════════════════════════════════ */
@@ -2144,6 +2145,8 @@ const ManagementDashboard = () => {
   const [collapsed, setCollapsed] = useState(false);
   const school    = localStorage.getItem('adminSchool') || 'School';
   const adminName = localStorage.getItem('adminName')   || 'Admin';
+  const schoolId  = localStorage.getItem('schoolId') || '';
+  const adminToken = localStorage.getItem('adminToken') || '';
 
   useEffect(()=>{ if(!localStorage.getItem('adminToken')) navigate('/login'); },[navigate]);
 
@@ -2158,15 +2161,23 @@ const ManagementDashboard = () => {
 
       {/* Sidebar */}
       <Box sx={{width:collapsed?64:240,minHeight:'100vh',background:C.sidebar,borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column',transition:'width 0.2s ease',flexShrink:0}}>
-        <Box sx={{px:collapsed?1.5:2.5,py:2.5,display:'flex',alignItems:'center',gap:1.5,borderBottom:`1px solid ${C.border}`}}>
-          <Box sx={{width:34,height:34,borderRadius:'8px',background:C.brand,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-            <SchoolIcon sx={{color:C.white,fontSize:18}}/>
-          </Box>
-          {!collapsed&&(
-            <Box sx={{overflow:'hidden'}}>
-              <Typography sx={{fontWeight:800,fontSize:'0.85rem',color:C.brand,lineHeight:1.2,fontFamily:"'IBM Plex Sans', sans-serif",whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{school}</Typography>
-              <Typography sx={{fontSize:'0.65rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>Management Portal</Typography>
-            </Box>
+        <Box sx={{px:collapsed?1.5:2.5,py:2.5,display:'flex',alignItems:'center',gap:1.5,borderBottom:`1px solid ${C.border}`,flexDirection:'column',alignItems:collapsed?'center':'flex-start'}}>
+          {!collapsed ? (
+            <>
+              <SchoolLogoHeader
+                schoolId={schoolId}
+                token={adminToken}
+                schoolName={school}
+                logoHeight={40}
+              />
+              <Typography sx={{fontSize:'0.65rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif",mt:1}}>Management Portal</Typography>
+            </>
+          ) : (
+            <Tooltip title={school} placement="right">
+              <Box sx={{width:34,height:34,borderRadius:'8px',background:C.brand,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <SchoolIcon sx={{color:C.white,fontSize:18}}/>
+              </Box>
+            </Tooltip>
           )}
         </Box>
 
