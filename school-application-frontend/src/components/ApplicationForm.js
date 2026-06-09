@@ -279,10 +279,8 @@ const ApplicationForm = () => {
       .catch(e => console.error(e)).finally(() => setSchoolsLoading(false));
   }, []);
 
-  useEffect(() => {
-    const s = localStorage.getItem('applicationDraft');
-    if (s) { try { setForm(JSON.parse(s)); } catch {} }
-  }, []);
+  // Clear any stale draft on mount — form always starts fresh
+  useEffect(() => { localStorage.removeItem('applicationDraft'); }, []);
 
   useEffect(() => {
     const edit = searchParams.get('edit') === 'true';
@@ -321,11 +319,20 @@ const ApplicationForm = () => {
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-  const saveDraft = () => localStorage.setItem('applicationDraft', JSON.stringify(form));
-
   const vEmail  = v => !v ? 'Required.' : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? 'Invalid email.' : '';
-  const vPhone  = v => { if (!v) return 'Required.'; const c = v.replace(/\D/,''); return (c.length===10&&c.startsWith('0'))||(c.length===11&&c.startsWith('27')) ? '' : 'Use format: 082 123 4567'; };
-  const vName   = v => !v ? 'Required.' : v.length<2 ? 'Min 2 characters.' : !/^[a-zA-Z\s]+$/.test(v) ? 'Letters only.' : '';
+  const vPhone  = v => { if (!v) return 'Required.'; const c = v.replace(/\D/g,''); return (c.length===10&&c.startsWith('0'))||(c.length===11&&c.startsWith('27')) ? '' : 'Use format: 082 123 4567 or 27821234567'; };
+  const vName   = v => !v ? 'Required.' : v.length<2 ? 'Min 2 characters.' : !/^[a-zA-Z\s\-'\.]+$/.test(v) ? 'Letters only.' : '';
+
+  const sanitizeValue = (name, raw) => {
+    if (typeof raw !== 'string') return raw;
+    if (['phone', 'parentPhone', 'emergencyPhone'].includes(name))
+      return raw.replace(/[^\d\s\-\+\(\)]/g, '');
+    if (name === 'nationalId')
+      return raw.replace(/\D/g, '').slice(0, 13);
+    if (['firstName', 'lastName', 'parentName', 'emergencyContact'].includes(name))
+      return raw.replace(/[^a-zA-Z\s\-'\.]/g, '');
+    return raw;
+  };
   const vReq    = (v, f) => !v?.trim() ? `${f} is required.` : '';
   const vSAID   = id => { const c = id.replace(/[\s-]/g,''); if (!/^\d{13}$/.test(c)) return { ok:false,e:'Must be 13 digits.' }; return { ok:true,e:null }; };
 
@@ -351,7 +358,8 @@ const ApplicationForm = () => {
   const extractGender = id => { const c=id.replace(/[\s-]/g,''); if(c.length!==13)return''; return +c.slice(6,10)>=5000?'Male':'Female'; };
 
   const handleChange = e => {
-    const { name, value } = e.target;
+    const { name } = e.target;
+    const value = sanitizeValue(name, e.target.value);
     if (name === 'schools') {
       const v = typeof value === 'string' ? value.split(',') : value;
       setForm(p => ({ ...p, schools: v }));
@@ -403,7 +411,7 @@ const ApplicationForm = () => {
     return Object.values(e).every(v=>!v);
   };
 
-  const handleNext   = () => { if (validateStep(activeStep)) { setActiveStep(p=>p+1); saveDraft(); } };
+  const handleNext   = () => { if (validateStep(activeStep)) setActiveStep(p=>p+1); };
   const handleBack   = () => setActiveStep(p=>p-1);
 
   const handleSubmit = async e => {
@@ -466,7 +474,7 @@ const ApplicationForm = () => {
             value={form.gender} error={errors.gender} onChange={handleChange} />
         </TwoColField>
         <TwoColField>
-          <FieldBlock name="phone" label="Phone Number" required
+          <FieldBlock name="phone" label="Phone Number" required type="tel"
             value={form.phone} error={errors.phone} onChange={handleChange} />
         </TwoColField>
       </FieldRow>
@@ -616,7 +624,7 @@ const ApplicationForm = () => {
     <Section title="Parent / Guardian Information">
       <Grid container spacing={2}>
         {F({ name:'parentName',       label:'Full Name',     xs:12, required:true })}
-        {F({ name:'parentPhone',      label:'Phone Number',  xs:12, sm:6, required:true })}
+        {F({ name:'parentPhone',      label:'Phone Number',  xs:12, sm:6, required:true, type:'tel' })}
         {F({ name:'parentEmail',      label:'Email Address', xs:12, sm:6, type:'email' })}
         {F({ name:'parentOccupation', label:'Occupation',    xs:12, sm:6, required:true })}
 
@@ -635,7 +643,7 @@ const ApplicationForm = () => {
         </Grid>
 
         {F({ name:'emergencyContact', label:'Emergency Contact Name', xs:12, sm:6 })}
-        {F({ name:'emergencyPhone',   label:'Emergency Phone',        xs:12, sm:6 })}
+        {F({ name:'emergencyPhone',   label:'Emergency Phone',        xs:12, sm:6, type:'tel' })}
       </Grid>
     </Section>
   );
@@ -746,7 +754,7 @@ const ApplicationForm = () => {
                       </Stack>
                       <UploadRow
                         docType={docType}
-                        label={`Completed Form — ${school.name}`}
+                        label="Completed Application Form"
                         accept=".pdf"
                         hasDoc={hasDoc(docType)}
                         onUpload={handleFileUpload}
