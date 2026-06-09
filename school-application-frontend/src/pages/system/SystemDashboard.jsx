@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Grid, Card, CardContent, CircularProgress,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
@@ -14,7 +14,7 @@ import SystemLayout, { FONT, BLUE } from '../../components/system/SystemLayout';
 import API_BASE from '../../config';
 
 const API = API_BASE;
-const token = () => localStorage.getItem('systemToken');
+const token = () => sessionStorage.getItem('systemToken');
 
 // ── Stat card ─────────────────────────────────────────────────
 const StatCard = ({ icon, label, value, color, bg }) => (

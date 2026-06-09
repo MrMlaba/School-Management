@@ -1,4 +1,4 @@
-// src/pages/LoginPage.js — Admin Login
+﻿// src/pages/LoginPage.js — Admin Login
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -42,9 +42,9 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        localStorage.setItem('adminToken',  data.token);
-        localStorage.setItem('adminSchool', data.school);
-        localStorage.setItem('adminName',   data.name || username);
+        sessionStorage.setItem('adminToken',  data.token);
+        sessionStorage.setItem('adminSchool', data.school);
+        sessionStorage.setItem('adminName',   data.name || username);
         navigate('/admin');
       } else {
         setError(data.message || 'Invalid credentials. Please try again.');

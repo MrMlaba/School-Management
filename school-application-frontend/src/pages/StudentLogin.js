@@ -1,4 +1,4 @@
-// src/pages/StudentLogin.js — Student Login
+﻿// src/pages/StudentLogin.js — Student Login
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -43,7 +43,7 @@ export default function StudentLogin() {
       });
       const data = await res.json();
       if (res.ok) {
-        localStorage.setItem('studentToken', data.token);
+        sessionStorage.setItem('studentToken', data.token);
         if (data.tempPasswordFlag) {
           navigate('/student/change-password');
         } else {

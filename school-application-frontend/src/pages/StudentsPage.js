@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Table, Button, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, CircularProgress,
@@ -366,7 +366,7 @@ const StudentsPage = () => {
   const [gradeSearch, setGradeSearch]           = useState('');
   const [selectedGrade, setSelectedGrade]       = useState(null);
 
-  const adminToken = localStorage.getItem('adminToken');
+  const adminToken = sessionStorage.getItem('adminToken');
 
   const authHeaders = { Authorization: `Bearer ${adminToken}` };
 

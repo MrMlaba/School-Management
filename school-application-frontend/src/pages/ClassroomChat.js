@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
 /* ── Design tokens ── */
@@ -20,11 +20,11 @@ const initials = (name='') => name.split(' ').map(w=>w[0]).join('').toUpperCase(
 
 /* Get logged-in student ID from JWT — reliable even if two students have same name */
 const getMyId = () => {
-  try { return JSON.parse(atob(localStorage.getItem('studentToken').split('.')[1])).id ?? null; }
+  try { return JSON.parse(atob(sessionStorage.getItem('studentToken').split('.')[1])).id ?? null; }
   catch { return null; }
 };
 
-const authH = () => ({ Authorization:`Bearer ${localStorage.getItem('studentToken')}` });
+const authH = () => ({ Authorization:`Bearer ${sessionStorage.getItem('studentToken')}` });
 const jsonH = () => ({ 'Content-Type':'application/json', ...authH() });
 
 /* Timestamp */

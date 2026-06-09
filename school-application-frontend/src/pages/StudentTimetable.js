@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography, CircularProgress, Chip, IconButton, Tooltip } from '@mui/material';
 import ArrowBackIcon  from '@mui/icons-material/ArrowBack';
@@ -66,7 +66,7 @@ const todayName = () =>
 
 const initials = () => {
   try {
-    const p = JSON.parse(atob(localStorage.getItem('studentToken').split('.')[1]));
+    const p = JSON.parse(atob(sessionStorage.getItem('studentToken').split('.')[1]));
     return `${p.firstName?.[0] ?? ''}${p.lastName?.[0] ?? ''}`.toUpperCase();
   } catch { return '?'; }
 };
@@ -82,7 +82,7 @@ export default function StudentTimetable() {
   const today     = todayName();
 
   useEffect(() => {
-    const token = localStorage.getItem('studentToken');
+    const token = sessionStorage.getItem('studentToken');
     if (!token) { navigate('/student-login'); return; }
     (async () => {
       try {
@@ -90,7 +90,7 @@ export default function StudentTimetable() {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.status === 401) {
-          localStorage.removeItem('studentToken');
+          sessionStorage.removeItem('studentToken');
           navigate('/student-login');
           return;
         }
@@ -105,7 +105,7 @@ export default function StudentTimetable() {
   }, [navigate]);
 
   const handleLogout = () => {
-    localStorage.removeItem('studentToken');
+    sessionStorage.removeItem('studentToken');
     navigate('/student-login');
   };
 

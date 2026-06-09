@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Avatar, CircularProgress,
@@ -335,7 +335,7 @@ function Sidebar({student,desktopTab,setDesktopTab,overdueCount,pendingQuizzesCo
         {student?.schoolId && (
           <SchoolLogoHeader
             schoolId={student.schoolId}
-            token={localStorage.getItem('studentToken') || ''}
+            token={sessionStorage.getItem('studentToken') || ''}
             logoHeight={30}
             sx={{ mt:1.5, p:0.75, background:'#fff', borderRadius:'8px', display:'inline-flex' }}
           />
@@ -411,7 +411,7 @@ export default function StudentDashboard() {
   const gradeId = student ? `grade-${(student.grade||'').replace(/[^0-9]/g,'')}` : 'grade-unknown';
 
   useEffect(()=>{
-    const token = localStorage.getItem('studentToken');
+    const token = sessionStorage.getItem('studentToken');
     if (!token){navigate('/student-login');return;}
     const headers = {Authorization:`Bearer ${token}`};
     (async()=>{
@@ -423,7 +423,7 @@ export default function StudentDashboard() {
           fetch(`${BASE}/api/student/quizzes`,     {headers}),
           fetch(`${BASE}/api/student/exams`,       {headers}),
         ]);
-        if (pRes.status===401){localStorage.removeItem('studentToken');navigate('/student-login');return;}
+        if (pRes.status===401){sessionStorage.removeItem('studentToken');navigate('/student-login');return;}
         if (pRes.ok) setStudent(await pRes.json());
         if (aRes.ok) setAssignments(await aRes.json());
         if (sRes.ok){
@@ -440,7 +440,7 @@ export default function StudentDashboard() {
     })();
   },[navigate]);
 
-  const handleLogout = ()=>{localStorage.removeItem('studentToken');navigate('/student-login');};
+  const handleLogout = ()=>{sessionStorage.removeItem('studentToken');navigate('/student-login');};
 
   /* ── Derived ── */
   const overdueCount      = assignments.filter(a=>{const d=daysUntil(a.dueDate);return d!==null&&d<0&&!submissionsMap[String(a.id)];}).length;
@@ -727,7 +727,7 @@ export default function StudentDashboard() {
           {student?.schoolId && (
             <SchoolLogoHeader
               schoolId={student.schoolId}
-              token={localStorage.getItem('studentToken') || ''}
+              token={sessionStorage.getItem('studentToken') || ''}
               logoHeight={26}
               sx={{ ml:1, p:0.5, background:'#fff', borderRadius:'6px', display:'inline-flex' }}
             />

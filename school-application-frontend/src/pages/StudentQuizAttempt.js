@@ -1,4 +1,4 @@
-// StudentQuizAttempt.js
+﻿// StudentQuizAttempt.js
 // Route in App.js:
 //   import StudentQuizAttempt from './StudentQuizAttempt';
 //   <Route path="/student/quiz/:id" element={<StudentQuizAttempt />} />
@@ -40,7 +40,7 @@ const T = {
 };
 
 const BASE    = 'https://school-management-production-6167.up.railway.app';
-const authHdr = () => ({ Authorization: `Bearer ${localStorage.getItem('studentToken')}` });
+const authHdr = () => ({ Authorization: `Bearer ${sessionStorage.getItem('studentToken')}` });
 const jsonHdr = () => ({ 'Content-Type': 'application/json', ...authHdr() });
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
@@ -77,7 +77,7 @@ export default function StudentQuizAttempt() {
 
   /* ── Load quiz ── */
   useEffect(() => {
-    const token = localStorage.getItem('studentToken');
+    const token = sessionStorage.getItem('studentToken');
     if (!token) { navigate('/student-login'); return; }
 
     (async () => {

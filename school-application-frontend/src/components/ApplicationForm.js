@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   TextField, Button, MenuItem, FormControl, Select,
   Box, Typography, Grid, Chip, CircularProgress, Stack, LinearProgress,
@@ -280,7 +280,7 @@ const ApplicationForm = () => {
   }, []);
 
   // Clear any stale draft on mount — form always starts fresh
-  useEffect(() => { localStorage.removeItem('applicationDraft'); }, []);
+  useEffect(() => { sessionStorage.removeItem('applicationDraft'); }, []);
 
   useEffect(() => {
     const edit = searchParams.get('edit') === 'true';
@@ -427,7 +427,7 @@ const ApplicationForm = () => {
       const url = isEditMode ? `https://school-management-production-6167.up.railway.app/api/applications/${applicationId}` : 'https://school-management-production-6167.up.railway.app/api/applications';
       const res  = await fetch(url, { method: isEditMode?'PUT':'POST', body: fd });
       const data = await res.json();
-      if (data.success) { localStorage.removeItem('applicationDraft'); navigate(`/applicant-dashboard?nationalId=${encodeURIComponent(form.nationalId)}`); }
+      if (data.success) { sessionStorage.removeItem('applicationDraft'); navigate(`/applicant-dashboard?nationalId=${encodeURIComponent(form.nationalId)}`); }
       else alert('Submission failed: ' + data.message);
     } catch { alert('Network error. Please try again.'); }
     finally { setLoading(false); }

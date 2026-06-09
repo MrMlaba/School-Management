@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Table, TableBody, TableCell,
@@ -151,7 +151,7 @@ export default function TeacherGradebook() {
   async function load() {
     setLoading(true);
     try {
-      const token = localStorage.getItem('teacherToken');
+      const token = sessionStorage.getItem('teacherToken');
       const res = await fetch(`${BASE}/api/teacher/marks-table?classId=${classId}`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error('Failed to load');
       const json = await res.json();
@@ -175,7 +175,7 @@ export default function TeacherGradebook() {
     let mounted = true;
     (async () => {
       try {
-        const token = localStorage.getItem('teacherToken');
+        const token = sessionStorage.getItem('teacherToken');
         const res = await fetch(`${BASE}/api/teacher/dashboard`, { headers: { Authorization: `Bearer ${token}` } });
         if (!res.ok) return;
         const d = await res.json();
@@ -203,7 +203,7 @@ export default function TeacherGradebook() {
   };
 
   const saveEdit = async () => {
-    const token = localStorage.getItem('teacherToken');
+    const token = sessionStorage.getItem('teacherToken');
     const { studentId, assignmentId, value } = editing;
     if (!studentId || !assignmentId) return;
     setLoading(true);
@@ -221,7 +221,7 @@ export default function TeacherGradebook() {
   };
 
   const saveCell = async (studentId, assignmentId) => {
-    const token = localStorage.getItem('teacherToken');
+    const token = sessionStorage.getItem('teacherToken');
     const value = drafts?.[studentId]?.[assignmentId];
     if (value === undefined) return;
     try {
@@ -237,7 +237,7 @@ export default function TeacherGradebook() {
   const saveAll = async () => {
     if (!data) return;
     setSavingAll(true);
-    const token = localStorage.getItem('teacherToken');
+    const token = sessionStorage.getItem('teacherToken');
     try {
       const promises = [];
       Object.entries(drafts).forEach(([studentId, assigns]) => {
@@ -262,7 +262,7 @@ export default function TeacherGradebook() {
   const handleImport = async (e, assignmentId) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const token = localStorage.getItem('teacherToken');
+    const token = sessionStorage.getItem('teacherToken');
     const fd = new FormData(); fd.append('file', file);
     setLoading(true);
     try {

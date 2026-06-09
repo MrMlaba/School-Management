@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+﻿import React, { useEffect, useState, useMemo } from 'react';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Paper, Typography, Button, Box, Dialog, DialogTitle, DialogContent,
@@ -184,13 +184,13 @@ const AdminPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
+    const token = sessionStorage.getItem('adminToken');
     if (!token) navigate('/login');
   }, [navigate]);
 
   const fetchApplications = () => {
     setLoading(true);
-    const token = localStorage.getItem('adminToken');
+    const token = sessionStorage.getItem('adminToken');
     fetch('https://school-management-production-6167.up.railway.app/api/applications', {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -203,12 +203,12 @@ const AdminPage = () => {
 
   useEffect(() => {
     // Load current school's form settings
-    const token = localStorage.getItem('adminToken');
+    const token = sessionStorage.getItem('adminToken');
     if (!token) return;
     fetch('https://school-management-production-6167.up.railway.app/api/schools')
       .then(r => r.json())
       .then(schools => {
-        const adminSch = localStorage.getItem('adminSchool');
+        const adminSch = sessionStorage.getItem('adminSchool');
         const mine = schools.find(s => s.name === adminSch);
         if (mine) {
           setFormRequired(!!mine.application_form_required);
@@ -220,7 +220,7 @@ const AdminPage = () => {
 
   const handleSaveFormSettings = async () => {
     setFormSettingsSaving(true);
-    const token = localStorage.getItem('adminToken');
+    const token = sessionStorage.getItem('adminToken');
     const fd = new FormData();
     fd.append('enabled', String(formRequired));
     if (formTemplateFile) fd.append('formTemplate', formTemplateFile);
@@ -243,7 +243,7 @@ const AdminPage = () => {
     }
   };
 
-  const adminSchool = localStorage.getItem('adminSchool');
+  const adminSchool = sessionStorage.getItem('adminSchool');
 
   /* ── Derived data ───────────────────────────────────────────────────── */
   const filteredApps = applications.filter(app => app.status !== 'accepted');
@@ -301,7 +301,7 @@ const AdminPage = () => {
       if (comment === null) return;
     }
     try {
-      const token = localStorage.getItem('adminToken');
+      const token = sessionStorage.getItem('adminToken');
       const res = await fetch(`https://school-management-production-6167.up.railway.app/api/applications/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

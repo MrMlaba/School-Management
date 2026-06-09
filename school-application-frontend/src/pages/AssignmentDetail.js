@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Paper, Divider,
@@ -38,7 +38,7 @@ const BASE = 'https://school-management-production-6167.up.railway.app';
 /* ─── JWT helper ─────────────────────────────────────────────────────────── */
 const getStudentIdFromToken = () => {
   try {
-    const token = localStorage.getItem('studentToken');
+    const token = sessionStorage.getItem('studentToken');
     if (!token) return null;
     return JSON.parse(atob(token.split('.')[1])).id ?? null;
   } catch { return null; }
@@ -145,7 +145,7 @@ export default function AssignmentDetail() {
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fileInputRef = useRef(null);
-  const token        = localStorage.getItem('studentToken');
+  const token        = sessionStorage.getItem('studentToken');
 
   /* ── Auth check ── */
   useEffect(() => {
@@ -163,7 +163,7 @@ export default function AssignmentDetail() {
       ]);
 
       if (aRes.status === 401 || sRes.status === 401) {
-        localStorage.removeItem('studentToken');
+        sessionStorage.removeItem('studentToken');
         navigate('/student-login');
         return;
       }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Button, Container, Chip, Divider,
   TextField, MenuItem, CircularProgress, Snackbar, Alert,
@@ -34,7 +34,7 @@ const C = {
 };
 
 const BASE  = 'https://school-management-production-6167.up.railway.app';
-const authH = () => ({ Authorization: `Bearer ${localStorage.getItem('adminToken')}` });
+const authH = () => ({ Authorization: `Bearer ${sessionStorage.getItem('adminToken')}` });
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 const DAYS  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 

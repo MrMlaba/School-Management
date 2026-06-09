@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Chip, Divider,
@@ -57,7 +57,7 @@ const C = {
 };
 
 const BASE  = 'https://school-management-production-6167.up.railway.app';
-const authH = () => ({ Authorization: `Bearer ${localStorage.getItem('teacherToken')}` });
+const authH = () => ({ Authorization: `Bearer ${sessionStorage.getItem('teacherToken')}` });
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 const DAYS  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const DAY_S = { Monday:'Mon', Tuesday:'Tue', Wednesday:'Wed', Thursday:'Thu', Friday:'Fri' };
@@ -1233,7 +1233,7 @@ const ExamsTab = () => {
                               const f = e.target.files?.[0]; if (!f) return;
                               const fd = new FormData(); fd.append('file', f); fd.append('studentId', s.id); fd.append('assessmentId', resultsDialog.id);
                               try {
-                                const tok = localStorage.getItem('teacherToken');
+                                const tok = sessionStorage.getItem('teacherToken');
                                 const res = await fetch(`${BASE}/api/exams/upload`, { method: 'POST', headers: { Authorization: `Bearer ${tok}` }, body: fd });
                                 if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.message||'Upload failed'); }
                                 setSnack({ open:true, msg:'Scan uploaded', sev:'success' });
@@ -1359,10 +1359,10 @@ const TeacherDashboard = () => {
   const [tab,       setTab]       = useState('dashboard');
   const [tabParams, setTabParams] = useState({});
 
-  const firstName = localStorage.getItem('teacherFirstName') || '';
-  const lastName  = localStorage.getItem('teacherLastName')  || '';
-  const school    = localStorage.getItem('teacherSchool')    || '';
-  const teacherToken = localStorage.getItem('teacherToken') || '';
+  const firstName = sessionStorage.getItem('teacherFirstName') || '';
+  const lastName  = sessionStorage.getItem('teacherLastName')  || '';
+  const school    = sessionStorage.getItem('teacherSchool')    || '';
+  const teacherToken = sessionStorage.getItem('teacherToken') || '';
   const schoolId = (() => {
     try {
       const payload = teacherToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
@@ -1370,10 +1370,10 @@ const TeacherDashboard = () => {
     } catch { return ''; }
   })();
 
-  useEffect(() => { if (!localStorage.getItem('teacherToken')) navigate('/teacher-login'); }, [navigate]);
+  useEffect(() => { if (!sessionStorage.getItem('teacherToken')) navigate('/teacher-login'); }, [navigate]);
 
   const handleLogout = () => {
-    ['teacherToken','teacherFirstName','teacherLastName','teacherSchool'].forEach(k=>localStorage.removeItem(k));
+    ['teacherToken','teacherFirstName','teacherLastName','teacherSchool'].forEach(k=>sessionStorage.removeItem(k));
     navigate('/teacher-login');
   };
 

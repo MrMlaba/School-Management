@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
@@ -109,8 +109,8 @@ const Navbar = () => {
   const [mobileMenuAnchor,  setMobileMenuAnchor]  = useState(null);
 
   useEffect(() => {
-    setIsAdmin(!!localStorage.getItem('adminToken'));
-    setIsStudent(!!localStorage.getItem('nationalId'));
+    setIsAdmin(!!sessionStorage.getItem('adminToken'));
+    setIsStudent(!!sessionStorage.getItem('nationalId'));
   }, [location]);
 
   // Secret admin hold / keyboard shortcut
@@ -129,14 +129,14 @@ const Navbar = () => {
 
   // Logout handlers
   const handleAdminLogout = () => {
-    localStorage.removeItem('adminToken');
-    localStorage.removeItem('adminSchool');
+    sessionStorage.removeItem('adminToken');
+    sessionStorage.removeItem('adminSchool');
     setIsAdmin(false);
     setMobileMenuAnchor(null);
     navigate('/');
   };
   const handleStudentLogout = () => {
-    localStorage.removeItem('nationalId');
+    sessionStorage.removeItem('nationalId');
     setIsStudent(false);
     setMobileMenuAnchor(null);
     navigate('/');

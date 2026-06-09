@@ -1,4 +1,4 @@
-// src/pages/TeacherLoginPage.js — Teacher Login
+﻿// src/pages/TeacherLoginPage.js — Teacher Login
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -42,10 +42,10 @@ export default function TeacherLoginPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        localStorage.setItem('teacherToken',     data.token);
-        localStorage.setItem('teacherFirstName', data.teacher.firstName);
-        localStorage.setItem('teacherLastName',  data.teacher.lastName);
-        localStorage.setItem('teacherSchool',    data.teacher.school);
+        sessionStorage.setItem('teacherToken',     data.token);
+        sessionStorage.setItem('teacherFirstName', data.teacher.firstName);
+        sessionStorage.setItem('teacherLastName',  data.teacher.lastName);
+        sessionStorage.setItem('teacherSchool',    data.teacher.school);
         navigate('/teacher/dashboard');
       } else {
         setError(data.message || 'Login failed. Please check your credentials.');

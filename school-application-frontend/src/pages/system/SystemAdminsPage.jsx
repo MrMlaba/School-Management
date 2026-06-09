@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Button, Card, CardContent, Table, TableHead,
   TableRow, TableCell, TableBody, TableContainer, Chip, IconButton,
@@ -17,7 +17,7 @@ import SystemLayout, { FONT, BLUE } from '../../components/system/SystemLayout';
 import API_BASE from '../../config';
 
 const API   = API_BASE;
-const token = () => localStorage.getItem('systemToken');
+const token = () => sessionStorage.getItem('systemToken');
 const hdr   = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` });
 
 const fieldSx = {

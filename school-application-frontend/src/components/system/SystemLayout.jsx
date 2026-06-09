@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box, Typography, List, ListItem, ListItemButton, ListItemIcon,
@@ -115,7 +115,7 @@ const SidebarContent = ({ onNavigate, onLogout, currentPath }) => (
         fontFamily: FONT, fontWeight: 600, fontSize: '0.82rem',
         color: 'rgba(255,255,255,0.75)', mb: 1.5,
       }}>
-        {localStorage.getItem('systemUsername') || 'sysadmin'}
+        {sessionStorage.getItem('systemUsername') || 'sysadmin'}
       </Typography>
       <ListItemButton
         onClick={onLogout}
@@ -155,8 +155,8 @@ const SystemLayout = ({ title, subtitle, children }) => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('systemToken');
-    localStorage.removeItem('systemUsername');
+    sessionStorage.removeItem('systemToken');
+    sessionStorage.removeItem('systemUsername');
     navigate('/system');
   };
 

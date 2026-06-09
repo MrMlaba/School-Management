@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
@@ -24,7 +24,7 @@ const StudentChangePassword = () => {
     }
     setLoading(true);
     setError('');
-    const token = localStorage.getItem('studentToken');
+    const token = sessionStorage.getItem('studentToken');
     if (!token) { setError('Not authenticated'); setLoading(false); return; }
     try {
       const res = await fetch('https://school-management-production-6167.up.railway.app/api/student/change-password', {

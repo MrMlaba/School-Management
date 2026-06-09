@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -151,7 +151,7 @@ const ApplicantDashboard = () => {
 
       if (response.ok) {
         setApplications(data);
-        if (nationalId) localStorage.setItem('nationalId', nationalId);
+        if (nationalId) sessionStorage.setItem('nationalId', nationalId);
       } else {
         setError(data.message || 'Failed to fetch applications');
       }
@@ -164,7 +164,7 @@ const ApplicantDashboard = () => {
 
   const handleAcceptOffer = async (appId) => {
     setUpdating(prev => ({ ...prev, [appId]: true }));
-    const storedNationalId = nationalId || localStorage.getItem('nationalId');
+    const storedNationalId = nationalId || sessionStorage.getItem('nationalId');
 
     try {
       const response = await fetch(`https://school-management-production-6167.up.railway.app/api/applications/${appId}/accept`, {

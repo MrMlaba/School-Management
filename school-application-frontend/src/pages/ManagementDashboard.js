@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Chip, Divider, Avatar, CircularProgress,
@@ -55,7 +55,7 @@ const C = {
 };
 
 const BASE  = 'https://school-management-production-6167.up.railway.app';
-const authH = () => ({ Authorization: `Bearer ${localStorage.getItem('adminToken')}` });
+const authH = () => ({ Authorization: `Bearer ${sessionStorage.getItem('adminToken')}` });
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 
 const hc = {
@@ -2143,10 +2143,10 @@ const ManagementDashboard = () => {
   const navigate    = useNavigate();
   const [active,    setActive]    = useState('overview');
   const [collapsed, setCollapsed] = useState(false);
-  const school    = localStorage.getItem('adminSchool') || 'School';
-  const adminName = localStorage.getItem('adminName')   || 'Admin';
+  const school    = sessionStorage.getItem('adminSchool') || 'School';
+  const adminName = sessionStorage.getItem('adminName')   || 'Admin';
   
-  const adminToken = localStorage.getItem('adminToken') || '';
+  const adminToken = sessionStorage.getItem('adminToken') || '';
   const schoolId = (() => {
     try {
       const payload = adminToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
@@ -2154,10 +2154,10 @@ const ManagementDashboard = () => {
     } catch { return ''; }
   })();
 
-  useEffect(()=>{ if(!localStorage.getItem('adminToken')) navigate('/login'); },[navigate]);
+  useEffect(()=>{ if(!sessionStorage.getItem('adminToken')) navigate('/login'); },[navigate]);
 
   const handleLogout = () => {
-    ['adminToken','adminSchool','adminName'].forEach(k=>localStorage.removeItem(k));
+    ['adminToken','adminSchool','adminName'].forEach(k=>sessionStorage.removeItem(k));
     navigate('/login');
   };
 

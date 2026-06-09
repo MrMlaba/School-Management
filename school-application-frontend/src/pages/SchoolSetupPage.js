@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Button, Container, Chip, Divider,
   TextField, MenuItem, CircularProgress, Snackbar, Alert,
@@ -48,7 +48,7 @@ const bodyCell = {
 };
 
 /* ─── Helpers ───────────────────────────────────────────────────────── */
-const authH = () => ({ Authorization: `Bearer ${localStorage.getItem('adminToken')}` });
+const authH = () => ({ Authorization: `Bearer ${sessionStorage.getItem('adminToken')}` });
 const json  = body => ({ 'Content-Type': 'application/json', ...authH() });
 
 const GRADES  = [8, 9, 10, 11, 12];

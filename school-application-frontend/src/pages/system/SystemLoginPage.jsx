@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, TextField, Button, Typography, CircularProgress,
@@ -56,7 +56,7 @@ const SystemLoginPage = () => {
 
   useEffect(() => {
     console.log('[SystemLoginPage] API_BASE:', API_BASE);
-    if (localStorage.getItem('systemToken')) navigate('/system/dashboard');
+    if (sessionStorage.getItem('systemToken')) navigate('/system/dashboard');
   }, [navigate]);
 
   const handleSubmit = async (e) => {
@@ -72,8 +72,8 @@ const SystemLoginPage = () => {
       });
       const data = await res.json();
       if (res.ok && data.token) {
-        localStorage.setItem('systemToken',    data.token);
-        localStorage.setItem('systemUsername', data.username);
+        sessionStorage.setItem('systemToken',    data.token);
+        sessionStorage.setItem('systemUsername', data.username);
         navigate('/system/dashboard');
       } else {
         setError(data.error || 'Invalid credentials.');
