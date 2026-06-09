@@ -171,7 +171,7 @@ const SchoolCard = ({ school, onViewDetails }) => {
             variant="contained"
             size="small"
             endIcon={<EastIcon sx={{ fontSize: '14px !important' }} />}
-            onClick={(e) => { e.stopPropagation(); navigate('/apply'); }}
+            onClick={(e) => { e.stopPropagation(); navigate('/apply?school=' + encodeURIComponent(school.name)); }}
             sx={{
               fontFamily: BODY_FONT,
               fontWeight: 600,

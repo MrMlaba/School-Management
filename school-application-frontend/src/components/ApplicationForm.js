@@ -253,12 +253,14 @@ const ApplicationForm = () => {
   const [activeStep, setActiveStep]   = useState(0);
   const [availableSchools, setAvailableSchools] = useState([]);
   const [schoolsLoading, setSchoolsLoading]     = useState(true);
+  const preselectedSchool = searchParams.get('school') || null;
 
   const [form, setForm] = useState({
     nationalId: '', firstName: '', lastName: '', dateOfBirth: '', gender: '',
     email: '', phone: '', address: '', city: '',
     parentName: '', parentPhone: '', parentEmail: '', parentOccupation: '', relationship: '',
-    schools: [], grade: '', subject: '', previousSchool: '', achievements: '',
+    schools: preselectedSchool ? [preselectedSchool] : [],
+    grade: '', subject: '', previousSchool: '', achievements: '',
     whyAttend: '', emergencyContact: '', emergencyPhone: '', documents: [],
   });
 
@@ -374,7 +376,12 @@ const ApplicationForm = () => {
 
   const removeDoc    = i => setForm(p => ({ ...p, documents: p.documents.filter((_,idx) => idx!==i) }));
   const hasDoc       = t => form.documents.some(d => d.type===t);
-  const requiredDocs = () => form.grade==='Grade 8' ? ['id','gradeResult','gradeReport'] : ['id','removal','gradeResult','gradeReport'];
+  const schoolsRequiringForm = () => availableSchools.filter(s => form.schools.includes(s.name) && s.application_form_required);
+  const requiredDocs = () => {
+    const base = form.grade==='Grade 8' ? ['id','parentId','gradeResult','gradeReport'] : ['id','parentId','removal','gradeResult','gradeReport'];
+    const schoolForms = schoolsRequiringForm().map(s => `schoolForm_${s.name}`);
+    return [...base, ...schoolForms];
+  };
   const allDocsOk    = () => requiredDocs().every(t => hasDoc(t));
   const docsProgress = () => { const req=requiredDocs(); return (req.filter(t=>hasDoc(t)).length/req.length)*100; };
 
@@ -493,42 +500,73 @@ const ApplicationForm = () => {
       <Grid container spacing={2.5}>
 
         <Grid item xs={12}>
-          <FieldLabel required>Select School(s)</FieldLabel>
-          <FormControl fullWidth size="small" error={!!errors.schools} sx={fieldSx}>
-            <Select
-              name="schools" multiple value={form.schools}
-              onChange={handleChange} renderValue={() => ''} MenuProps={selectMenuSx}
-              displayEmpty
-              sx={{ fontFamily:BODY, fontSize:'0.9rem', color:C.text }}
-            >
-              {schoolsLoading
-                ? <MenuItem disabled><CircularProgress size={16} sx={{ mr:1 }} /> Loading…</MenuItem>
-                : availableSchools.map(s => (
-                  <MenuItem key={s.id} value={s.name} sx={{ display:'flex', alignItems:'center', gap:1.5 }}>
-                    <img src={s.image} alt={s.name} style={{ width:30,height:30,borderRadius:'50%',objectFit:'cover',flexShrink:0 }} />
-                    <Box>
-                      <Typography sx={{ fontFamily:BODY, fontSize:'0.875rem', fontWeight:600, color:C.text }}>{s.name}</Typography>
-                      {s.location && <Typography sx={{ fontFamily:BODY, fontSize:'0.72rem', color:C.textMuted }}>{s.location}</Typography>}
-                    </Box>
-                  </MenuItem>
-                ))}
-            </Select>
-          </FormControl>
-          <FieldError msg={errors.schools} />
-          {form.schools.length > 0 && (
-            <Box sx={{ display:'flex', flexWrap:'wrap', gap:0.75, mt:1 }}>
-              {form.schools.map((name, i) => (
-                <Chip key={i} label={name} size="small"
-                  onDelete={() => { const v=form.schools.filter((_,idx)=>idx!==i); setForm(p=>({...p,schools:v})); }}
-                  sx={{
-                    fontFamily:BODY, fontSize:'0.75rem', fontWeight:600,
-                    bgcolor:C.navyGhost, border:`1px solid ${C.navyBorder}`,
-                    color:C.navy, borderRadius:'4px',
-                    '& .MuiChip-deleteIcon':{ color:C.textMuted, fontSize:14 },
-                  }}
+          <FieldLabel required>
+            {preselectedSchool ? 'Applying To' : 'Select School(s)'}
+          </FieldLabel>
+
+          {preselectedSchool ? (
+            /* Single-school mode — locked display */
+            <Box sx={{
+              display: 'flex', alignItems: 'center', gap: 1.5,
+              px: 2, py: 1.25,
+              bgcolor: C.navyGhost, border: `1.5px solid ${C.navyBorder}`, borderRadius: '4px',
+            }}>
+              {availableSchools.find(s => s.name === preselectedSchool)?.image && (
+                <img
+                  src={availableSchools.find(s => s.name === preselectedSchool).image}
+                  alt={preselectedSchool}
+                  style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
                 />
-              ))}
+              )}
+              <Box>
+                <Typography sx={{ fontFamily: BODY, fontWeight: 700, fontSize: '0.9rem', color: C.navy }}>
+                  {preselectedSchool}
+                </Typography>
+                <Typography sx={{ fontFamily: BODY, fontSize: '0.72rem', color: C.textMuted }}>
+                  Single school application — school is pre-selected
+                </Typography>
+              </Box>
             </Box>
+          ) : (
+            /* Multi-school mode — dropdown */
+            <>
+              <FormControl fullWidth size="small" error={!!errors.schools} sx={fieldSx}>
+                <Select
+                  name="schools" multiple value={form.schools}
+                  onChange={handleChange} renderValue={() => ''} MenuProps={selectMenuSx}
+                  displayEmpty
+                  sx={{ fontFamily:BODY, fontSize:'0.9rem', color:C.text }}
+                >
+                  {schoolsLoading
+                    ? <MenuItem disabled><CircularProgress size={16} sx={{ mr:1 }} /> Loading…</MenuItem>
+                    : availableSchools.map(s => (
+                      <MenuItem key={s.id} value={s.name} sx={{ display:'flex', alignItems:'center', gap:1.5 }}>
+                        <img src={s.image} alt={s.name} style={{ width:30,height:30,borderRadius:'50%',objectFit:'cover',flexShrink:0 }} />
+                        <Box>
+                          <Typography sx={{ fontFamily:BODY, fontSize:'0.875rem', fontWeight:600, color:C.text }}>{s.name}</Typography>
+                          {s.location && <Typography sx={{ fontFamily:BODY, fontSize:'0.72rem', color:C.textMuted }}>{s.location}</Typography>}
+                        </Box>
+                      </MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
+              <FieldError msg={errors.schools} />
+              {form.schools.length > 0 && (
+                <Box sx={{ display:'flex', flexWrap:'wrap', gap:0.75, mt:1 }}>
+                  {form.schools.map((name, i) => (
+                    <Chip key={i} label={name} size="small"
+                      onDelete={() => { const v=form.schools.filter((_,idx)=>idx!==i); setForm(p=>({...p,schools:v})); }}
+                      sx={{
+                        fontFamily:BODY, fontSize:'0.75rem', fontWeight:600,
+                        bgcolor:C.navyGhost, border:`1px solid ${C.navyBorder}`,
+                        color:C.navy, borderRadius:'4px',
+                        '& .MuiChip-deleteIcon':{ color:C.textMuted, fontSize:14 },
+                      }}
+                    />
+                  ))}
+                </Box>
+              )}
+            </>
           )}
         </Grid>
 
@@ -606,8 +644,9 @@ const ApplicationForm = () => {
   const renderStep3 = () => {
     const req      = requiredDocs();
     const progress = docsProgress();
-    const DOC_LABELS = { id:'SA ID Document', removal:'School Removal Letter', gradeResult:'Previous Grade Result', gradeReport:'Grade Report', additional:'Additional Documents' };
-    const DOC_ACCEPT = { id:'.pdf', removal:'.pdf', gradeResult:'.pdf,.jpg,.jpeg,.png', gradeReport:'.pdf,.jpg,.jpeg,.png', additional:'.pdf,.jpg,.jpeg,.png' };
+    const DOC_LABELS = { id:'SA ID Document', parentId:'Parent / Guardian ID Document', removal:'School Removal Letter', gradeResult:'Previous Grade Result', gradeReport:'Grade Report', additional:'Additional Documents' };
+    const DOC_ACCEPT = { id:'.pdf,.jpg,.jpeg,.png', parentId:'.pdf,.jpg,.jpeg,.png', removal:'.pdf', gradeResult:'.pdf,.jpg,.jpeg,.png', gradeReport:'.pdf,.jpg,.jpeg,.png', additional:'.pdf,.jpg,.jpeg,.png' };
+    const schoolsNeedingForm = schoolsRequiringForm();
 
     return (
       <>
@@ -617,8 +656,13 @@ const ApplicationForm = () => {
             Incomplete documentation will prevent your application from being submitted.
           </Typography>
           <Box component="ul" sx={{ m:0, pl:2.5 }}>
-            {['SA ID / Passport copy', 'Latest school report / grade results', 'Grade report',
-              ...(form.grade && form.grade!=='Grade 8' ? ['School removal / transfer letter'] : [])
+            {[
+              'SA ID / Passport copy',
+              'Parent / Guardian ID copy',
+              'Latest school report / grade results',
+              'Grade report',
+              ...(form.grade && form.grade!=='Grade 8' ? ['School removal / transfer letter'] : []),
+              ...(schoolsNeedingForm.length > 0 ? schoolsNeedingForm.map(s => `${s.name} — completed application form`) : []),
             ].map(item => (
               <Box component="li" key={item} sx={{ fontFamily:BODY, fontSize:'0.82rem', color:'#78350f', mb:0.3 }}>{item}</Box>
             ))}
@@ -643,7 +687,7 @@ const ApplicationForm = () => {
           </Box>
 
           <Stack spacing={1.25} sx={{ mb:2.5 }}>
-            {['id','gradeResult','gradeReport'].map(t => (
+            {['id','parentId','gradeResult','gradeReport'].map(t => (
               <UploadRow key={t} docType={t} label={DOC_LABELS[t]} accept={DOC_ACCEPT[t]}
                 hasDoc={hasDoc(t)} onUpload={handleFileUpload} />
             ))}
@@ -654,6 +698,66 @@ const ApplicationForm = () => {
             <UploadRow docType="additional" label={DOC_LABELS.additional} accept={DOC_ACCEPT.additional}
               required={false} hasDoc={hasDoc('additional')} onUpload={handleFileUpload} />
           </Stack>
+
+          {/* ── Per-school application forms ── */}
+          {schoolsNeedingForm.length > 0 && (
+            <Box sx={{ mt: 3 }}>
+              <Box sx={{ borderLeft: `4px solid #e8a020`, pl: 1.5, mb: 2 }}>
+                <Typography sx={{ fontFamily: BODY, fontWeight: 700, fontSize: '0.9rem', color: C.text }}>
+                  School Application Forms
+                </Typography>
+                <Typography sx={{ fontFamily: BODY, fontSize: '0.75rem', color: C.textMuted, mt: 0.25 }}>
+                  The following school(s) require you to download, complete, and upload their official application form.
+                </Typography>
+              </Box>
+              <Stack spacing={2}>
+                {schoolsNeedingForm.map(school => {
+                  const docType = `schoolForm_${school.name}`;
+                  return (
+                    <Box key={school.id} sx={{ p: 2, border: `1px solid #fde68a`, borderLeft: `4px solid #e8a020`, borderRadius: '4px', bgcolor: '#fffbeb' }}>
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} sx={{ mb: 1.5 }}>
+                        <Stack direction="row" alignItems="center" spacing={1.25}>
+                          {school.image && (
+                            <img src={school.image} alt={school.name} style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
+                          )}
+                          <Box>
+                            <Typography sx={{ fontFamily: BODY, fontWeight: 700, fontSize: '0.85rem', color: C.text }}>{school.name}</Typography>
+                            <Typography sx={{ fontFamily: BODY, fontSize: '0.7rem', color: C.textMuted }}>Requires completed application form</Typography>
+                          </Box>
+                        </Stack>
+                        {school.application_form_url && (
+                          <Button
+                            component="a"
+                            href={school.application_form_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            size="small"
+                            variant="outlined"
+                            sx={{
+                              fontFamily: BODY, fontWeight: 600, fontSize: '0.75rem',
+                              textTransform: 'none', px: 2, py: 0.6, borderRadius: '4px',
+                              borderColor: '#e8a020', color: '#92400e', flexShrink: 0,
+                              '&:hover': { borderColor: '#d97706', bgcolor: 'rgba(232,160,32,0.08)' },
+                            }}
+                          >
+                            Download Form Template
+                          </Button>
+                        )}
+                      </Stack>
+                      <UploadRow
+                        docType={docType}
+                        label={`Completed Form — ${school.name}`}
+                        accept=".pdf"
+                        hasDoc={hasDoc(docType)}
+                        onUpload={handleFileUpload}
+                      />
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </Box>
+          )}
+
 
           {form.documents.length > 0 && (
             <Box sx={{ mb:2, p:2, bgcolor:C.pageBg, border:`1px solid ${C.border}`, borderRadius:'4px' }}>
@@ -726,7 +830,11 @@ const ApplicationForm = () => {
             fontSize: { xs:'1.2rem', md:'1.5rem' },
             color: '#ffffff', textAlign:'center',
           }}>
-            {isEditMode ? `Edit Application — ${existingApplication?.school || ''}` : 'School Application Form'}
+            {isEditMode
+            ? `Edit Application — ${existingApplication?.school || ''}`
+            : preselectedSchool
+              ? `Application — ${preselectedSchool}`
+              : 'School Application Form'}
           </Typography>
           <Typography sx={{ fontFamily:BODY, fontWeight:400, fontSize:'0.82rem', color:'rgba(255,255,255,0.65)', textAlign:'center', mt:0.4 }}>
             KwaZulu-Natal · 2025 / 2026 Academic Year · Fields marked * are required

@@ -187,6 +187,25 @@ function validateFile(file, expectedType) {
 const schoolImgDir = path.join(__dirname, 'uploads', 'schools');
 if (!fs.existsSync(schoolImgDir)) fs.mkdirSync(schoolImgDir, { recursive: true });
 
+// ─── School application form template upload ─────────────────────────────────
+const schoolFormDir = path.join(__dirname, 'uploads', 'school-forms');
+if (!fs.existsSync(schoolFormDir)) fs.mkdirSync(schoolFormDir, { recursive: true });
+
+const schoolFormStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, schoolFormDir),
+  filename:    (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, 'form_' + crypto.randomBytes(12).toString('hex') + ext);
+  },
+});
+const uploadSchoolForm = multer({
+  storage:    schoolFormStorage,
+  limits:     { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    cb(null, file.mimetype === 'application/pdf');
+  },
+});
+
 const schoolImageStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, schoolImgDir),
   filename:    (req, file, cb) => {
@@ -691,14 +710,19 @@ app.get('/api/schools', async (req, res) => {
   try {
     const baseUrl = process.env.API_BASE || `${req.protocol}://${req.get('host')}`;
     const { rows } = await pool.query(
-      `SELECT 
+      `SELECT
         id, name, location, phone, email, principal, grades, streams, is_active, created_at, image_id,
-        CASE 
+        application_form_required, application_form_originalname,
+        CASE
           WHEN image_id IS NOT NULL THEN $1 || '/api/system/schools/' || id || '/image?v=' || image_id
-          ELSE NULL 
-        END as image
-       FROM schools 
-       WHERE is_active = true 
+          ELSE NULL
+        END as image,
+        CASE
+          WHEN application_form_filename IS NOT NULL THEN $1 || '/api/schools/application-form/' || id
+          ELSE NULL
+        END as application_form_url
+       FROM schools
+       WHERE is_active = true
        ORDER BY id ASC`,
       [baseUrl]
     );
@@ -706,6 +730,57 @@ app.get('/api/schools', async (req, res) => {
   } catch (err) {
     console.error('GET /api/schools error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ─── School admin: manage application form ────────────────────────────────────
+app.patch('/api/admin/schools/application-form', requireSchoolAdmin, uploadSchoolForm.single('formTemplate'), async (req, res) => {
+  try {
+    const schoolId = req.admin.schoolId;
+    const enabled  = req.body.enabled === 'true' || req.body.enabled === true;
+
+    if (req.file) {
+      // New template uploaded — delete old file if it exists
+      const { rows } = await pool.query('SELECT application_form_filename FROM schools WHERE id = $1', [schoolId]);
+      if (rows[0]?.application_form_filename) {
+        const old = path.join(schoolFormDir, rows[0].application_form_filename);
+        if (fs.existsSync(old)) fs.unlinkSync(old);
+      }
+      await pool.query(
+        `UPDATE schools SET application_form_required=$1, application_form_filename=$2, application_form_originalname=$3 WHERE id=$4`,
+        [enabled, req.file.filename, req.file.originalname, schoolId]
+      );
+    } else {
+      await pool.query(
+        `UPDATE schools SET application_form_required=$1 WHERE id=$2`,
+        [enabled, schoolId]
+      );
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('PATCH /api/admin/schools/application-form error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ─── Public: download school application form template ────────────────────────
+app.get('/api/schools/application-form/:schoolId', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT application_form_filename, application_form_originalname FROM schools WHERE id = $1 AND is_active = true',
+      [req.params.schoolId]
+    );
+    if (!rows[0]?.application_form_filename)
+      return res.status(404).json({ message: 'No application form available' });
+    const filePath = path.join(schoolFormDir, rows[0].application_form_filename);
+    if (!fs.existsSync(filePath))
+      return res.status(404).json({ message: 'Form file not found' });
+    res.setHeader('Content-Disposition', `attachment; filename="${rows[0].application_form_originalname}"`);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.sendFile(filePath);
+  } catch (err) {
+    console.error('GET /api/schools/application-form error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -727,13 +802,15 @@ app.post('/api/applications', upload.array('documents', 10), async (req, res) =>
     const v = validateFile(documents[i], documentTypes[i] || 'additional');
     if (!v.valid) return res.status(400).json({ success: false, message: `File validation failed: ${v.error}` });
   }
-  const requiredDocuments = grade === 'Grade 8' ? ['id', 'gradeResult', 'gradeReport'] : ['id', 'removal', 'gradeResult', 'gradeReport'];
+  const DOC_NAMES = { id: 'SA ID Copy', parentId: 'Parent/Guardian ID Copy', removal: 'School Removal Letter', gradeResult: 'Previous Grade Result', gradeReport: 'Grade Report' };
+  const baseRequired      = grade === 'Grade 8' ? ['id', 'parentId', 'gradeResult', 'gradeReport'] : ['id', 'parentId', 'removal', 'gradeResult', 'gradeReport'];
   const uploadedTypes     = documentTypes.map((type, i) => ({ type, filename: documents[i]?.filename || null, originalname: documents[i]?.originalname || null, mimetype: documents[i]?.mimetype || null }));
-  const missing           = requiredDocuments.filter(r => !uploadedTypes.some(u => u.type === r));
+  const missing           = baseRequired.filter(r => !uploadedTypes.some(u => u.type === r));
   if (missing.length > 0) {
-    const names = missing.map(t => t === 'id' ? 'SA ID Copy' : t === 'removal' ? 'School Removal Letter' : t === 'gradeResult' ? 'Previous Grade Result' : 'Grade Report');
+    const names = missing.map(t => DOC_NAMES[t] || t);
     return res.status(400).json({ success: false, message: `Missing required documents: ${names.join(', ')}` });
   }
+  const requiredDocuments = baseRequired;
   try {
     const insertedApps = [];
     for (const school of schools) {
@@ -1015,6 +1092,17 @@ async function ensureTables() {
   } catch (err) {
     if (!err.message.includes('already exists')) {
       console.warn('Note: image_id column may already exist or ALTER failed:', err.message);
+    }
+  }
+
+  // Add application form columns to schools
+  for (const col of [
+    `ALTER TABLE schools ADD COLUMN application_form_required BOOLEAN DEFAULT false`,
+    `ALTER TABLE schools ADD COLUMN application_form_filename TEXT`,
+    `ALTER TABLE schools ADD COLUMN application_form_originalname TEXT`,
+  ]) {
+    try { await pool.query(col); } catch (err) {
+      if (!err.message.includes('already exists')) console.warn('Migration note:', err.message);
     }
   }
 
