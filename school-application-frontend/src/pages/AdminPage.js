@@ -175,6 +175,8 @@ const AdminPage = () => {
   const [viewMode, setViewMode]                     = useState('table');
   const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument]     = useState(null);
+  const [docPreviewUrl, setDocPreviewUrl]           = useState(null);
+  const [docPreviewLoading, setDocPreviewLoading]   = useState(false);
   const [selectedGrade, setSelectedGrade]           = useState(null);
   const [formSettingsOpen, setFormSettingsOpen]     = useState(false);
   const [formRequired, setFormRequired]             = useState(false);
@@ -328,8 +330,32 @@ const AdminPage = () => {
   const handleRowClick       = app => { setSelectedApp(app); setDialogOpen(true); };
   const handleDialogClose    = () => { setDialogOpen(false); setSelectedApp(null); };
   const handleSnackbarClose  = () => setSnackbar(s => ({ ...s, open: false }));
-  const handleViewDocument   = doc => { setSelectedDocument(doc); setDocumentViewerOpen(true); };
-  const handleCloseDocViewer = () => { setDocumentViewerOpen(false); setSelectedDocument(null); };
+  const handleViewDocument = async (doc) => {
+    setSelectedDocument(doc);
+    setDocPreviewUrl(null);
+    setDocumentViewerOpen(true);
+    if (!doc.filename) return;
+    setDocPreviewLoading(true);
+    const token = sessionStorage.getItem('adminToken');
+    try {
+      const res = await fetch(
+        `https://school-management-production-6167.up.railway.app/api/documents/${doc.filename}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) throw new Error('Failed');
+      const blob = await res.blob();
+      setDocPreviewUrl(URL.createObjectURL(blob));
+    } catch {
+      setSnackbar({ open: true, message: 'Could not load document preview.', severity: 'error' });
+    } finally {
+      setDocPreviewLoading(false);
+    }
+  };
+  const handleCloseDocViewer = () => {
+    setDocumentViewerOpen(false);
+    setSelectedDocument(null);
+    if (docPreviewUrl) { URL.revokeObjectURL(docPreviewUrl); setDocPreviewUrl(null); }
+  };
 
   const openDocument = async (filename, download = false) => {
     const token = sessionStorage.getItem('adminToken');
@@ -1031,9 +1057,6 @@ const AdminPage = () => {
                                 {doc.filename && (
                                   <Button size="small" variant="contained" startIcon={<DownloadIcon />} onClick={() => openDocument(doc.filename, true)}>Download</Button>
                                 )}
-                                {doc.filename && (
-                                  <IconButton size="small" onClick={() => openDocument(doc.filename)}><OpenInNewIcon fontSize="small" /></IconButton>
-                                )}
                               </Stack>
                             </Paper>
                           );
@@ -1173,45 +1196,61 @@ const AdminPage = () => {
         </Dialog>
 
         {/* ── Document Viewer Dialog ──────────────────────────────────── */}
-        <Dialog open={documentViewerOpen} onClose={handleCloseDocViewer} maxWidth="sm" fullWidth>
-          <DialogTitle sx={{ borderBottom: '1px solid #e2e8f0' }}>
+        <Dialog open={documentViewerOpen} onClose={handleCloseDocViewer} maxWidth="lg" fullWidth
+          PaperProps={{ sx: { height: '90vh', display: 'flex', flexDirection: 'column' } }}>
+          <DialogTitle sx={{ borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between">
-              <Typography variant="h6">{selectedDocument && getDocumentTypeName(selectedDocument.type)}</Typography>
-              <IconButton onClick={handleCloseDocViewer} size="small"><CancelOutlinedIcon /></IconButton>
+              <Box>
+                <Typography variant="h6" sx={{ lineHeight: 1.2 }}>
+                  {selectedDocument && getDocumentTypeName(selectedDocument.type)}
+                </Typography>
+                {selectedDocument && (
+                  <Typography variant="caption" color="text.secondary">
+                    {getDocumentFilename(selectedDocument)}
+                    {selectedDocument.filename && ` · ${selectedDocument.filename.split('.').pop().toUpperCase()}`}
+                  </Typography>
+                )}
+              </Box>
+              <Stack direction="row" spacing={1} alignItems="center">
+                {selectedDocument?.filename && (
+                  <Button size="small" variant="outlined" startIcon={<DownloadIcon />}
+                    onClick={() => openDocument(selectedDocument.filename, true)}>
+                    Download
+                  </Button>
+                )}
+                <IconButton onClick={handleCloseDocViewer} size="small"><CancelOutlinedIcon /></IconButton>
+              </Stack>
             </Stack>
           </DialogTitle>
-          <DialogContent dividers>
-            {selectedDocument && (
-              <Stack spacing={2}>
-                <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
-                  <Typography variant="body2" sx={{ mb: 0.5 }}><b>Type:</b> {getDocumentTypeName(selectedDocument.type)}</Typography>
-                  <Typography variant="body2" sx={{ mb: 0.5 }}><b>File:</b> {getDocumentFilename(selectedDocument)}</Typography>
-                  <Typography variant="body2"><b>Format:</b> {selectedDocument.filename ? selectedDocument.filename.split('.').pop().toUpperCase() : 'Unknown'}</Typography>
-                </Paper>
-                <Typography variant="subtitle2">Open this document</Typography>
-                <Stack spacing={1}>
-                  {selectedDocument.filename && (
-                    <>
-                      <Button variant="contained" startIcon={<OpenInNewIcon />} onClick={() => openDocument(selectedDocument.filename)}>Open in New Tab</Button>
-                      <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => openDocument(selectedDocument.filename, true)}>Download</Button>
-                      {selectedDocument.filename.toLowerCase().endsWith('.pdf') && (
-                        <Button variant="outlined" onClick={() => openDocument(selectedDocument.filename)}>Open PDF with Reader</Button>
-                      )}
-                    </>
-                  )}
-                </Stack>
-                <Paper variant="outlined" sx={{ p: 2, bgcolor: '#eff6ff', borderColor: '#dbeafe' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.dark', mb: 0.5 }}>Tips</Typography>
-                  <Typography variant="body2" sx={{ color: 'primary.dark' }}>• Use "Open in New Tab" for quick viewing</Typography>
-                  <Typography variant="body2" sx={{ color: 'primary.dark' }}>• Use "Download" to save and review offline</Typography>
-                  <Typography variant="body2" sx={{ color: 'primary.dark' }}>• PDFs open with the browser's PDF viewer</Typography>
-                </Paper>
-              </Stack>
+
+          <DialogContent sx={{ p: 0, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            {docPreviewLoading && (
+              <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                <CircularProgress size={28} />
+                <Typography variant="body2" color="text.secondary">Loading document…</Typography>
+              </Box>
+            )}
+
+            {!docPreviewLoading && docPreviewUrl && selectedDocument && (() => {
+              const isImage = selectedDocument.mimetype?.startsWith('image/') ||
+                /\.(jpg|jpeg|png)$/i.test(selectedDocument.filename || '');
+              return isImage ? (
+                <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2, bgcolor: '#1a1a1a', overflow: 'auto' }}>
+                  <img src={docPreviewUrl} alt={getDocumentFilename(selectedDocument)}
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 4 }} />
+                </Box>
+              ) : (
+                <iframe src={docPreviewUrl} title={getDocumentFilename(selectedDocument)}
+                  style={{ flex: 1, width: '100%', height: '100%', border: 'none' }} />
+              );
+            })()}
+
+            {!docPreviewLoading && !docPreviewUrl && selectedDocument && (
+              <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Typography variant="body2" color="text.secondary">Preview not available.</Typography>
+              </Box>
             )}
           </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseDocViewer} variant="contained">Close</Button>
-          </DialogActions>
         </Dialog>
 
         <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
