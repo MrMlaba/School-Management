@@ -337,7 +337,7 @@ router.get('/reports/results', async (req, res) => {
     // Assignment marks
     const aParams = [studentIds, subjectIds, classId];
     let aTermFilter = '';
-    if (termId) { aParams.push(termId); aTermFilter = ` AND a.term_id = $${aParams.length}`; }
+    if (termId) { aParams.push(termId); aTermFilter = ` AND (a.term_id = $${aParams.length} OR a.term_id IS NULL)`; }
 
     const { rows: assignmentMarks } = await pool.query(
       `SELECT sub.student_id, sub.assignment_id,
@@ -356,8 +356,8 @@ router.get('/reports/results', async (req, res) => {
     // Exam results
     const eParams2 = [studentIds, subjectIds, schoolId];
   let eTermFilter2 = '';
-  if (termId) { eParams2.push(termId); eTermFilter2 = ` AND e.term_id = $${eParams2.length}`; }
- 
+  if (termId) { eParams2.push(termId); eTermFilter2 = ` AND (e.term_id = $${eParams2.length} OR e.term_id IS NULL)`; }
+
   const { rows: examResults2 } = await pool.query(
     `SELECT r.student_id, r.exam_id,
             r.marks_obtained AS score, e.total_marks AS "maxScore",
@@ -520,7 +520,7 @@ async function getStudentReportData(schoolId, studentId, termId) {
   // Assignment marks
   let aParams = [studentId];
   let aWhere  = cls ? ` AND a.class_id=$${aParams.push(cls.id)}` : '';
-  if (termId) aWhere += ` AND a.term_id=$${aParams.push(termId)}`;
+  if (termId) aWhere += ` AND (a.term_id=$${aParams.push(termId)} OR a.term_id IS NULL)`;
 
   const { rows: assignmentMarks } = await pool.query(
     `SELECT sub.marks_obtained AS score, a.total_marks AS "maxScore",
@@ -534,7 +534,7 @@ async function getStudentReportData(schoolId, studentId, termId) {
   // Exam results
   let eParams = [studentId, schoolId];
   let eWhere  = cls ? ` AND e.class_id=$${eParams.push(cls.id)}` : '';
-  if (termId) eWhere += ` AND e.term_id=$${eParams.push(termId)}`;
+  if (termId) eWhere += ` AND (e.term_id=$${eParams.push(termId)} OR e.term_id IS NULL)`;
 
   const { rows: examResults } = await pool.query(
     `SELECT r.marks_obtained AS score, e.total_marks AS "maxScore",
