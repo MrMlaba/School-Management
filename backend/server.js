@@ -1166,12 +1166,10 @@ async function ensureTables() {
   // Add image_id column to schools if it doesn't exist
   try {
     await pool.query(`
-      ALTER TABLE schools ADD COLUMN image_id INTEGER REFERENCES school_images(id) ON DELETE SET NULL
+      ALTER TABLE schools ADD COLUMN IF NOT EXISTS image_id INTEGER REFERENCES school_images(id) ON DELETE SET NULL
     `);
   } catch (err) {
-    if (!err.message.includes('already exists')) {
-      console.warn('Note: image_id column may already exist or ALTER failed:', err.message);
-    }
+    console.warn('Note: image_id column ALTER failed:', err.message);
   }
 
   // document_files — persistent binary storage for uploaded documents (replaces ephemeral disk)
@@ -1189,12 +1187,12 @@ async function ensureTables() {
 
   // Add application form columns to schools
   for (const col of [
-    `ALTER TABLE schools ADD COLUMN application_form_required BOOLEAN DEFAULT false`,
-    `ALTER TABLE schools ADD COLUMN application_form_filename TEXT`,
-    `ALTER TABLE schools ADD COLUMN application_form_originalname TEXT`,
+    `ALTER TABLE schools ADD COLUMN IF NOT EXISTS application_form_required BOOLEAN DEFAULT false`,
+    `ALTER TABLE schools ADD COLUMN IF NOT EXISTS application_form_filename TEXT`,
+    `ALTER TABLE schools ADD COLUMN IF NOT EXISTS application_form_originalname TEXT`,
   ]) {
     try { await pool.query(col); } catch (err) {
-      if (!err.message.includes('already exists')) console.warn('Migration note:', err.message);
+      console.warn('Migration note:', err.message);
     }
   }
 

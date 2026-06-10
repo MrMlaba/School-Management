@@ -69,9 +69,9 @@ async function ensureSupportTables() {
   `);
   // Add term_id to exams table
   try {
-    await pool.query(`ALTER TABLE exams ADD COLUMN term_id INTEGER REFERENCES terms(id) ON DELETE SET NULL`);
+    await pool.query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS term_id INTEGER REFERENCES terms(id) ON DELETE SET NULL`);
   } catch (err) {
-    if (!err.message.includes('already exists')) console.warn('[ensureSupportTables] exams.term_id:', err.message);
+    console.warn('[ensureSupportTables] exams.term_id:', err.message);
   }
   // term_weights — assignment/exam mark split per (class, subject, term), used by report calculator
   await pool.query(`
