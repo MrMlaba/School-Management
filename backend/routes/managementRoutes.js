@@ -355,8 +355,8 @@ router.get('/reports/results', async (req, res) => {
 
     // Exam results
     const eParams2 = [studentIds, subjectIds, schoolId];
-  let eTermFilter2 = '';
-  if (termId) { eParams2.push(termId); eTermFilter2 = ` AND (e.term_id = $${eParams2.length} OR e.term_id IS NULL)`; }
+  let eTermFilter = '';
+  if (termId) { eParams2.push(termId); eTermFilter = ` AND (e.term_id = $${eParams2.length} OR e.term_id IS NULL)`; }
 
   const { rows: examResults2 } = await pool.query(
     `SELECT r.student_id, r.exam_id,
@@ -367,7 +367,7 @@ router.get('/reports/results', async (req, res) => {
      WHERE r.student_id = ANY($1::int[])
        AND e.subject_id = ANY($2::int[])
        AND r.school_id  = $3
-       ${eTermFilter2}`,
+       ${eTermFilter}`,
     eParams2
   );
 
