@@ -1198,6 +1198,22 @@ async function ensureTables() {
     }
   }
 
+  // term_weights — per (class, subject, term) split between assignment marks and exam marks
+  // used by the report-card calculator to compute each subject's final percentage
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS term_weights (
+      id                SERIAL PRIMARY KEY,
+      school_id         INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      class_id          INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+      subject_id        INTEGER NOT NULL REFERENCES school_subjects(id) ON DELETE CASCADE,
+      term_id           INTEGER NOT NULL REFERENCES terms(id) ON DELETE CASCADE,
+      assignment_weight NUMERIC NOT NULL DEFAULT 50,
+      exam_weight       NUMERIC NOT NULL DEFAULT 50,
+      updated_at        TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(class_id, subject_id, term_id)
+    )
+  `);
+
   console.log('✅ All tables verified');
 }
 

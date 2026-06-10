@@ -73,6 +73,20 @@ async function ensureSupportTables() {
   } catch (err) {
     if (!err.message.includes('already exists')) console.warn('[ensureSupportTables] exams.term_id:', err.message);
   }
+  // term_weights — assignment/exam mark split per (class, subject, term), used by report calculator
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS term_weights (
+      id                SERIAL PRIMARY KEY,
+      school_id         INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      class_id          INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+      subject_id        INTEGER NOT NULL REFERENCES school_subjects(id) ON DELETE CASCADE,
+      term_id           INTEGER NOT NULL REFERENCES terms(id) ON DELETE CASCADE,
+      assignment_weight NUMERIC NOT NULL DEFAULT 50,
+      exam_weight       NUMERIC NOT NULL DEFAULT 50,
+      updated_at        TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(class_id, subject_id, term_id)
+    )
+  `);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -448,6 +462,74 @@ router.get('/terms', async (req, res) => {
   } catch (err) {
     console.error('[teacher terms GET]', err);
     res.status(500).json({ message: 'Failed to load terms' });
+  }
+});
+
+// ── Term Weights GET ─────────────────────────────────────────────────────────
+// Returns the assignment/exam weight split for each subject the teacher teaches
+// in a given class + term. Defaults to 50/50 for any subject without a saved split.
+router.get('/term-weights', async (req, res) => {
+  const teacherId = req.teacher.id;
+  const schoolId  = req.teacher.schoolId;
+  const { classId, termId } = req.query;
+  if (!classId || !termId) return res.status(400).json({ message: 'classId and termId are required' });
+  try {
+    await ensureSupportTables();
+
+    const { rows: subjects } = await pool.query(
+      `SELECT DISTINCT ss.id, ss.name
+       FROM timetable_slots ts
+       JOIN school_subjects ss ON ss.id = ts.subject_id
+       WHERE ts.teacher_id = $1 AND ts.class_id = $2 AND ts.school_id = $3
+       ORDER BY ss.name`,
+      [teacherId, classId, schoolId]
+    );
+
+    const { rows: weights } = await pool.query(
+      `SELECT subject_id AS "subjectId", assignment_weight AS "assignmentWeight", exam_weight AS "examWeight"
+       FROM term_weights WHERE class_id = $1 AND term_id = $2`,
+      [classId, termId]
+    );
+    const weightMap = {};
+    weights.forEach(w => { weightMap[w.subjectId] = w; });
+
+    res.json(subjects.map(s => ({
+      subjectId: s.id,
+      subjectName: s.name,
+      assignmentWeight: weightMap[s.id] ? Number(weightMap[s.id].assignmentWeight) : 50,
+      examWeight:       weightMap[s.id] ? Number(weightMap[s.id].examWeight)       : 50,
+    })));
+  } catch (err) {
+    console.error('[teacher term-weights GET]', err);
+    res.status(500).json({ message: 'Failed to load term weights' });
+  }
+});
+
+// ── Term Weights PUT ─────────────────────────────────────────────────────────
+// Upserts the assignment/exam weight split for a (class, subject, term) combo.
+router.put('/term-weights', async (req, res) => {
+  const schoolId = req.teacher.schoolId;
+  const { classId, subjectId, termId, assignmentWeight, examWeight } = req.body;
+  if (!classId || !subjectId || !termId) return res.status(400).json({ message: 'classId, subjectId and termId are required' });
+
+  const aw = Number(assignmentWeight);
+  const ew = Number(examWeight);
+  if (!Number.isFinite(aw) || !Number.isFinite(ew) || aw < 0 || ew < 0 || Math.round(aw + ew) !== 100)
+    return res.status(400).json({ message: 'Assignment weight and exam weight must be between 0 and 100 and add up to 100' });
+
+  try {
+    await ensureSupportTables();
+    await pool.query(
+      `INSERT INTO term_weights (school_id, class_id, subject_id, term_id, assignment_weight, exam_weight)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (class_id, subject_id, term_id)
+       DO UPDATE SET assignment_weight = $5, exam_weight = $6, updated_at = NOW()`,
+      [schoolId, classId, subjectId, termId, aw, ew]
+    );
+    res.json({ success: true, assignmentWeight: aw, examWeight: ew });
+  } catch (err) {
+    console.error('[teacher term-weights PUT]', err);
+    res.status(500).json({ message: 'Failed to save term weights' });
   }
 });
 

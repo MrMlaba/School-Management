@@ -1905,6 +1905,8 @@ const ReportsSection = () => {
         (report.subjects||[]).forEach(sub=>{
           const r = s.results?.[sub.id];
           row[sub.name] = r ? `${r.score}/${r.maxScore} (${r.percentage}%)` : '—';
+          row[`${sub.name} - Assignments %`] = r && r.assignmentPercentage!==null ? `${r.assignmentPercentage}%` : '—';
+          row[`${sub.name} - Exams %`] = r && r.examPercentage!==null ? `${r.examPercentage}%` : '—';
         });
         row['Average %'] = s.average!==null ? `${s.average}%` : '—';
         return row;
@@ -2084,13 +2086,19 @@ const ReportsSection = () => {
                         <TableCell sx={{...bc,fontWeight:600}}>{s.firstName} {s.lastName}</TableCell>
                         {(report.subjects||[]).map(sub=>{
                           const r=s.results?.[sub.id];
+                          const breakdown = r ? [
+                            r.assignmentPercentage!==null ? `Assignments: ${r.assignmentPercentage}%${r.weights?` (weight ${r.weights.assignmentWeight}%)`:''}` : null,
+                            r.examPercentage!==null ? `Exams: ${r.examPercentage}%${r.weights?` (weight ${r.weights.examWeight}%)`:''}` : null,
+                          ].filter(Boolean).join(' · ') : '';
                           return(
                             <TableCell key={sub.id} sx={{...bc,textAlign:'center'}}>
                               {r?(
-                                <Box>
-                                  <Typography sx={{fontSize:'0.82rem',fontWeight:700,color:resColor(r.percentage),fontFamily:"'IBM Plex Sans', sans-serif"}}>{r.score}/{r.maxScore}</Typography>
-                                  <Typography sx={{fontSize:'0.7rem',color:resColor(r.percentage),fontFamily:"'IBM Plex Sans', sans-serif"}}>{r.percentage}% (Sym {getSymbol(r.percentage)})</Typography>
-                                </Box>
+                                <Tooltip title={breakdown || 'No breakdown available'} arrow>
+                                  <Box>
+                                    <Typography sx={{fontSize:'0.82rem',fontWeight:700,color:resColor(r.percentage),fontFamily:"'IBM Plex Sans', sans-serif"}}>{r.score}/{r.maxScore}</Typography>
+                                    <Typography sx={{fontSize:'0.7rem',color:resColor(r.percentage),fontFamily:"'IBM Plex Sans', sans-serif"}}>{r.percentage}% (Sym {getSymbol(r.percentage)})</Typography>
+                                  </Box>
+                                </Tooltip>
                               ):<Typography sx={{color:C.muted,fontSize:'0.8rem'}}>—</Typography>}
                             </TableCell>
                           );

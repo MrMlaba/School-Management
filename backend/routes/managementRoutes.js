@@ -371,34 +371,29 @@ router.get('/reports/results', async (req, res) => {
     eParams2
   );
 
+    // Assignment/exam weight split per subject for this class+term (defaults to 50/50 when a term is set)
+    const weightsMap = await getTermWeightsMap(classId, termId);
+
     // Build per-student per-subject aggregates
     const studentsWithResults = students.map(s => {
       const subjectResults = {};
-      let totalScore = 0, totalMax = 0;
+      const percentages = [];
 
       subjects.forEach(sub => {
         const aMarks = assignmentMarks.filter(m => m.student_id === s.id && m.subjectId === sub.id);
         const eMarks = examResults2.filter(m => m.student_id === s.id && m.subjectId === sub.id);
-        const all    = [...aMarks, ...eMarks];
 
-        if (all.length === 0) { subjectResults[sub.id] = null; return; }
+        if (!aMarks.length && !eMarks.length) { subjectResults[sub.id] = null; return; }
 
-        const score  = all.reduce((sum, m) => sum + (parseFloat(m.score) || 0), 0);
-        const maxSc  = all.reduce((sum, m) => sum + (parseFloat(m.maxScore) || 0), 0);
-        const pct    = maxSc > 0 ? Math.round((score / maxSc) * 100) : null;
-
-        totalScore += score;
-        totalMax   += maxSc;
-
-        subjectResults[sub.id] = {
-          score:    Math.round(score * 10) / 10,
-          maxScore: maxSc,
-          percentage: pct,
-          assessments: all.length,
-        };
+        const weights  = weightsMap[sub.id] || (termId ? { assignmentWeight: 50, examWeight: 50 } : null);
+        const combined = combineSubjectMarks(aMarks, eMarks, weights);
+        if (combined.percentage !== null) percentages.push(combined.percentage);
+        subjectResults[sub.id] = combined;
       });
 
-      const average = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : null;
+      const average = percentages.length > 0
+        ? Math.round(percentages.reduce((sum, p) => sum + p, 0) / percentages.length)
+        : null;
       return { ...s, results: subjectResults, average };
     });
 
@@ -418,6 +413,63 @@ router.get('/reports/results', async (req, res) => {
 //  No external PDF library needed — the browser prints/saves it as PDF.
 //  The endpoint returns an HTML page styled for A4 printing.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ── Term weights helper ───────────────────────────────────────────────────────
+// Returns a map of subjectId -> { assignmentWeight, examWeight } for a class+term.
+// Subjects without a saved split fall back to 50/50 once a termId is given.
+async function getTermWeightsMap(classId, termId) {
+  const map = {};
+  if (!classId || !termId) return map;
+  const { rows } = await pool.query(
+    `SELECT subject_id AS "subjectId", assignment_weight AS "assignmentWeight", exam_weight AS "examWeight"
+     FROM term_weights WHERE class_id = $1 AND term_id = $2`,
+    [classId, termId]
+  );
+  rows.forEach(w => { map[w.subjectId] = { assignmentWeight: Number(w.assignmentWeight), examWeight: Number(w.examWeight) }; });
+  return map;
+}
+
+// ── Subject mark combiner ───────────────────────────────────────────────────────
+// Combines a subject's assignment marks and exam marks into a final percentage.
+// When weights are supplied (i.e. a term is selected), the final percentage is the
+// weighted average of the assignment % and exam %. Otherwise (no term selected,
+// or only one type of mark exists) it falls back to a simple combined percentage.
+function combineSubjectMarks(aMarks, eMarks, weights) {
+  const aScore = aMarks.reduce((s, m) => s + (parseFloat(m.score) || 0), 0);
+  const aMax   = aMarks.reduce((s, m) => s + (parseFloat(m.maxScore) || 0), 0);
+  const eScore = eMarks.reduce((s, m) => s + (parseFloat(m.score) || 0), 0);
+  const eMax   = eMarks.reduce((s, m) => s + (parseFloat(m.maxScore) || 0), 0);
+
+  const aPct = aMax > 0 ? (aScore / aMax) * 100 : null;
+  const ePct = eMax > 0 ? (eScore / eMax) * 100 : null;
+
+  let percentage = null;
+  if (aPct !== null && ePct !== null) {
+    if (weights) {
+      percentage = (aPct * (weights.assignmentWeight / 100)) + (ePct * (weights.examWeight / 100));
+    } else {
+      percentage = ((aScore + eScore) / (aMax + eMax)) * 100;
+    }
+  } else if (aPct !== null) {
+    percentage = aPct;
+  } else if (ePct !== null) {
+    percentage = ePct;
+  }
+
+  return {
+    score:    Math.round((aScore + eScore) * 10) / 10,
+    maxScore: aMax + eMax,
+    assignmentScore:      aMax > 0 ? Math.round(aScore * 10) / 10 : null,
+    assignmentMax:        aMax > 0 ? aMax : null,
+    assignmentPercentage: aPct !== null ? Math.round(aPct) : null,
+    examScore:      eMax > 0 ? Math.round(eScore * 10) / 10 : null,
+    examMax:        eMax > 0 ? eMax : null,
+    examPercentage: ePct !== null ? Math.round(ePct) : null,
+    percentage: percentage !== null ? Math.round(percentage) : null,
+    assessments: aMarks.length + eMarks.length,
+    weights: weights || null,
+  };
+}
 
 // Helper: build a single student's full data for the report card
 async function getStudentReportData(schoolId, studentId, termId) {
@@ -480,7 +532,7 @@ async function getStudentReportData(schoolId, studentId, termId) {
   );
 
   // Exam results
-  let eParams = [studentId];
+  let eParams = [studentId, schoolId];
   let eWhere  = cls ? ` AND e.class_id=$${eParams.push(cls.id)}` : '';
   if (termId) eWhere += ` AND e.term_id=$${eParams.push(termId)}`;
 
@@ -490,9 +542,13 @@ async function getStudentReportData(schoolId, studentId, termId) {
      FROM results r
      JOIN exams e ON e.id = r.exam_id
      WHERE r.student_id = $1
-       AND r.school_id  = $2`,
-    [studentId, schoolId]
+       AND r.school_id  = $2
+       ${eWhere}`,
+    eParams
   );
+
+  // Assignment/exam weight split per subject for this class+term (defaults to 50/50 when a term is set)
+  const weightsMap = await getTermWeightsMap(cls?.id, termId);
 
   // Attendance
   let attParams = [schoolId, studentId];
@@ -518,21 +574,16 @@ async function getStudentReportData(schoolId, studentId, termId) {
   const att = attRows[0] || { present:0, absent:0, late:0, excused:0, total:0 };
   const attPct = att.total > 0 ? Math.round(((parseInt(att.present)+parseInt(att.late))/parseInt(att.total))*100) : null;
 
-  // Build subject results
+  // Build subject results — combine assignment + exam marks using the term's weight split
   const subjectResults = subjects.map(sub => {
-    const marks = [...assignmentMarks, ...examResults].filter(m => m.subjectId === sub.id);
-    if (!marks.length) return { ...sub, score: null, maxScore: null, percentage: null, symbol: '—', assessments: 0 };
-    const score  = marks.reduce((s, m) => s + (parseFloat(m.score) || 0), 0);
-    const maxSc  = marks.reduce((s, m) => s + (parseFloat(m.maxScore) || 0), 0);
-    const pct    = maxSc > 0 ? Math.round((score / maxSc) * 100) : null;
-    return {
-      ...sub,
-      score:    Math.round(score * 10) / 10,
-      maxScore: maxSc,
-      percentage: pct,
-      symbol:   getSymbol(pct),
-      assessments: marks.length,
-    };
+    const aMarks = assignmentMarks.filter(m => m.subjectId === sub.id);
+    const eMarks = examResults.filter(m => m.subjectId === sub.id);
+    if (!aMarks.length && !eMarks.length)
+      return { ...sub, score: null, maxScore: null, percentage: null, symbol: '—', assessments: 0 };
+
+    const weights  = weightsMap[sub.id] || (termId ? { assignmentWeight: 50, examWeight: 50 } : null);
+    const combined = combineSubjectMarks(aMarks, eMarks, weights);
+    return { ...sub, ...combined, symbol: getSymbol(combined.percentage) };
   });
 
   const scoredSubjects = subjectResults.filter(s => s.percentage !== null);
@@ -598,11 +649,19 @@ function buildReportCardHTML(data, schoolLogoUrl) {
   const subjectRows = subjectResults.map(sub => {
     const barWidth = sub.percentage !== null ? sub.percentage : 0;
     const color    = getBarColor(sub.percentage);
+    const aLabel   = sub.assignmentPercentage !== null
+      ? `${sub.assignmentPercentage}%${sub.weights ? ` <span class="muted" style="font-size:9px;">(${sub.weights.assignmentWeight}%)</span>` : ''}`
+      : '—';
+    const eLabel   = sub.examPercentage !== null
+      ? `${sub.examPercentage}%${sub.weights ? ` <span class="muted" style="font-size:9px;">(${sub.weights.examWeight}%)</span>` : ''}`
+      : '—';
     return `
     <tr>
       <td class="subject-name">${sub.name}</td>
       <td class="center">${sub.score !== null ? sub.score : '—'}</td>
       <td class="center">${sub.maxScore !== null ? sub.maxScore : '—'}</td>
+      <td class="center">${aLabel}</td>
+      <td class="center">${eLabel}</td>
       <td class="center bold" style="color:${color}">${sub.percentage !== null ? sub.percentage + '%' : '—'}</td>
       <td class="center">
         <div class="bar-bg"><div class="bar-fill" style="width:${barWidth}%;background:${color}"></div></div>
@@ -776,7 +835,9 @@ function buildReportCardHTML(data, schoolLogoUrl) {
           <th>Subject</th>
           <th class="center">Score</th>
           <th class="center">Max</th>
-          <th class="center">%</th>
+          <th class="center">Assignment %</th>
+          <th class="center">Exam %</th>
+          <th class="center">Final %</th>
           <th class="center">Progress</th>
           <th class="center">Symbol</th>
           <th class="center">Achievement</th>

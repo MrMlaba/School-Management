@@ -23,6 +23,7 @@ import SchoolIcon         from '@mui/icons-material/School';
 import WarningAmberIcon   from '@mui/icons-material/WarningAmber';
 import TableChartIcon     from '@mui/icons-material/TableChart';
 import ListAltIcon        from '@mui/icons-material/ListAlt';
+import TuneIcon           from '@mui/icons-material/Tune';
 import QuizIcon from '@mui/icons-material/Quiz';
 import QuizTab  from './QuizTab';
 import SchoolLogoHeader from '../components/SchoolLogoHeader';
@@ -807,6 +808,113 @@ const AttendanceTab = ({ initSlotId }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════
+   TERM WEIGHTS DIALOG
+   Lets the teacher set, per class + term + subject, what % of the final
+   report mark comes from assignments vs. exams. Must add up to 100%.
+══════════════════════════════════════════════════════════════════════ */
+const TermWeightsDialog = ({ open, onClose, toast }) => {
+  const [classes,  setClasses]  = useState([]);
+  const [terms,    setTerms]    = useState([]);
+  const [selClass, setSelClass] = useState('');
+  const [selTerm,  setSelTerm]  = useState('');
+  const [weights,  setWeights]  = useState([]);
+  const [loading,  setLoading]  = useState(false);
+  const [saving,   setSaving]   = useState({});
+
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      const [dRes, tRes] = await Promise.all([
+        fetch(`${BASE}/api/teacher/dashboard`, { headers: authH() }),
+        fetch(`${BASE}/api/teacher/terms`,     { headers: authH() }),
+      ]);
+      if (dRes.ok) { const d = await dRes.json(); setClasses(d.myClasses || []); }
+      if (tRes.ok) setTerms(await tRes.json());
+    })();
+  }, [open]);
+
+  useEffect(() => {
+    if (!selClass || !selTerm) { setWeights([]); return; }
+    setLoading(true);
+    fetch(`${BASE}/api/teacher/term-weights?classId=${selClass}&termId=${selTerm}`, { headers: authH() })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setWeights(d))
+      .finally(() => setLoading(false));
+  }, [selClass, selTerm]);
+
+  const updateWeight = (subjectId, field, value) => {
+    let num = Number(value);
+    if (!Number.isFinite(num)) num = 0;
+    num = Math.max(0, Math.min(100, num));
+    setWeights(ws => ws.map(w => w.subjectId !== subjectId ? w : (
+      field === 'assignmentWeight'
+        ? { ...w, assignmentWeight: num, examWeight: 100 - num }
+        : { ...w, examWeight: num, assignmentWeight: 100 - num }
+    )));
+  };
+
+  const handleSave = async (w) => {
+    setSaving(s => ({ ...s, [w.subjectId]: true }));
+    const res = await fetch(`${BASE}/api/teacher/term-weights`, {
+      method: 'PUT', headers: jsonH(),
+      body: JSON.stringify({ classId: selClass, subjectId: w.subjectId, termId: selTerm, assignmentWeight: w.assignmentWeight, examWeight: w.examWeight }),
+    });
+    setSaving(s => ({ ...s, [w.subjectId]: false }));
+    if (res.ok) toast(`Weights saved for ${w.subjectName}`);
+    else { const e = await res.json(); toast(e.message || 'Failed to save weights', 'error'); }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx:{ borderRadius:'12px' } }}>
+      <DialogTitle sx={{ fontWeight:700, color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif" }}>Term Weights</DialogTitle>
+      <Divider />
+      <DialogContent sx={{ pt:2.5, display:'flex', flexDirection:'column', gap:2 }}>
+        <Typography sx={{ fontSize:'0.82rem', color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>
+          Choose how much each subject's final report mark depends on assignment marks vs. exam marks for a term.
+          The two values must add up to 100%. If left unset, marks are split 50/50.
+        </Typography>
+        <Box sx={{ display:'flex', gap:2 }}>
+          <TextField select label="Class" value={selClass} onChange={e=>{ setSelClass(e.target.value); setWeights([]); }} size="small" fullWidth>
+            <MenuItem value="">— Select —</MenuItem>
+            {classes.map(c=><MenuItem key={c.id} value={c.id}>{c.name}{c.stream?` (${c.stream})`:''}</MenuItem>)}
+          </TextField>
+          <TextField select label="Term" value={selTerm} onChange={e=>{ setSelTerm(e.target.value); setWeights([]); }} size="small" fullWidth>
+            <MenuItem value="">— Select —</MenuItem>
+            {terms.map(t=><MenuItem key={t.id} value={t.id}>Term {t.termNumber}</MenuItem>)}
+          </TextField>
+        </Box>
+
+        {loading && <Box sx={{ display:'flex', justifyContent:'center', py:3 }}><CircularProgress sx={{ color:C.brand }} /></Box>}
+
+        {!loading && selClass && selTerm && weights.length===0 && (
+          <Typography sx={{ color:C.muted, textAlign:'center', py:2, fontFamily:"'IBM Plex Sans', sans-serif" }}>
+            No subjects found for this class.
+          </Typography>
+        )}
+
+        {!loading && weights.map(w => (
+          <Box key={w.subjectId} sx={{ display:'flex', alignItems:'center', gap:1.5, p:1.5, border:`1px solid ${C.border}`, borderRadius:'8px', flexWrap:'wrap' }}>
+            <Typography sx={{ flex:1, minWidth:100, fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{w.subjectName}</Typography>
+            <TextField label="Assignment %" type="number" size="small" value={w.assignmentWeight}
+              onChange={e=>updateWeight(w.subjectId,'assignmentWeight',e.target.value)} sx={{ width:120 }} />
+            <TextField label="Exam %" type="number" size="small" value={w.examWeight}
+              onChange={e=>updateWeight(w.subjectId,'examWeight',e.target.value)} sx={{ width:120 }} />
+            <Button size="small" variant="contained" disabled={!!saving[w.subjectId]} onClick={()=>handleSave(w)}
+              sx={{ background:C.brand, textTransform:'none', fontWeight:700, boxShadow:'none', borderRadius:'6px', fontFamily:"'IBM Plex Sans', sans-serif" }}>
+              {saving[w.subjectId] ? '…' : 'Save'}
+            </Button>
+          </Box>
+        ))}
+      </DialogContent>
+      <Divider />
+      <DialogActions sx={{ px:3, py:2 }}>
+        <Button onClick={onClose} sx={{ textTransform:'none', color:C.muted }}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+/* ══════════════════════════════════════════════════════════════════════
    ASSIGNMENTS TAB  — now has two views: List  |  Marks Table
 ══════════════════════════════════════════════════════════════════════ */
 const AssignmentsTab = () => {
@@ -830,6 +938,7 @@ const AssignmentsTab = () => {
   const [submissions,        setSubmissions]         = useState([]);
   const [loadingSubs,        setLoadingSubs]         = useState(false);
   const [grading,            setGrading]             = useState({});
+  const [weightsOpen,        setWeightsOpen]         = useState(false);
 
   const fetchAll = useCallback(async () => {
     const [aRes, tRes, termsRes] = await Promise.all([
@@ -917,12 +1026,18 @@ const AssignmentsTab = () => {
               ))}
             </Box>
 
-            {view==='list' && (
-              <Button variant="contained" startIcon={<AddIcon />} onClick={()=>{ setForm(EMPTY); setDialog(true); }}
-                sx={{ background:C.brand, textTransform:'none', fontWeight:700, boxShadow:'none', borderRadius:'8px', fontFamily:"'IBM Plex Sans', sans-serif" }}>
-                New Assignment
+            <Box sx={{ display:'flex', gap:1 }}>
+              <Button size="small" variant="outlined" startIcon={<TuneIcon sx={{ fontSize:17 }} />} onClick={()=>setWeightsOpen(true)}
+                sx={{ textTransform:'none', fontWeight:700, fontFamily:"'IBM Plex Sans', sans-serif", borderColor:C.border, color:C.muted, borderRadius:'8px', '&:hover':{ borderColor:C.brand, color:C.brand } }}>
+                Term Weights
               </Button>
-            )}
+              {view==='list' && (
+                <Button variant="contained" startIcon={<AddIcon />} onClick={()=>{ setForm(EMPTY); setDialog(true); }}
+                  sx={{ background:C.brand, textTransform:'none', fontWeight:700, boxShadow:'none', borderRadius:'8px', fontFamily:"'IBM Plex Sans', sans-serif" }}>
+                  New Assignment
+                </Button>
+              )}
+            </Box>
           </Box>
           <Divider sx={{ borderColor:C.border }} />
         </Box>
@@ -1103,6 +1218,8 @@ const AssignmentsTab = () => {
         <DialogActions><Button onClick={()=>setSubmissionsDialog(null)} sx={{ textTransform:'none', color:C.muted }}>Close</Button></DialogActions>
       </Dialog>
 
+      <TermWeightsDialog open={weightsOpen} onClose={()=>setWeightsOpen(false)} toast={toast} />
+
       <Snackbar open={snack.open} autoHideDuration={4000} onClose={()=>setSnack(s=>({...s,open:false}))} anchorOrigin={{ vertical:'bottom', horizontal:'right' }}>
         <Alert severity={snack.sev} onClose={()=>setSnack(s=>({...s,open:false}))} sx={{ fontFamily:"'IBM Plex Sans', sans-serif", fontWeight:600 }}>{snack.msg}</Alert>
       </Snackbar>
@@ -1261,6 +1378,7 @@ const ExamsTab = () => {
   const [saving,        setSaving]        = useState(false);
   const [filterTerm,    setFilterTerm]    = useState('');
   const [view,          setView]          = useState('list'); // 'list' | 'marks'
+  const [weightsOpen,   setWeightsOpen]   = useState(false);
   const [snack,         setSnack]         = useState({ open:false, msg:'', sev:'success' });
   const toast = (msg, sev='success') => setSnack({ open:true, msg, sev });
 
@@ -1330,12 +1448,18 @@ const ExamsTab = () => {
                 }}>{v.label}</Button>
               ))}
             </Box>
-            {view==='list' && (
-              <Button variant="contained" startIcon={<AddIcon />} onClick={()=>{ setForm(EMPTY); setDialog(true); }}
-                sx={{ background:C.brand, textTransform:'none', fontWeight:700, boxShadow:'none', borderRadius:'8px', fontFamily:"'IBM Plex Sans', sans-serif" }}>
-                New Exam
+            <Box sx={{ display:'flex', gap:1 }}>
+              <Button size="small" variant="outlined" startIcon={<TuneIcon sx={{ fontSize:17 }} />} onClick={()=>setWeightsOpen(true)}
+                sx={{ textTransform:'none', fontWeight:700, fontFamily:"'IBM Plex Sans', sans-serif", borderColor:C.border, color:C.muted, borderRadius:'8px', '&:hover':{ borderColor:C.brand, color:C.brand } }}>
+                Term Weights
               </Button>
-            )}
+              {view==='list' && (
+                <Button variant="contained" startIcon={<AddIcon />} onClick={()=>{ setForm(EMPTY); setDialog(true); }}
+                  sx={{ background:C.brand, textTransform:'none', fontWeight:700, boxShadow:'none', borderRadius:'8px', fontFamily:"'IBM Plex Sans', sans-serif" }}>
+                  New Exam
+                </Button>
+              )}
+            </Box>
           </Box>
           <Divider sx={{ borderColor:C.border }} />
         </Box>
@@ -1483,6 +1607,8 @@ const ExamsTab = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <TermWeightsDialog open={weightsOpen} onClose={()=>setWeightsOpen(false)} toast={toast} />
 
       <Snackbar open={snack.open} autoHideDuration={4000} onClose={()=>setSnack(s=>({...s,open:false}))} anchorOrigin={{ vertical:'bottom', horizontal:'right' }}>
         <Alert severity={snack.sev} onClose={()=>setSnack(s=>({...s,open:false}))} sx={{ fontFamily:"'IBM Plex Sans', sans-serif", fontWeight:600 }}>{snack.msg}</Alert>
