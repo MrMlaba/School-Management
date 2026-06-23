@@ -20,8 +20,6 @@ import LogoutIcon         from '@mui/icons-material/Logout';
 import SwapHorizIcon      from '@mui/icons-material/SwapHoriz';
 import FamilyRestroomIcon from '@mui/icons-material/FamilyRestroom';
 import HourglassTopIcon   from '@mui/icons-material/HourglassTop';
-import ChevronLeftIcon    from '@mui/icons-material/ChevronLeft';
-import MenuIcon           from '@mui/icons-material/Menu';
 import AddIcon            from '@mui/icons-material/Add';
 import DeleteIcon         from '@mui/icons-material/Delete';
 import EditIcon           from '@mui/icons-material/Edit';
@@ -44,14 +42,22 @@ import SchoolLogoHeader from '../components/SchoolLogoHeader';
 ═══════════════════════════════════════════════════════════════ */
 const C = {
   brand:    '#1A3557', brandDark: '#122740',
-  accent:   '#2E7D32',
+  accent:   '#2E7D32',                       // semantic GREEN (active / success) — unchanged
   sidebar:  '#F7F9FC', sidebarAct: '#E8EFF8',
-  border:   '#E2E8F0',
+  border:   '#D4DBE3',
   text:     '#1A2332', muted: '#6B7C93',
-  white:    '#FFFFFF', bg: '#F0F4F8',
+  white:    '#FFFFFF', bg: '#EDF1F5',
   danger:   '#C62828', dangerBg: '#FFEBEE',
   warn:     '#D97706', warnBg: '#FFFBEB',
-  headerBg: '#F0F4F8',
+  headerBg: '#EAEEF3',
+  /* ── enterprise chrome ── */
+  menubar:    '#37474F',   // dark top menu bar
+  menubarHi:  '#455A64',   // hover state on the menu bar
+  menubarTxt: '#ECEFF1',
+  link:       '#1565C0',   // accent / link blue
+  tabBar:     '#E3E8EE',   // tab strip background
+  tabIdle:    '#EAEEF3',   // inactive tab
+  dock:       '#F2F5F8',   // bottom icon dock
 };
 
 const BASE  = 'https://school-management-production-6167.up.railway.app';
@@ -59,15 +65,15 @@ const authH = () => ({ Authorization: `Bearer ${sessionStorage.getItem('adminTok
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 
 const hc = {
-  background: '#F0F4F8', color: C.brand, fontWeight: 700,
-  fontSize: '0.72rem', letterSpacing: '0.06em', textTransform: 'uppercase',
+  background: C.headerBg, color: C.brand, fontWeight: 700,
+  fontSize: '0.72rem', letterSpacing: '0.05em', textTransform: 'uppercase',
   borderBottom: `2px solid ${C.brand}`, borderRight: `1px solid ${C.border}`,
-  padding: '9px 14px', whiteSpace: 'nowrap', fontFamily: "'IBM Plex Sans', sans-serif",
+  padding: '8px 12px', whiteSpace: 'nowrap', fontFamily: "'IBM Plex Sans', sans-serif",
 };
 const bc = {
-  fontSize: '0.85rem', color: C.text,
+  fontSize: '0.83rem', color: C.text,
   borderBottom: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`,
-  padding: '8px 14px', fontFamily: "'IBM Plex Sans', sans-serif",
+  padding: '7px 12px', fontFamily: "'IBM Plex Sans', sans-serif",
 };
 
 const DAYS    = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
@@ -82,14 +88,14 @@ const toast_ = (setSnack) => (msg, sev = 'success') => setSnack({ open: true, ms
    SHARED UI
 ═══════════════════════════════════════════════════════════════ */
 const Card_ = ({ children, sx = {} }) => (
-  <Box sx={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: '10px', p: 2.5, ...sx }}>
+  <Box sx={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: '4px', p: 2.5, boxShadow: '0 1px 2px rgba(15,31,61,0.04)', mb: 2.5, ...sx }}>
     {children}
   </Box>
 );
 
 const SectionHead = ({ title, subtitle, action }) => (
   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-    <Box>
+    <Box sx={{ pl: 1.25, borderLeft: `3px solid ${C.brand}` }}>
       <Typography sx={{ fontWeight: 700, fontSize: '1rem', color: C.brand, fontFamily: "'IBM Plex Sans', sans-serif" }}>{title}</Typography>
       {subtitle && <Typography sx={{ fontSize: '0.8rem', color: C.muted, mt: 0.25, fontFamily: "'IBM Plex Sans', sans-serif" }}>{subtitle}</Typography>}
     </Box>
@@ -98,7 +104,7 @@ const SectionHead = ({ title, subtitle, action }) => (
 );
 
 const InfoBanner = ({ children, color = C.warn, bg = C.warnBg, border = '#FDE68A' }) => (
-  <Box sx={{ background: bg, border: `1px solid ${border}`, borderRadius: '6px', p: 1.5, mb: 2, display: 'flex', gap: 1.5 }}>
+  <Box sx={{ background: bg, border: `1px solid ${border}`, borderRadius: '4px', p: 1.5, mb: 2, display: 'flex', gap: 1.5 }}>
     <InfoOutlinedIcon sx={{ color, fontSize: 18, mt: 0.1, flexShrink: 0 }} />
     <Typography sx={{ fontSize: '0.8rem', color: '#92400E', fontFamily: "'IBM Plex Sans', sans-serif", lineHeight: 1.5 }}>{children}</Typography>
   </Box>
@@ -164,14 +170,14 @@ const OverviewSection = () => {
 }, []);
 
   const StatCard = ({ label, value, icon, bg, color, border, sub }) => (
-    <Box sx={{ flex:'1 1 180px', background:C.white, border:`1px solid ${border}`, borderRadius:'10px', p:2, boxShadow:'0 1px 4px rgba(15,31,61,0.05)' }}>
+    <Box sx={{ flex:'1 1 180px', background:C.white, border:`1px solid ${border}`, borderRadius:'4px', p:2, boxShadow:'0 1px 4px rgba(15,31,61,0.05)' }}>
       <Box sx={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
         <Box>
           <Typography sx={{ fontSize:'0.68rem', fontWeight:600, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em', fontFamily:"'IBM Plex Sans', sans-serif" }}>{label}</Typography>
           <Typography sx={{ fontSize:'1.9rem', fontWeight:800, color:C.text, lineHeight:1.2, mt:0.5, fontFamily:"'IBM Plex Sans', sans-serif" }}>{value ?? 0}</Typography>
           {sub && <Typography sx={{ fontSize:'0.68rem', color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>{sub}</Typography>}
         </Box>
-        <Box sx={{ width:40, height:40, borderRadius:'10px', background:bg, display:'flex', alignItems:'center', justifyContent:'center', color }}>{icon}</Box>
+        <Box sx={{ width:40, height:40, borderRadius:'8px', background:bg, display:'flex', alignItems:'center', justifyContent:'center', color }}>{icon}</Box>
       </Box>
     </Box>
   );
@@ -195,7 +201,7 @@ const OverviewSection = () => {
       </Box>
 
       <Box sx={{display:'flex',gap:2.5,mb:3,flexWrap:'wrap'}}>
-        <Card_ sx={{flex:'1 1 380px'}}>
+        <Card_ sx={{flex:'1 1 380px',mb:0}}>
           <SectionHead title="Attendance This Week" subtitle="Daily present vs absent"/>
           <ResponsiveContainer width="100%" height={190}>
             <BarChart data={attData} barSize={16} barGap={3}>
@@ -210,7 +216,7 @@ const OverviewSection = () => {
           </ResponsiveContainer>
         </Card_>
 
-        <Card_ sx={{width:260,flexShrink:0}}>
+        <Card_ sx={{width:260,flexShrink:0,mb:0}}>
           <Box sx={{display:'flex',justifyContent:'space-between',alignItems:'center',mb:1.5}}>
             <Typography sx={{fontWeight:700,fontSize:'0.85rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>
               {calDate.toLocaleDateString('en-US',{month:'long',year:'numeric'})}
@@ -238,10 +244,10 @@ const OverviewSection = () => {
         </Card_>
       </Box>
       {/* ── Announcements + Events row ── */}
-      <Box sx={{ display: 'flex', gap: 2.5, mt: 3, flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', gap: 2.5, mt: 3, mb: 2.5, flexWrap: 'wrap' }}>
 
         {/* Announcements */}
-        <Card_ sx={{ flex: '1 1 340px' }}>
+        <Card_ sx={{ flex: '1 1 340px', mb: 0 }}>
           <SectionHead title="📢 Announcements" subtitle="Recent notices — all audiences shown"/>
           {announcements.length === 0 ? (
             <Typography sx={{ color: C.muted, fontSize: '0.875rem', fontFamily: "'IBM Plex Sans', sans-serif" }}>
@@ -278,7 +284,7 @@ const OverviewSection = () => {
         </Card_>
 
         {/* Upcoming Events */}
-        <Card_ sx={{ flex: '1 1 340px' }}>
+        <Card_ sx={{ flex: '1 1 340px', mb: 0 }}>
           <SectionHead title="📅 Upcoming Events" subtitle="This month's school calendar"/>
           {events.length === 0 ? (
             <Typography sx={{ color: C.muted, fontSize: '0.875rem', fontFamily: "'IBM Plex Sans', sans-serif" }}>
@@ -315,12 +321,12 @@ const OverviewSection = () => {
 
       </Box>
 
-      <Card_>
+      <Card_ sx={{mb:0}}>
         <SectionHead title="Recently Enrolled" subtitle="Students enrolled in the last 7 days"/>
         {recent.length===0 ? (
           <Typography sx={{color:C.muted,fontSize:'0.875rem',textAlign:'center',py:3,fontFamily:"'IBM Plex Sans', sans-serif"}}>No students enrolled in the last 7 days.</Typography>
         ) : (
-          <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'6px'}}>
+          <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'4px'}}>
             <Table size="small" sx={{borderCollapse:'collapse'}}>
               <TableHead><TableRow>
                 {['Student No.','Name','Grade','Stream','Enrolled'].map(h=>(
@@ -383,7 +389,7 @@ const StudentsSection = () => {
   if (loading) return <Box sx={{display:'flex',justifyContent:'center',py:8}}><CircularProgress sx={{color:C.brand}}/></Box>;
 
   return (
-    <Card_>
+    <Card_ sx={{mb:0}}>
       <SectionHead title="Enrolled Students" subtitle={`${enrolled.length} student${enrolled.length!==1?'s':''} currently enrolled`}/>
       <Box sx={{display:'flex',gap:2,mb:3,flexWrap:'wrap'}}>
         <TextField placeholder="Search name, student no. or ID…" value={search} onChange={e=>setSearch(e.target.value)} size="small" sx={{width:280,'& .MuiOutlinedInput-root':{borderRadius:'6px',fontSize:'0.85rem',fontFamily:"'IBM Plex Sans', sans-serif"}}}/>
@@ -418,7 +424,7 @@ const StudentsSection = () => {
               <Typography sx={{fontWeight:700,fontSize:'0.9rem',color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif"}}> {grade}</Typography>
               <Chip label={grouped[grade].length} size="small" sx={{height:20,fontSize:'0.7rem',fontWeight:700,bgcolor:'#E8F5E9',color:C.accent}}/>
             </Box>
-            <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'6px'}}>
+            <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'4px'}}>
               <Table size="small" sx={{borderCollapse:'collapse'}}>
                 <TableHead><TableRow>
                   {['#','Student No.','Name','National ID','Email','Phone','Stream','Login','Enrolled'].map(h=>(
@@ -720,7 +726,7 @@ const TeachersSection = () => {
   if (loading) return <Box sx={{display:'flex',justifyContent:'center',py:8}}><CircularProgress sx={{color:C.brand}}/></Box>;
 
   return (
-    <Card_>
+    <Card_ sx={{mb:0}}>
       <SectionHead title="Teachers" subtitle="Manage teachers and their login access"
         action={
           <Button variant="contained" startIcon={<AddIcon/>} onClick={openAdd}
@@ -733,7 +739,7 @@ const TeachersSection = () => {
       {teachers.length===0 ? (
         <Typography sx={{color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>No teachers added yet.</Typography>
       ) : (
-        <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'6px'}}>
+        <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'4px'}}>
           <Table size="small" sx={{borderCollapse:'collapse'}}>
             <TableHead><TableRow>
               {['#','Name','Emp. No.','Email','Phone','Subjects','Status','Login',''].map(h=>(
@@ -1060,7 +1066,7 @@ const TimetableSection = () => {
   if(loading)return<Box sx={{display:'flex',justifyContent:'center',py:8}}><CircularProgress sx={{color:C.brand}}/></Box>;
 
   return(
-    <Card_>
+    <Card_ sx={{mb:0}}>
       <SectionHead title="Timetable Builder" subtitle="Click a class to build its weekly timetable"/>
       {!selClass?(
         <>
@@ -1069,7 +1075,7 @@ const TimetableSection = () => {
           ):(
             <Box sx={{display:'flex',flexWrap:'wrap',gap:2}}>
               {classes.map(cls=>(
-                <Box key={cls.id} onClick={()=>loadTimetable(cls)} sx={{width:140,p:2.5,borderRadius:'10px',cursor:'pointer',border:`1.5px solid ${C.border}`,background:C.white,textAlign:'center','&:hover':{borderColor:C.brand,background:'#EFF6FF'},transition:'all 0.15s'}}>
+                <Box key={cls.id} onClick={()=>loadTimetable(cls)} sx={{width:140,p:2.5,borderRadius:'4px',cursor:'pointer',border:`1.5px solid ${C.border}`,background:C.white,textAlign:'center','&:hover':{borderColor:C.brand,background:'#EFF6FF'},transition:'all 0.15s'}}>
                   <Typography sx={{fontWeight:800,fontSize:'1.7rem',color:C.brand,lineHeight:1,fontFamily:"'IBM Plex Sans', sans-serif"}}>{cls.name}</Typography>
                   <Typography sx={{fontSize:'0.72rem',color:C.muted,mt:0.5,fontFamily:"'IBM Plex Sans', sans-serif"}}>{cls.grade}</Typography>
                   {cls.stream&&<Chip label={cls.stream} size="small" sx={{mt:0.75,fontSize:'0.65rem',fontWeight:700,bgcolor:'#EEF2FF',color:'#3730A3'}}/>}
@@ -1080,7 +1086,7 @@ const TimetableSection = () => {
         </>
       ):(
         <Box>
-          <Box sx={{background:C.brand,borderRadius:'8px',p:2,mb:2.5,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <Box sx={{background:C.brand,borderRadius:'4px',p:2,mb:2.5,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
             <Box>
               <Typography sx={{fontWeight:800,fontSize:'1.3rem',color:C.white,fontFamily:"'IBM Plex Sans', sans-serif"}}>
                 {selClass.name} {selClass.stream&&<Chip label={selClass.stream} size="small" sx={{ml:1,bgcolor:'rgba(255,255,255,0.2)',color:C.white,fontWeight:700,fontSize:'0.72rem'}}/>}
@@ -1323,7 +1329,7 @@ const SetupSection = () => {
   };
 
   return(
-    <Card_>
+    <Card_ sx={{mb:0}}>
       <SectionHead title="School Setup" subtitle={summary?.currentYear?`Academic Year ${summary.currentYear}`:'Configure your school structure'}/>
       <Box sx={{display:'flex',gap:1,mb:3,flexWrap:'wrap'}}>
         {STEPS.map(s=>(
@@ -1376,7 +1382,7 @@ const SetupSection = () => {
           <Box sx={{display:'flex',justifyContent:'flex-end',mb:2}}>
             <Button variant="contained" onClick={savePeriods} disabled={saving} sx={{background:C.accent,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>{saving?'Saving…':'Save All Periods'}</Button>
           </Box>
-          <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'6px'}}>
+          <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'4px'}}>
             <Table size="small" sx={{borderCollapse:'collapse'}}>
               <TableHead><TableRow>{['#','Name','Start','End','Break?',''].map(h=><TableCell key={h} sx={{...hc,...(h===''?{borderRight:'none'}:{})}}>{h}</TableCell>)}</TableRow></TableHead>
               <TableBody>
@@ -1430,7 +1436,7 @@ const SetupSection = () => {
             {addGrade&&available.length===0&&<Typography sx={{fontSize:'0.82rem',color:C.accent,fontFamily:"'IBM Plex Sans', sans-serif"}}>✓ All subjects for this grade/stream already added.</Typography>}
           </Box>
           {subjects.length>0&&(
-            <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'6px'}}>
+            <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'4px'}}>
               <Table size="small" sx={{borderCollapse:'collapse'}}>
                 <TableHead><TableRow>{['Subject','Code','Grade','Stream',''].map(h=><TableCell key={h} sx={{...hc,...(h===''?{borderRight:'none'}:{})}}>{h}</TableCell>)}</TableRow></TableHead>
                 <TableBody>
@@ -1482,7 +1488,7 @@ const SetupSection = () => {
           {classes.length>0&&(
             <Box sx={{display:'flex',flexWrap:'wrap',gap:1.5}}>
               {classes.map(cls=>(
-                <Box key={cls.id} sx={{position:'relative',p:2,borderRadius:'10px',border:`1.5px solid ${C.border}`,background:C.white,textAlign:'center',minWidth:120,'&:hover .del-btn':{opacity:1}}}>
+                <Box key={cls.id} sx={{position:'relative',p:2,borderRadius:'4px',border:`1.5px solid ${C.border}`,background:C.white,textAlign:'center',minWidth:120,'&:hover .del-btn':{opacity:1}}}>
                   <Typography sx={{fontWeight:800,fontSize:'1.5rem',color:C.brand,lineHeight:1,fontFamily:"'IBM Plex Sans', sans-serif"}}>{cls.name}</Typography>
                   <Typography sx={{fontSize:'0.7rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>{cls.grade}</Typography>
                   {cls.stream&&<Chip label={cls.stream} size="small" sx={{mt:0.5,fontSize:'0.65rem',fontWeight:700,bgcolor:'#EEF2FF',color:'#3730A3'}}/>}
@@ -1573,7 +1579,7 @@ const EventsSection = () => {
   }, {});
  
   return (
-    <Card_>
+    <Card_ sx={{mb:0}}>
       <SectionHead title="Events" subtitle={`Events for ${new Date(month+'-01').toLocaleDateString('en-US',{month:'long',year:'numeric'})}`}
         action={
           <Box sx={{display:'flex',gap:1.5,alignItems:'center'}}>
@@ -1717,7 +1723,7 @@ const AnnouncementsSection = () => {
   const AUDIENCE_COLORS = {all:{bg:'#EEF2FF',color:'#3730A3'},teachers:{bg:'#FFF7ED',color:'#C2410C'},students:{bg:'#F0FDF4',color:'#166534'}};
  
   return (
-    <Card_>
+    <Card_ sx={{mb:0}}>
       <SectionHead title="Announcements" subtitle="Post notices for teachers and students"
         action={
           <Button variant="contained" startIcon={<AddIcon/>} onClick={openAdd}
@@ -1923,7 +1929,7 @@ const ReportsSection = () => {
   const getSymbol = (pct) => { if(pct===null)return'—'; if(pct>=80)return'7'; if(pct>=70)return'6'; if(pct>=60)return'5'; if(pct>=50)return'4'; if(pct>=40)return'3'; if(pct>=30)return'2'; return'1'; };
  
   return (
-    <Card_>
+    <Card_ sx={{mb:0}}>
       <SectionHead title="Reports" subtitle="Generate attendance and results reports — download as PDF or Excel"/>
  
       {/* Report type tabs */}
@@ -2012,7 +2018,7 @@ const ReportsSection = () => {
  
           {/* ── ATTENDANCE TABLE ── */}
           {tab==='attendance' && (
-            <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'6px'}}>
+            <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'4px'}}>
               <Table size="small" sx={{borderCollapse:'collapse'}}>
                 <TableHead><TableRow>
                   {['#','Student No.','Name','Present','Absent','Late','Excused','Total','Attendance %','PDF'].map((h,i,arr)=>(
@@ -2147,13 +2153,20 @@ const NAV = [
   {key:'reports',  label:'Reports',       icon:<AssessmentIcon sx={{fontSize:19}}/> },
 ];
 
+// Top dark menu bar groups → jump to a representative section
+const MENU = [
+  { label:'HOME',      target:'overview' },
+  { label:'PEOPLE',    target:'students' },
+  { label:'ACADEMICS', target:'timetable' },
+  { label:'COMMS',     target:'announcements' },
+];
+
 const ManagementDashboard = () => {
   const navigate    = useNavigate();
   const [active,    setActive]    = useState('overview');
-  const [collapsed, setCollapsed] = useState(false);
   const school    = sessionStorage.getItem('adminSchool') || 'School';
   const adminName = sessionStorage.getItem('adminName')   || 'Admin';
-  
+
   const adminToken = sessionStorage.getItem('adminToken') || '';
   const schoolId = (() => {
     try {
@@ -2169,102 +2182,115 @@ const ManagementDashboard = () => {
     navigate('/login');
   };
 
+  const activeLabel = NAV.find(n=>n.key===active)?.label || 'Dashboard';
+
   return (
-    <Box sx={{display:'flex',minHeight:'100vh',background:C.bg,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+    <Box sx={{display:'flex',flexDirection:'column',height:'100vh',background:C.bg,fontFamily:"'IBM Plex Sans', sans-serif"}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&display=swap');`}</style>
 
-      {/* Sidebar */}
-      <Box sx={{width:collapsed?64:240,minHeight:'100vh',background:C.sidebar,borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column',transition:'width 0.2s ease',flexShrink:0}}>
-        <Box sx={{px:collapsed?1.5:2.5,py:2.5,display:'flex',alignItems:'center',gap:1.5,borderBottom:`1px solid ${C.border}`,flexDirection:'column',alignItems:collapsed?'center':'flex-start'}}>
-          {!collapsed ? (
-            <>
-              <SchoolLogoHeader
-                schoolId={schoolId}
-                token={adminToken}
-                schoolName={school}
-                logoHeight={40}
-              />
-              <Typography sx={{fontSize:'0.65rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif",mt:1}}>Management Portal</Typography>
-            </>
-          ) : (
-            <Tooltip title={school} placement="right">
-              <Box sx={{width:34,height:34,borderRadius:'8px',background:C.brand,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                <SchoolIcon sx={{color:C.white,fontSize:18}}/>
-              </Box>
-            </Tooltip>
-          )}
+      {/* ── Dark top menu bar ── */}
+      <Box sx={{height:40,background:C.menubar,display:'flex',alignItems:'center',px:2,flexShrink:0}}>
+        <Box sx={{display:'flex',alignItems:'center',gap:1,mr:3}}>
+          <Box sx={{width:22,height:22,borderRadius:'4px',background:C.brand,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+            <SchoolIcon sx={{color:C.white,fontSize:14}}/>
+          </Box>
+          <Typography sx={{color:C.white,fontWeight:700,fontSize:'0.8rem',letterSpacing:'0.02em',fontFamily:"'IBM Plex Sans', sans-serif",whiteSpace:'nowrap'}}>
+            {school}
+          </Typography>
         </Box>
 
-        <Box sx={{flex:1,py:1.5,px:collapsed?0.75:1.5,overflowY:'auto'}}>
-          {!collapsed&&<Typography sx={{fontSize:'0.62rem',fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:'0.08em',px:1,mb:0.75,fontFamily:"'IBM Plex Sans', sans-serif"}}>Menu</Typography>}
-          {NAV.map(item=>{
-            const on=active===item.key;
-            return(
-              <Tooltip key={item.key} title={collapsed?item.label:''} placement="right">
-                <Box onClick={()=>setActive(item.key)} sx={{display:'flex',alignItems:'center',gap:1.5,px:collapsed?1.25:1.5,py:1,borderRadius:'8px',cursor:'pointer',mb:0.25,background:on?C.sidebarAct:'transparent',color:on?C.brand:C.muted,'&:hover':{background:C.sidebarAct,color:C.brand},transition:'all 0.12s'}}>
-                  <Box sx={{color:'inherit',display:'flex',flexShrink:0}}>{item.icon}</Box>
-                  {!collapsed&&<Typography sx={{fontSize:'0.85rem',fontWeight:on?700:500,color:'inherit',fontFamily:"'IBM Plex Sans', sans-serif",whiteSpace:'nowrap'}}>{item.label}</Typography>}
-                  {on&&!collapsed&&<Box sx={{ml:'auto',width:5,height:5,borderRadius:'50%',background:C.brand}}/>}
-                </Box>
-              </Tooltip>
-            );
-          })}
-          {!collapsed?<><Divider sx={{my:1.5,borderColor:C.border}}/><Typography sx={{fontSize:'0.62rem',fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:'0.08em',px:1,mb:0.75,fontFamily:"'IBM Plex Sans', sans-serif"}}>Switch Mode</Typography></>:<Divider sx={{my:1,borderColor:C.border}}/>}
-          <Tooltip title={collapsed?'Applications Portal':''} placement="right">
-            <Box onClick={()=>navigate('/admin')} sx={{display:'flex',alignItems:'center',gap:1.5,px:collapsed?1.25:1.5,py:1,borderRadius:'8px',cursor:'pointer',color:C.muted,'&:hover':{background:C.sidebarAct,color:C.brand}}}>
-              <SwapHorizIcon sx={{fontSize:19,flexShrink:0}}/>
-              {!collapsed&&<Typography sx={{fontSize:'0.85rem',fontWeight:500,color:'inherit',fontFamily:"'IBM Plex Sans', sans-serif",whiteSpace:'nowrap'}}>Applications Portal</Typography>}
+        <Box sx={{display:'flex',height:'100%'}}>
+          {MENU.map(m=>(
+            <Box key={m.label} onClick={()=>setActive(m.target)}
+              sx={{display:'flex',alignItems:'center',px:1.75,cursor:'pointer',color:C.menubarTxt,fontSize:'0.72rem',fontWeight:600,letterSpacing:'0.06em',textTransform:'uppercase',fontFamily:"'IBM Plex Sans', sans-serif",'&:hover':{background:C.menubarHi}}}>
+              {m.label}
             </Box>
-          </Tooltip>
+          ))}
         </Box>
 
-        <Box sx={{p:collapsed?0.75:1.5,borderTop:`1px solid ${C.border}`}}>
-          <Tooltip title={collapsed?'Expand':''} placement="right">
-            <Box onClick={()=>setCollapsed(c=>!c)} sx={{display:'flex',alignItems:'center',gap:1.5,px:collapsed?1.25:1.5,py:0.9,borderRadius:'8px',cursor:'pointer',color:C.muted,'&:hover':{background:C.sidebarAct,color:C.brand}}}>
-              {collapsed?<MenuIcon sx={{fontSize:19}}/>:<><ChevronLeftIcon sx={{fontSize:19}}/><Typography sx={{fontSize:'0.82rem',fontWeight:500,fontFamily:"'IBM Plex Sans', sans-serif"}}>Collapse</Typography></>}
-            </Box>
-          </Tooltip>
-          <Tooltip title={collapsed?'Logout':''} placement="right">
-            <Box onClick={handleLogout} sx={{display:'flex',alignItems:'center',gap:1.5,px:collapsed?1.25:1.5,py:0.9,borderRadius:'8px',cursor:'pointer',color:C.muted,'&:hover':{background:'#FFEBEE',color:C.danger}}}>
-              <LogoutIcon sx={{fontSize:19,flexShrink:0}}/>
-              {!collapsed&&<Typography sx={{fontSize:'0.82rem',fontWeight:500,fontFamily:"'IBM Plex Sans', sans-serif"}}>Logout</Typography>}
-            </Box>
-          </Tooltip>
+        <Box sx={{flex:1}}/>
+
+        <Box onClick={()=>navigate('/admin')} sx={{display:'flex',alignItems:'center',gap:0.75,px:1.5,height:'100%',cursor:'pointer',color:C.menubarTxt,'&:hover':{background:C.menubarHi}}}>
+          <SwapHorizIcon sx={{fontSize:16}}/>
+          <Typography sx={{fontSize:'0.72rem',fontWeight:600,fontFamily:"'IBM Plex Sans', sans-serif",whiteSpace:'nowrap'}}>Applications Portal</Typography>
+        </Box>
+        <Divider orientation="vertical" flexItem sx={{borderColor:'rgba(255,255,255,0.15)',my:1}}/>
+        <Box sx={{display:'flex',alignItems:'center',gap:1,px:1.5}}>
+          <Avatar sx={{width:24,height:24,background:C.brand,fontSize:'0.72rem',fontWeight:700}}>{adminName.charAt(0).toUpperCase()}</Avatar>
+          <Typography sx={{color:C.white,fontSize:'0.74rem',fontWeight:600,fontFamily:"'IBM Plex Sans', sans-serif",whiteSpace:'nowrap'}}>{adminName}</Typography>
+        </Box>
+        <Box onClick={handleLogout} sx={{display:'flex',alignItems:'center',gap:0.75,px:1.5,height:'100%',cursor:'pointer',color:C.menubarTxt,'&:hover':{background:C.danger,color:C.white}}}>
+          <LogoutIcon sx={{fontSize:16}}/>
+          <Typography sx={{fontSize:'0.72rem',fontWeight:600,fontFamily:"'IBM Plex Sans', sans-serif"}}>Logout</Typography>
         </Box>
       </Box>
 
-      {/* Main */}
-      <Box sx={{flex:1,minWidth:0,display:'flex',flexDirection:'column'}}>
-        <Box sx={{background:C.white,borderBottom:`1px solid ${C.border}`,px:3,height:56,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
-          <Typography sx={{fontWeight:700,fontSize:'0.95rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>
-            {NAV.find(n=>n.key===active)?.label||'Dashboard'}
-          </Typography>
-          <Box sx={{display:'flex',alignItems:'center',gap:1.5}}>
-            <Avatar sx={{width:32,height:32,background:C.brand,fontSize:'0.8rem',fontWeight:700}}>{adminName.charAt(0).toUpperCase()}</Avatar>
-            <Box>
-              <Typography sx={{fontSize:'0.8rem',fontWeight:700,color:C.text,lineHeight:1.2,fontFamily:"'IBM Plex Sans', sans-serif"}}>{adminName}</Typography>
-              <Typography sx={{fontSize:'0.65rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>School Admin</Typography>
+      {/* ── Tab strip ── */}
+      <Box sx={{display:'flex',background:C.tabBar,borderBottom:`1px solid ${C.border}`,px:1,pt:0.75,gap:0.25,overflowX:'auto',flexShrink:0}}>
+        {NAV.map(item=>{
+          const on=active===item.key;
+          return (
+            <Box key={item.key} onClick={()=>setActive(item.key)}
+              sx={{display:'flex',alignItems:'center',gap:0.75,px:1.75,py:0.9,cursor:'pointer',whiteSpace:'nowrap',
+                background:on?C.white:C.tabIdle,
+                color:on?C.brand:C.muted,
+                border:`1px solid ${C.border}`,
+                borderBottom:on?`1px solid ${C.white}`:`1px solid ${C.border}`,
+                borderTop:on?`2px solid ${C.link}`:`1px solid ${C.border}`,
+                borderRadius:'5px 5px 0 0',
+                mb:'-1px',
+                transition:'all 0.12s',
+                '&:hover':{background:on?C.white:C.sidebarAct,color:C.brand}}}>
+              <Box sx={{display:'flex',color:'inherit'}}>{item.icon}</Box>
+              <Typography sx={{fontSize:'0.78rem',fontWeight:on?700:500,color:'inherit',fontFamily:"'IBM Plex Sans', sans-serif"}}>{item.label}</Typography>
             </Box>
-          </Box>
-        </Box>
-        <Box sx={{flex:1,p:3,overflowY:'auto'}}>
-          {active==='overview'  && <OverviewSection/>}
-          {active==='students'  && <StudentsSection/>}
-          {active==='teachers'  && <TeachersSection/>}
-          {active==='timetable' && <TimetableSection/>}
-          {active==='events'         && <EventsSection/>}
-          {active==='announcements'  && <AnnouncementsSection/>}
-          {active==='reports'        && <ReportsSection/>}
-          {active==='setup'     && <SetupSection/>}
+          );
+        })}
+      </Box>
 
-        </Box>
+      {/* ── Breadcrumb / sub-bar ── */}
+      <Box sx={{display:'flex',alignItems:'center',gap:1.5,background:C.white,borderBottom:`1px solid ${C.border}`,px:2.5,py:1,flexShrink:0}}>
+        <SchoolLogoHeader schoolId={schoolId} token={adminToken} schoolName={school} logoHeight={26}/>
+        <Box sx={{flex:1}}/>
+        <Typography sx={{fontSize:'0.8rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+          <Box component="span" sx={{color:C.link,fontWeight:600,cursor:'pointer'}} onClick={()=>setActive('overview')}>{school}</Box>
+          {'  ›  '}
+          <Box component="span" sx={{color:C.text,fontWeight:700}}>{activeLabel}</Box>
+        </Typography>
+      </Box>
+
+      {/* ── Content ── */}
+      <Box sx={{flex:1,minHeight:0,overflowY:'auto',p:2.5}}>
+        {active==='overview'       && <OverviewSection/>}
+        {active==='students'       && <StudentsSection/>}
+        {active==='teachers'       && <TeachersSection/>}
+        {active==='timetable'      && <TimetableSection/>}
+        {active==='events'         && <EventsSection/>}
+        {active==='announcements'  && <AnnouncementsSection/>}
+        {active==='reports'        && <ReportsSection/>}
+        {active==='setup'          && <SetupSection/>}
+      </Box>
+
+      {/* ── Bottom icon dock ── */}
+      <Box sx={{display:'flex',alignItems:'stretch',justifyContent:'center',gap:0.5,background:C.dock,borderTop:`1px solid ${C.border}`,px:2,py:0.75,flexShrink:0,overflowX:'auto'}}>
+        {NAV.map(item=>{
+          const on=active===item.key;
+          return (
+            <Tooltip key={item.key} title={item.label}>
+              <Box onClick={()=>setActive(item.key)}
+                sx={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:0.25,minWidth:74,px:1,py:0.75,cursor:'pointer',borderRadius:'6px',
+                  background:on?C.sidebarAct:'transparent',
+                  color:on?C.brand:C.muted,
+                  '&:hover':{background:C.sidebarAct,color:C.brand},transition:'all 0.12s'}}>
+                <Box sx={{display:'flex',color:'inherit'}}>{item.icon}</Box>
+                <Typography sx={{fontSize:'0.62rem',fontWeight:on?700:500,color:'inherit',fontFamily:"'IBM Plex Sans', sans-serif",textAlign:'center',lineHeight:1.1}}>{item.label}</Typography>
+              </Box>
+            </Tooltip>
+          );
+        })}
       </Box>
     </Box>
   );
 };
 
 export default ManagementDashboard;
-
-
-
-
