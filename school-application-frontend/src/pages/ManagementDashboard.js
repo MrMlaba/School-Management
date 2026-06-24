@@ -117,6 +117,50 @@ const Snack_ = ({ snack, onClose }) => (
 );
 
 /* ═══════════════════════════════════════════════════════════════
+   MASTER–DETAIL PRIMITIVES
+   (label-left/input-right form rows, docked Save/Reset footer)
+═══════════════════════════════════════════════════════════════ */
+const FormRow = ({ label, required, children }) => (
+  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 1.75 }}>
+    <Typography sx={{ width: 130, flexShrink: 0, fontSize: '0.76rem', fontWeight: 600, color: C.muted, fontFamily: "'IBM Plex Sans', sans-serif", pt: '8px' }}>
+      {label}{required && <Box component="span" sx={{ color: C.danger }}> *</Box>}
+    </Typography>
+    <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
+  </Box>
+);
+
+const DetailEmpty = ({ icon, text }) => (
+  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: C.muted, py: 6 }}>
+    {icon}
+    <Typography sx={{ fontSize: '0.85rem', mt: 1, fontFamily: "'IBM Plex Sans', sans-serif" }}>{text}</Typography>
+  </Box>
+);
+
+const DetailPanel = ({ title, onClose, createdAt, fmt, onReset, onSave, saving, saveLabel, children }) => (
+  <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.25, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+      <Typography sx={{ fontWeight: 700, fontSize: '0.88rem', color: C.brand, fontFamily: "'IBM Plex Sans', sans-serif" }}>{title}</Typography>
+      <IconButton size="small" onClick={onClose} sx={{ color: C.muted }}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
+    </Box>
+    <Box sx={{ flex: 1, overflowY: 'auto', p: 2.5 }}>
+      {children}
+      {createdAt && (
+        <Typography sx={{ fontSize: '0.7rem', color: C.muted, mt: 2, pt: 1.5, borderTop: `1px solid ${C.border}`, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+          Created: {fmt(createdAt)}
+        </Typography>
+      )}
+    </Box>
+    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, px: 2, py: 1.5, borderTop: `1px solid ${C.border}`, background: C.headerBg, flexShrink: 0 }}>
+      <Button size="small" onClick={onReset} sx={{ textTransform: 'none', color: C.muted, fontFamily: "'IBM Plex Sans', sans-serif" }}>Reset</Button>
+      <Button size="small" variant="contained" onClick={onSave} disabled={saving}
+        sx={{ background: C.brand, textTransform: 'none', fontWeight: 700, boxShadow: 'none', fontFamily: "'IBM Plex Sans', sans-serif" }}>
+        {saving ? 'Saving…' : (saveLabel || 'Save')}
+      </Button>
+    </Box>
+  </Box>
+);
+
+/* ═══════════════════════════════════════════════════════════════
    OVERVIEW
 ═══════════════════════════════════════════════════════════════ */
 const OverviewSection = () => {
@@ -725,160 +769,168 @@ const TeachersSection = () => {
 
   if (loading) return <Box sx={{display:'flex',justifyContent:'center',py:8}}><CircularProgress sx={{color:C.brand}}/></Box>;
 
+  const fmtDate = d => new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+
   return (
-    <Card_ sx={{mb:0}}>
-      <SectionHead title="Teachers" subtitle="Manage teachers and their login access"
-        action={
-          <Button variant="contained" startIcon={<AddIcon/>} onClick={openAdd}
-            sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>
-            Add Teacher
-          </Button>
-        }
-      />
+    <Card_ sx={{mb:0,p:0,overflow:'hidden'}}>
+      <Box sx={{p:2.5,pb:0}}>
+        <SectionHead title="Teachers" subtitle="Manage teachers and their login access"
+          action={
+            <Box sx={{display:'flex',gap:0.5}}>
+              <Tooltip title="Refresh"><IconButton size="small" onClick={fetch_} sx={{color:C.muted,border:`1px solid ${C.border}`,borderRadius:'4px'}}><RestoreIcon sx={{fontSize:16}}/></IconButton></Tooltip>
+              <Tooltip title="Add Teacher"><IconButton size="small" onClick={openAdd} sx={{color:C.white,background:C.brand,borderRadius:'4px','&:hover':{background:C.brand}}}><AddIcon sx={{fontSize:18}}/></IconButton></Tooltip>
+            </Box>
+          }
+        />
+      </Box>
 
-      {teachers.length===0 ? (
-        <Typography sx={{color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>No teachers added yet.</Typography>
-      ) : (
-        <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'4px'}}>
-          <Table size="small" sx={{borderCollapse:'collapse'}}>
-            <TableHead><TableRow>
-              {['#','Name','Emp. No.','Email','Phone','Subjects','Status','Login',''].map(h=>(
-                <TableCell key={h} sx={{...hc,...(h===''?{borderRight:'none'}:{})}}>{h}</TableCell>
-              ))}
-            </TableRow></TableHead>
-            <TableBody>
-              {teachers.map((t,idx)=>(
-                <TableRow key={t.id} sx={{backgroundColor:idx%2===0?C.white:'#FAFBFC'}}>
-                  <TableCell sx={{...bc,color:C.muted,textAlign:'center',width:40}}>{idx+1}</TableCell>
-                  <TableCell sx={{...bc,fontWeight:600}}>{t.firstName} {t.lastName}</TableCell>
-                  <TableCell sx={{...bc,fontFamily:'monospace',fontSize:'0.8rem'}}>{t.employeeNumber||'—'}</TableCell>
-                  <TableCell sx={{...bc,color:'#1565C0'}}>{t.email||'—'}</TableCell>
-                  {/* ── Phone column ── */}
-                  <TableCell sx={bc}>{t.phone||'—'}</TableCell>
-                  {/* ── Subjects column ── */}
-                  <TableCell sx={bc}>
-                    {(t.subjects||[]).length>0 ? (
-                      <Box sx={{display:'flex',flexWrap:'wrap',gap:0.5}}>
-                        {(t.subjects||[]).slice(0,3).map(s=>(
-                          <Chip key={s.id} label={s.name} size="small" sx={{fontSize:'0.65rem',fontWeight:600,height:18,bgcolor:'#EEF2FF',color:'#3730A3'}}/>
-                        ))}
-                        {(t.subjects||[]).length>3 && <Chip label={`+${(t.subjects||[]).length-3}`} size="small" sx={{fontSize:'0.65rem',height:18,bgcolor:C.headerBg,color:C.muted}}/>}
-                      </Box>
-                    ) : (
-                      <Typography sx={{fontSize:'0.78rem',color:C.muted,fontStyle:'italic',fontFamily:"'IBM Plex Sans', sans-serif"}}>None assigned</Typography>
-                    )}
-                  </TableCell>
-                  <TableCell sx={bc}>
-                    <Chip label={t.isActive?'Active':'Inactive'} size="small" sx={{fontWeight:700,fontSize:'0.7rem',bgcolor:t.isActive?'#E8F5E9':'#F5F5F5',color:t.isActive?C.accent:C.muted}}/>
-                  </TableCell>
-                  <TableCell sx={bc}>
-                    <Chip label={t.username?'Set':'Not set'} size="small" sx={{fontWeight:700,fontSize:'0.7rem',bgcolor:t.username?'#EEF2FF':'#FFF3F3',color:t.username?'#3730A3':C.danger}}/>
-                  </TableCell>
-                  <TableCell sx={{...bc,borderRight:'none'}}>
-                    <Box sx={{display:'flex',gap:0.5}}>
-                      <Tooltip title="Edit"><IconButton size="small" onClick={()=>openEdit(t)} sx={{color:C.brand}}><EditIcon sx={{fontSize:15}}/></IconButton></Tooltip>
-                      <Tooltip title="Set Login Credentials"><IconButton size="small" onClick={()=>{setCredDialog(t);setCred({username:'',password:''});}} sx={{color:'#6A1B9A'}}><KeyIcon sx={{fontSize:15}}/></IconButton></Tooltip>
-                      {t.username && (
-                          <Tooltip title="Reset Password">
-                            <IconButton size="small"
-                              onClick={()=>setResetTeacherDialog(t)}
-                              sx={{color:C.danger}}>
-                              <RestoreIcon sx={{fontSize:15}}/>
-                            </IconButton>
-                          </Tooltip>
+      <Box sx={{display:'flex',minHeight:420}}>
+        <Box sx={{flex:'1 1 60%',minWidth:0,overflowX:'auto',p:2.5,pt:1.5}}>
+          {teachers.length===0 ? (
+            <Typography sx={{color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>No teachers added yet.</Typography>
+          ) : (
+            <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'4px'}}>
+              <Table size="small" sx={{borderCollapse:'collapse'}}>
+                <TableHead><TableRow>
+                  {['#','Name','Emp. No.','Email','Phone','Subjects','Status','Login',''].map(h=>(
+                    <TableCell key={h} sx={{...hc,...(h===''?{borderRight:'none'}:{})}}>{h}</TableCell>
+                  ))}
+                </TableRow></TableHead>
+                <TableBody>
+                  {teachers.map((t,idx)=>(
+                    <TableRow key={t.id} sx={{backgroundColor:editing?.id===t.id&&dialog?'#EFF6FF':idx%2===0?C.white:'#FAFBFC'}}>
+                      <TableCell sx={{...bc,color:C.muted,textAlign:'center',width:40}}>{idx+1}</TableCell>
+                      <TableCell sx={{...bc,fontWeight:600}}>{t.firstName} {t.lastName}</TableCell>
+                      <TableCell sx={{...bc,fontFamily:'monospace',fontSize:'0.8rem'}}>{t.employeeNumber||'—'}</TableCell>
+                      <TableCell sx={{...bc,color:'#1565C0'}}>{t.email||'—'}</TableCell>
+                      {/* ── Phone column ── */}
+                      <TableCell sx={bc}>{t.phone||'—'}</TableCell>
+                      {/* ── Subjects column ── */}
+                      <TableCell sx={bc}>
+                        {(t.subjects||[]).length>0 ? (
+                          <Box sx={{display:'flex',flexWrap:'wrap',gap:0.5}}>
+                            {(t.subjects||[]).slice(0,3).map(s=>(
+                              <Chip key={s.id} label={s.name} size="small" sx={{fontSize:'0.65rem',fontWeight:600,height:18,bgcolor:'#EEF2FF',color:'#3730A3'}}/>
+                            ))}
+                            {(t.subjects||[]).length>3 && <Chip label={`+${(t.subjects||[]).length-3}`} size="small" sx={{fontSize:'0.65rem',height:18,bgcolor:C.headerBg,color:C.muted}}/>}
+                          </Box>
+                        ) : (
+                          <Typography sx={{fontSize:'0.78rem',color:C.muted,fontStyle:'italic',fontFamily:"'IBM Plex Sans', sans-serif"}}>None assigned</Typography>
                         )}
-                      {t.isActive&&<Tooltip title="Deactivate"><IconButton size="small" onClick={()=>handleDeactivate(t.id)} sx={{color:C.danger}}><DeleteIcon sx={{fontSize:15}}/></IconButton></Tooltip>}
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
+                      </TableCell>
+                      <TableCell sx={bc}>
+                        <Chip label={t.isActive?'Active':'Inactive'} size="small" sx={{fontWeight:700,fontSize:'0.7rem',bgcolor:t.isActive?'#E8F5E9':'#F5F5F5',color:t.isActive?C.accent:C.muted}}/>
+                      </TableCell>
+                      <TableCell sx={bc}>
+                        <Chip label={t.username?'Set':'Not set'} size="small" sx={{fontWeight:700,fontSize:'0.7rem',bgcolor:t.username?'#EEF2FF':'#FFF3F3',color:t.username?'#3730A3':C.danger}}/>
+                      </TableCell>
+                      <TableCell sx={{...bc,borderRight:'none'}}>
+                        <Box sx={{display:'flex',gap:0.5}}>
+                          <Tooltip title="Edit"><IconButton size="small" onClick={()=>openEdit(t)} sx={{color:C.brand}}><EditIcon sx={{fontSize:15}}/></IconButton></Tooltip>
+                          <Tooltip title="Set Login Credentials"><IconButton size="small" onClick={()=>{setCredDialog(t);setCred({username:'',password:''});}} sx={{color:'#6A1B9A'}}><KeyIcon sx={{fontSize:15}}/></IconButton></Tooltip>
+                          {t.username && (
+                              <Tooltip title="Reset Password">
+                                <IconButton size="small"
+                                  onClick={()=>setResetTeacherDialog(t)}
+                                  sx={{color:C.danger}}>
+                                  <RestoreIcon sx={{fontSize:15}}/>
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          {t.isActive&&<Tooltip title="Deactivate"><IconButton size="small" onClick={()=>handleDeactivate(t.id)} sx={{color:C.danger}}><DeleteIcon sx={{fontSize:15}}/></IconButton></Tooltip>}
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Box>
 
-      {/* Add/Edit dialog */}
-      <Dialog open={dialog} onClose={()=>setDialog(false)} maxWidth="sm" fullWidth PaperProps={{sx:{borderRadius:'10px'}}}>
-        <DialogTitle sx={{fontWeight:700,color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif"}}>{editing?'Edit Teacher':'Add Teacher'}</DialogTitle>
-        <Divider/>
-        <DialogContent sx={{pt:2.5,display:'flex',flexDirection:'column',gap:2}}>
-
-          <Box sx={{display:'flex',gap:2}}>
-            <TextField label="First Name *" value={form.firstName} size="small" fullWidth
-              error={!!errors.firstName} helperText={errors.firstName||''}
-              inputProps={{maxLength:50}}
-              onChange={e=>{setForm(f=>({...f,firstName:e.target.value}));if(errors.firstName)setErrors(v=>({...v,firstName:''}));}}/>
-            <TextField label="Last Name *" value={form.lastName} size="small" fullWidth
-              error={!!errors.lastName} helperText={errors.lastName||''}
-              inputProps={{maxLength:50}}
-              onChange={e=>{setForm(f=>({...f,lastName:e.target.value}));if(errors.lastName)setErrors(v=>({...v,lastName:''}));}}/>
-          </Box>
-
-          <Box sx={{display:'flex',gap:2}}>
-            <TextField label="Employee Number" value={form.employeeNumber} size="small" fullWidth
-              error={!!errors.employeeNumber} helperText={errors.employeeNumber||''}
-              inputProps={{maxLength:20}}
-              onChange={e=>{setForm(f=>({...f,employeeNumber:e.target.value}));if(errors.employeeNumber)setErrors(v=>({...v,employeeNumber:''}));}}/>
-            <TextField select label="Gender" value={form.gender} onChange={e=>setForm(f=>({...f,gender:e.target.value}))} size="small" fullWidth>
-              <MenuItem value="">—</MenuItem><MenuItem value="Male">Male</MenuItem><MenuItem value="Female">Female</MenuItem>
-            </TextField>
-          </Box>
-
-          <TextField label="Email" value={form.email} size="small" fullWidth
-            placeholder="teacher@school.co.za"
-            error={!!errors.email} helperText={errors.email||''}
-            inputProps={{maxLength:100}}
-            onChange={e=>{setForm(f=>({...f,email:e.target.value}));if(errors.email)setErrors(v=>({...v,email:''}));}}/>
-
-          <TextField label="Phone *" value={form.phone} size="small" fullWidth
-            placeholder="0821234567"
-            error={!!errors.phone}
-            helperText={errors.phone||`${(form.phone||'').replace(/\D/g,'').length}/10 digits`}
-            inputProps={{maxLength:15}}
-            onChange={e=>{
-              const val=e.target.value.replace(/[^\d\s+\-()]/g,'');
-              setForm(f=>({...f,phone:val}));
-              if(errors.phone)setErrors(v=>({...v,phone:''}));
-            }}/>
-
-          {/* Subject chips */}
-          <Box>
-            <Typography sx={{fontSize:'0.78rem',fontWeight:600,color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif",mb:1}}>
-              Subjects this teacher can teach
-            </Typography>
-            {allNatSubjects.length===0 ? (
-              <Typography sx={{fontSize:'0.78rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>Loading subjects…</Typography>
-            ) : (
-              <Box sx={{display:'flex',flexWrap:'wrap',gap:0.75,maxHeight:180,overflowY:'auto',p:1,border:`1px solid ${C.border}`,borderRadius:'6px'}}>
-                {allNatSubjects.map(ns=>{
-                  const selected=selSubjects.includes(ns.id);
-                  return (
-                    <Chip key={ns.id} label={ns.name} size="small" clickable
-                      onClick={()=>setSelSubjects(p=>selected?p.filter(x=>x!==ns.id):[...p,ns.id])}
-                      sx={{fontWeight:600,fontSize:'0.72rem',fontFamily:"'IBM Plex Sans', sans-serif",
-                        background:selected?C.brand:C.white,color:selected?C.white:C.text,
-                        border:`1px solid ${selected?C.brand:C.border}`}}/>
-                  );
-                })}
-              </Box>
-            )}
-            {selSubjects.length>0&&(
-              <Typography sx={{fontSize:'0.72rem',color:C.accent,mt:0.75,fontFamily:"'IBM Plex Sans', sans-serif"}}>
-                {selSubjects.length} subject{selSubjects.length!==1?'s':''} selected
-              </Typography>
-            )}
-          </Box>
-
-        </DialogContent>
-        <Divider/>
-        <DialogActions sx={{px:3,py:2,gap:1}}>
-          <Button onClick={()=>setDialog(false)} sx={{textTransform:'none',color:C.muted}}>Cancel</Button>
-          <Button variant="contained" onClick={handleSave} disabled={saving}
-            sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>
-            {saving?'Saving…':editing?'Update':'Add Teacher'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        <Box sx={{flex:'1 1 40%',minWidth:320,borderLeft:`1px solid ${C.border}`,background:C.sidebar}}>
+          {!dialog ? (
+            <DetailEmpty icon={<SchoolIcon sx={{fontSize:34,color:C.border}}/>} text="Select a teacher to edit, or click + to add a new teacher."/>
+          ) : (
+            <DetailPanel
+              title={editing?`Edit Teacher — ${editing.firstName} ${editing.lastName}`:'Add Teacher'}
+              onClose={()=>setDialog(false)}
+              createdAt={editing?.createdAt}
+              fmt={fmtDate}
+              onReset={()=>editing?openEdit(editing):openAdd()}
+              onSave={handleSave}
+              saving={saving}
+              saveLabel={editing?'Update':'Add Teacher'}
+            >
+              <FormRow label="First Name" required>
+                <TextField value={form.firstName} size="small" fullWidth
+                  error={!!errors.firstName} helperText={errors.firstName||''}
+                  inputProps={{maxLength:50}}
+                  onChange={e=>{setForm(f=>({...f,firstName:e.target.value}));if(errors.firstName)setErrors(v=>({...v,firstName:''}));}}/>
+              </FormRow>
+              <FormRow label="Last Name" required>
+                <TextField value={form.lastName} size="small" fullWidth
+                  error={!!errors.lastName} helperText={errors.lastName||''}
+                  inputProps={{maxLength:50}}
+                  onChange={e=>{setForm(f=>({...f,lastName:e.target.value}));if(errors.lastName)setErrors(v=>({...v,lastName:''}));}}/>
+              </FormRow>
+              <FormRow label="Employee Number">
+                <TextField value={form.employeeNumber} size="small" fullWidth
+                  error={!!errors.employeeNumber} helperText={errors.employeeNumber||''}
+                  inputProps={{maxLength:20}}
+                  onChange={e=>{setForm(f=>({...f,employeeNumber:e.target.value}));if(errors.employeeNumber)setErrors(v=>({...v,employeeNumber:''}));}}/>
+              </FormRow>
+              <FormRow label="Gender">
+                <TextField select value={form.gender} onChange={e=>setForm(f=>({...f,gender:e.target.value}))} size="small" fullWidth>
+                  <MenuItem value="">—</MenuItem><MenuItem value="Male">Male</MenuItem><MenuItem value="Female">Female</MenuItem>
+                </TextField>
+              </FormRow>
+              <FormRow label="Email">
+                <TextField value={form.email} size="small" fullWidth
+                  placeholder="teacher@school.co.za"
+                  error={!!errors.email} helperText={errors.email||''}
+                  inputProps={{maxLength:100}}
+                  onChange={e=>{setForm(f=>({...f,email:e.target.value}));if(errors.email)setErrors(v=>({...v,email:''}));}}/>
+              </FormRow>
+              <FormRow label="Phone" required>
+                <TextField value={form.phone} size="small" fullWidth
+                  placeholder="0821234567"
+                  error={!!errors.phone}
+                  helperText={errors.phone||`${(form.phone||'').replace(/\D/g,'').length}/10 digits`}
+                  inputProps={{maxLength:15}}
+                  onChange={e=>{
+                    const val=e.target.value.replace(/[^\d\s+\-()]/g,'');
+                    setForm(f=>({...f,phone:val}));
+                    if(errors.phone)setErrors(v=>({...v,phone:''}));
+                  }}/>
+              </FormRow>
+              <FormRow label="Subjects">
+                {allNatSubjects.length===0 ? (
+                  <Typography sx={{fontSize:'0.78rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>Loading subjects…</Typography>
+                ) : (
+                  <Box sx={{display:'flex',flexWrap:'wrap',gap:0.75,maxHeight:160,overflowY:'auto',p:1,border:`1px solid ${C.border}`,borderRadius:'6px',background:C.white}}>
+                    {allNatSubjects.map(ns=>{
+                      const selected=selSubjects.includes(ns.id);
+                      return (
+                        <Chip key={ns.id} label={ns.name} size="small" clickable
+                          onClick={()=>setSelSubjects(p=>selected?p.filter(x=>x!==ns.id):[...p,ns.id])}
+                          sx={{fontWeight:600,fontSize:'0.72rem',fontFamily:"'IBM Plex Sans', sans-serif",
+                            background:selected?C.brand:C.white,color:selected?C.white:C.text,
+                            border:`1px solid ${selected?C.brand:C.border}`}}/>
+                      );
+                    })}
+                  </Box>
+                )}
+                {selSubjects.length>0&&(
+                  <Typography sx={{fontSize:'0.72rem',color:C.accent,mt:0.75,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+                    {selSubjects.length} subject{selSubjects.length!==1?'s':''} selected
+                  </Typography>
+                )}
+              </FormRow>
+            </DetailPanel>
+          )}
+        </Box>
+      </Box>
 
       {/* Credentials dialog */}
       <Dialog open={!!credDialog} onClose={()=>setCredDialog(null)} maxWidth="xs" fullWidth PaperProps={{sx:{borderRadius:'10px'}}}>
@@ -1578,91 +1630,106 @@ const EventsSection = () => {
     return acc;
   }, {});
  
+  const fmtDate = d => new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+
   return (
-    <Card_ sx={{mb:0}}>
-      <SectionHead title="Events" subtitle={`Events for ${new Date(month+'-01').toLocaleDateString('en-US',{month:'long',year:'numeric'})}`}
-        action={
-          <Box sx={{display:'flex',gap:1.5,alignItems:'center'}}>
-            <TextField type="month" value={month} onChange={e=>setMonth(e.target.value)} size="small" InputLabelProps={{shrink:true}}/>
-            <Button variant="contained" startIcon={<AddIcon/>} onClick={openAdd}
-              sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>
-              Add Event
-            </Button>
-          </Box>
-        }
-      />
- 
-      {loading ? <Box sx={{display:'flex',justifyContent:'center',py:6}}><CircularProgress sx={{color:C.brand}}/></Box>
-      : events.length===0 ? (
-        <Box sx={{textAlign:'center',py:6}}>
-          <EventIcon sx={{color:C.border,fontSize:44,mb:1}}/>
-          <Typography sx={{color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>No events this month.</Typography>
-        </Box>
-      ) : (
-        <Box sx={{display:'flex',flexDirection:'column',gap:2}}>
-          {Object.keys(grouped).sort().map(date=>(
-            <Box key={date}>
-              <Typography sx={{fontSize:'0.78rem',fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:'0.06em',mb:1,fontFamily:"'IBM Plex Sans', sans-serif"}}>
-                {new Date(date+'T00:00:00').toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'long'})}
-              </Typography>
-              <Box sx={{display:'flex',flexDirection:'column',gap:0.75}}>
-                {grouped[date].map(ev=>{
-                  const tc = TYPE_COLORS[ev.type]||TYPE_COLORS.other;
-                  return(
-                    <Box key={ev.id} sx={{display:'flex',alignItems:'center',gap:2,p:1.5,borderRadius:'8px',border:`1px solid ${C.border}`,background:C.white,'&:hover':{background:C.bg}}}>
-                      <Box sx={{width:4,alignSelf:'stretch',borderRadius:'4px',background:tc.color,flexShrink:0}}/>
-                      <Box sx={{flex:1,minWidth:0}}>
-                        <Box sx={{display:'flex',alignItems:'center',gap:1,flexWrap:'wrap'}}>
-                          <Typography sx={{fontWeight:700,fontSize:'0.9rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>{ev.title}</Typography>
-                          <Chip label={ev.type} size="small" sx={{height:18,fontSize:'0.65rem',fontWeight:700,bgcolor:tc.bg,color:tc.color}}/>
-                        </Box>
-                        {ev.description&&<Typography sx={{fontSize:'0.8rem',color:C.muted,mt:0.25,fontFamily:"'IBM Plex Sans', sans-serif"}}>{ev.description}</Typography>}
-                        <Box sx={{display:'flex',gap:2,mt:0.5,flexWrap:'wrap'}}>
-                          {ev.eventTime&&<Typography sx={{fontSize:'0.75rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>🕐 {ev.eventTime?.slice(0,5)}</Typography>}
-                          {ev.location&&<Typography sx={{fontSize:'0.75rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>📍 {ev.location}</Typography>}
-                        </Box>
-                      </Box>
-                      <Box sx={{display:'flex',gap:0.5,flexShrink:0}}>
-                        <Tooltip title="Edit"><IconButton size="small" onClick={()=>openEdit(ev)} sx={{color:C.brand}}><EditIcon sx={{fontSize:15}}/></IconButton></Tooltip>
-                        <Tooltip title="Delete"><IconButton size="small" onClick={()=>handleDelete(ev.id)} sx={{color:C.danger}}><DeleteIcon sx={{fontSize:15}}/></IconButton></Tooltip>
-                      </Box>
-                    </Box>
-                  );
-                })}
-              </Box>
+    <Card_ sx={{mb:0,p:0,overflow:'hidden'}}>
+      <Box sx={{p:2.5,pb:0}}>
+        <SectionHead title="Events" subtitle={`Events for ${new Date(month+'-01').toLocaleDateString('en-US',{month:'long',year:'numeric'})}`}
+          action={
+            <Box sx={{display:'flex',gap:1.5,alignItems:'center'}}>
+              <TextField type="month" value={month} onChange={e=>setMonth(e.target.value)} size="small" InputLabelProps={{shrink:true}}/>
+              <Tooltip title="Add Event"><IconButton size="small" onClick={openAdd} sx={{color:C.white,background:C.brand,borderRadius:'4px','&:hover':{background:C.brand}}}><AddIcon sx={{fontSize:18}}/></IconButton></Tooltip>
             </Box>
-          ))}
+          }
+        />
+      </Box>
+
+      <Box sx={{display:'flex',minHeight:420}}>
+        <Box sx={{flex:'1 1 60%',minWidth:0,p:2.5,pt:1.5}}>
+          {loading ? <Box sx={{display:'flex',justifyContent:'center',py:6}}><CircularProgress sx={{color:C.brand}}/></Box>
+          : events.length===0 ? (
+            <Box sx={{textAlign:'center',py:6}}>
+              <EventIcon sx={{color:C.border,fontSize:44,mb:1}}/>
+              <Typography sx={{color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>No events this month.</Typography>
+            </Box>
+          ) : (
+            <Box sx={{display:'flex',flexDirection:'column',gap:2}}>
+              {Object.keys(grouped).sort().map(date=>(
+                <Box key={date}>
+                  <Typography sx={{fontSize:'0.78rem',fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:'0.06em',mb:1,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+                    {new Date(date+'T00:00:00').toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'long'})}
+                  </Typography>
+                  <Box sx={{display:'flex',flexDirection:'column',gap:0.75}}>
+                    {grouped[date].map(ev=>{
+                      const tc = TYPE_COLORS[ev.type]||TYPE_COLORS.other;
+                      return(
+                        <Box key={ev.id} sx={{display:'flex',alignItems:'center',gap:2,p:1.5,borderRadius:'8px',border:`1px solid ${editing?.id===ev.id&&dialog?C.brand:C.border}`,background:editing?.id===ev.id&&dialog?'#EFF6FF':C.white,'&:hover':{background:editing?.id===ev.id&&dialog?'#EFF6FF':C.bg}}}>
+                          <Box sx={{width:4,alignSelf:'stretch',borderRadius:'4px',background:tc.color,flexShrink:0}}/>
+                          <Box sx={{flex:1,minWidth:0}}>
+                            <Box sx={{display:'flex',alignItems:'center',gap:1,flexWrap:'wrap'}}>
+                              <Typography sx={{fontWeight:700,fontSize:'0.9rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>{ev.title}</Typography>
+                              <Chip label={ev.type} size="small" sx={{height:18,fontSize:'0.65rem',fontWeight:700,bgcolor:tc.bg,color:tc.color}}/>
+                            </Box>
+                            {ev.description&&<Typography sx={{fontSize:'0.8rem',color:C.muted,mt:0.25,fontFamily:"'IBM Plex Sans', sans-serif"}}>{ev.description}</Typography>}
+                            <Box sx={{display:'flex',gap:2,mt:0.5,flexWrap:'wrap'}}>
+                              {ev.eventTime&&<Typography sx={{fontSize:'0.75rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>🕐 {ev.eventTime?.slice(0,5)}</Typography>}
+                              {ev.location&&<Typography sx={{fontSize:'0.75rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>📍 {ev.location}</Typography>}
+                            </Box>
+                          </Box>
+                          <Box sx={{display:'flex',gap:0.5,flexShrink:0}}>
+                            <Tooltip title="Edit"><IconButton size="small" onClick={()=>openEdit(ev)} sx={{color:C.brand}}><EditIcon sx={{fontSize:15}}/></IconButton></Tooltip>
+                            <Tooltip title="Delete"><IconButton size="small" onClick={()=>handleDelete(ev.id)} sx={{color:C.danger}}><DeleteIcon sx={{fontSize:15}}/></IconButton></Tooltip>
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          )}
         </Box>
-      )}
- 
-      {/* Dialog */}
-      <Dialog open={dialog} onClose={()=>setDialog(false)} maxWidth="sm" fullWidth PaperProps={{sx:{borderRadius:'10px'}}}>
-        <DialogTitle sx={{fontWeight:700,color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif"}}>{editing?'Edit Event':'Add Event'}</DialogTitle>
-        <Divider/>
-        <DialogContent sx={{pt:2.5,display:'flex',flexDirection:'column',gap:2}}>
-          <TextField label="Title *" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} size="small" fullWidth inputProps={{maxLength:200}}/>
-          <TextField label="Description" value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} size="small" fullWidth multiline rows={2}/>
-          <Box sx={{display:'flex',gap:2}}>
-            <TextField label="Date *" type="date" value={form.eventDate} onChange={e=>setForm(f=>({...f,eventDate:e.target.value}))} size="small" fullWidth InputLabelProps={{shrink:true}}/>
-            <TextField label="Time" type="time" value={form.eventTime} onChange={e=>setForm(f=>({...f,eventTime:e.target.value}))} size="small" fullWidth InputLabelProps={{shrink:true}}/>
-          </Box>
-          <Box sx={{display:'flex',gap:2}}>
-            <TextField label="Location" value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))} size="small" fullWidth/>
-            <TextField select label="Type" value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} size="small" fullWidth>
-              {EVENT_TYPES.map(t=><MenuItem key={t} value={t} sx={{textTransform:'capitalize'}}>{t}</MenuItem>)}
-            </TextField>
-          </Box>
-        </DialogContent>
-        <Divider/>
-        <DialogActions sx={{px:3,py:2,gap:1}}>
-          <Button onClick={()=>setDialog(false)} sx={{textTransform:'none',color:C.muted}}>Cancel</Button>
-          <Button variant="contained" onClick={handleSave} disabled={saving}
-            sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>
-            {saving?'Saving…':editing?'Update':'Create Event'}
-          </Button>
-        </DialogActions>
-      </Dialog>
- 
+
+        <Box sx={{flex:'1 1 40%',minWidth:320,borderLeft:`1px solid ${C.border}`,background:C.sidebar}}>
+          {!dialog ? (
+            <DetailEmpty icon={<EventIcon sx={{fontSize:34,color:C.border}}/>} text="Select an event to edit, or click + to add a new event."/>
+          ) : (
+            <DetailPanel
+              title={editing?`Edit Event — ${editing.title}`:'Add Event'}
+              onClose={()=>setDialog(false)}
+              createdAt={editing?.createdAt}
+              fmt={fmtDate}
+              onReset={()=>editing?openEdit(editing):openAdd()}
+              onSave={handleSave}
+              saving={saving}
+              saveLabel={editing?'Update':'Create Event'}
+            >
+              <FormRow label="Title" required>
+                <TextField value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} size="small" fullWidth inputProps={{maxLength:200}}/>
+              </FormRow>
+              <FormRow label="Description">
+                <TextField value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} size="small" fullWidth multiline rows={2}/>
+              </FormRow>
+              <FormRow label="Date" required>
+                <TextField type="date" value={form.eventDate} onChange={e=>setForm(f=>({...f,eventDate:e.target.value}))} size="small" fullWidth InputLabelProps={{shrink:true}}/>
+              </FormRow>
+              <FormRow label="Time">
+                <TextField type="time" value={form.eventTime} onChange={e=>setForm(f=>({...f,eventTime:e.target.value}))} size="small" fullWidth InputLabelProps={{shrink:true}}/>
+              </FormRow>
+              <FormRow label="Location">
+                <TextField value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))} size="small" fullWidth/>
+              </FormRow>
+              <FormRow label="Type">
+                <TextField select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} size="small" fullWidth>
+                  {EVENT_TYPES.map(t=><MenuItem key={t} value={t} sx={{textTransform:'capitalize'}}>{t}</MenuItem>)}
+                </TextField>
+              </FormRow>
+            </DetailPanel>
+          )}
+        </Box>
+      </Box>
+
       <Snack_ snack={snack} onClose={()=>setSnack(s=>({...s,open:false}))}/>
     </Card_>
   );
@@ -1722,86 +1789,98 @@ const AnnouncementsSection = () => {
  
   const AUDIENCE_COLORS = {all:{bg:'#EEF2FF',color:'#3730A3'},teachers:{bg:'#FFF7ED',color:'#C2410C'},students:{bg:'#F0FDF4',color:'#166534'}};
  
+  const fmtDate = d => new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+
   return (
-    <Card_ sx={{mb:0}}>
-      <SectionHead title="Announcements" subtitle="Post notices for teachers and students"
-        action={
-          <Button variant="contained" startIcon={<AddIcon/>} onClick={openAdd}
-            sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>
-            New Announcement
-          </Button>
-        }
-      />
- 
-      {loading ? <Box sx={{display:'flex',justifyContent:'center',py:6}}><CircularProgress sx={{color:C.brand}}/></Box>
-      : items.length===0 ? (
-        <Box sx={{textAlign:'center',py:6}}>
-          <CampaignIcon sx={{color:C.border,fontSize:44,mb:1}}/>
-          <Typography sx={{color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>No announcements yet.</Typography>
-        </Box>
-      ) : (
-        <Box sx={{display:'flex',flexDirection:'column',gap:1.5}}>
-          {items.map(a=>{
-            const ac = AUDIENCE_COLORS[a.audience]||AUDIENCE_COLORS.all;
-            return(
-              <Box key={a.id} sx={{p:2,borderRadius:'8px',border:`1px solid ${a.isPinned?C.brand:C.border}`,background:a.isPinned?'#F0F6FF':C.white,position:'relative'}}>
-                {a.isPinned&&<Box sx={{position:'absolute',top:10,left:-1,width:3,height:'calc(100% - 20px)',borderRadius:'0 2px 2px 0',background:C.brand}}/>}
-                <Box sx={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:1,flexWrap:'wrap'}}>
-                  <Box sx={{flex:1,minWidth:0}}>
-                    <Box sx={{display:'flex',alignItems:'center',gap:1,flexWrap:'wrap',mb:0.5}}>
-                      {a.isPinned&&<PushPinIcon sx={{fontSize:14,color:C.brand,transform:'rotate(45deg)'}}/>}
-                      <Typography sx={{fontWeight:700,fontSize:'0.95rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>{a.title}</Typography>
-                      <Chip label={a.audience} size="small" sx={{height:18,fontSize:'0.65rem',fontWeight:700,bgcolor:ac.bg,color:ac.color,textTransform:'capitalize'}}/>
-                    </Box>
-                    <Typography sx={{fontSize:'0.85rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif",lineHeight:1.6,whiteSpace:'pre-wrap'}}>{a.body}</Typography>
-                    <Typography sx={{fontSize:'0.72rem',color:C.muted,mt:1,fontFamily:"'IBM Plex Sans', sans-serif"}}>
-                      {new Date(a.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
-                    </Typography>
-                  </Box>
-                  <Box sx={{display:'flex',gap:0.5,flexShrink:0}}>
-                    <Tooltip title={a.isPinned?'Unpin':'Pin to top'}>
-                      <IconButton size="small" onClick={()=>togglePin(a)} sx={{color:a.isPinned?C.brand:C.muted}}>
-                        <PushPinIcon sx={{fontSize:15,transform:a.isPinned?'rotate(45deg)':'none'}}/>
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Edit"><IconButton size="small" onClick={()=>openEdit(a)} sx={{color:C.brand}}><EditIcon sx={{fontSize:15}}/></IconButton></Tooltip>
-                    <Tooltip title="Delete"><IconButton size="small" onClick={()=>handleDelete(a.id)} sx={{color:C.danger}}><DeleteIcon sx={{fontSize:15}}/></IconButton></Tooltip>
-                  </Box>
-                </Box>
-              </Box>
-            );
-          })}
-        </Box>
-      )}
- 
-      <Dialog open={dialog} onClose={()=>setDialog(false)} maxWidth="sm" fullWidth PaperProps={{sx:{borderRadius:'10px'}}}>
-        <DialogTitle sx={{fontWeight:700,color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif"}}>{editing?'Edit Announcement':'New Announcement'}</DialogTitle>
-        <Divider/>
-        <DialogContent sx={{pt:2.5,display:'flex',flexDirection:'column',gap:2}}>
-          <TextField label="Title *" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} size="small" fullWidth inputProps={{maxLength:200}}/>
-          <TextField label="Body *" value={form.body} onChange={e=>setForm(f=>({...f,body:e.target.value}))} size="small" fullWidth multiline rows={4} placeholder="Write the announcement here…"/>
-          <Box sx={{display:'flex',gap:2,alignItems:'center'}}>
-            <TextField select label="Audience" value={form.audience} onChange={e=>setForm(f=>({...f,audience:e.target.value}))} size="small" sx={{width:160}}>
-              <MenuItem value="all">Everyone</MenuItem>
-              <MenuItem value="teachers">Teachers only</MenuItem>
-              <MenuItem value="students">Students only</MenuItem>
-            </TextField>
-            <Box sx={{display:'flex',alignItems:'center',gap:1}}>
-              <Switch checked={form.isPinned} onChange={e=>setForm(f=>({...f,isPinned:e.target.checked}))} size="small" inputProps={{ id: 'pin-switch', name: 'pin-switch' }}/>
-              <Typography sx={{fontSize:'0.82rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>Pin to top</Typography>
+    <Card_ sx={{mb:0,p:0,overflow:'hidden'}}>
+      <Box sx={{p:2.5,pb:0}}>
+        <SectionHead title="Announcements" subtitle="Post notices for teachers and students"
+          action={
+            <Tooltip title="New Announcement"><IconButton size="small" onClick={openAdd} sx={{color:C.white,background:C.brand,borderRadius:'4px','&:hover':{background:C.brand}}}><AddIcon sx={{fontSize:18}}/></IconButton></Tooltip>
+          }
+        />
+      </Box>
+
+      <Box sx={{display:'flex',minHeight:420}}>
+        <Box sx={{flex:'1 1 60%',minWidth:0,p:2.5,pt:1.5}}>
+          {loading ? <Box sx={{display:'flex',justifyContent:'center',py:6}}><CircularProgress sx={{color:C.brand}}/></Box>
+          : items.length===0 ? (
+            <Box sx={{textAlign:'center',py:6}}>
+              <CampaignIcon sx={{color:C.border,fontSize:44,mb:1}}/>
+              <Typography sx={{color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>No announcements yet.</Typography>
             </Box>
-          </Box>
-        </DialogContent>
-        <Divider/>
-        <DialogActions sx={{px:3,py:2,gap:1}}>
-          <Button onClick={()=>setDialog(false)} sx={{textTransform:'none',color:C.muted}}>Cancel</Button>
-          <Button variant="contained" onClick={handleSave} disabled={saving}
-            sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>
-            {saving?'Saving…':editing?'Update':'Post'}
-          </Button>
-        </DialogActions>
-      </Dialog>
- 
+          ) : (
+            <Box sx={{display:'flex',flexDirection:'column',gap:1.5}}>
+              {items.map(a=>{
+                const ac = AUDIENCE_COLORS[a.audience]||AUDIENCE_COLORS.all;
+                const sel = editing?.id===a.id&&dialog;
+                return(
+                  <Box key={a.id} sx={{p:2,borderRadius:'8px',border:`1px solid ${a.isPinned||sel?C.brand:C.border}`,background:sel?'#EFF6FF':a.isPinned?'#F0F6FF':C.white,position:'relative'}}>
+                    {a.isPinned&&<Box sx={{position:'absolute',top:10,left:-1,width:3,height:'calc(100% - 20px)',borderRadius:'0 2px 2px 0',background:C.brand}}/>}
+                    <Box sx={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:1,flexWrap:'wrap'}}>
+                      <Box sx={{flex:1,minWidth:0}}>
+                        <Box sx={{display:'flex',alignItems:'center',gap:1,flexWrap:'wrap',mb:0.5}}>
+                          {a.isPinned&&<PushPinIcon sx={{fontSize:14,color:C.brand,transform:'rotate(45deg)'}}/>}
+                          <Typography sx={{fontWeight:700,fontSize:'0.95rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>{a.title}</Typography>
+                          <Chip label={a.audience} size="small" sx={{height:18,fontSize:'0.65rem',fontWeight:700,bgcolor:ac.bg,color:ac.color,textTransform:'capitalize'}}/>
+                        </Box>
+                        <Typography sx={{fontSize:'0.85rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif",lineHeight:1.6,whiteSpace:'pre-wrap'}}>{a.body}</Typography>
+                        <Typography sx={{fontSize:'0.72rem',color:C.muted,mt:1,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+                          {new Date(a.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
+                        </Typography>
+                      </Box>
+                      <Box sx={{display:'flex',gap:0.5,flexShrink:0}}>
+                        <Tooltip title={a.isPinned?'Unpin':'Pin to top'}>
+                          <IconButton size="small" onClick={()=>togglePin(a)} sx={{color:a.isPinned?C.brand:C.muted}}>
+                            <PushPinIcon sx={{fontSize:15,transform:a.isPinned?'rotate(45deg)':'none'}}/>
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Edit"><IconButton size="small" onClick={()=>openEdit(a)} sx={{color:C.brand}}><EditIcon sx={{fontSize:15}}/></IconButton></Tooltip>
+                        <Tooltip title="Delete"><IconButton size="small" onClick={()=>handleDelete(a.id)} sx={{color:C.danger}}><DeleteIcon sx={{fontSize:15}}/></IconButton></Tooltip>
+                      </Box>
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+        </Box>
+
+        <Box sx={{flex:'1 1 40%',minWidth:320,borderLeft:`1px solid ${C.border}`,background:C.sidebar}}>
+          {!dialog ? (
+            <DetailEmpty icon={<CampaignIcon sx={{fontSize:34,color:C.border}}/>} text="Select an announcement to edit, or click + to post a new one."/>
+          ) : (
+            <DetailPanel
+              title={editing?`Edit Announcement — ${editing.title}`:'New Announcement'}
+              onClose={()=>setDialog(false)}
+              createdAt={editing?.createdAt}
+              fmt={fmtDate}
+              onReset={()=>editing?openEdit(editing):openAdd()}
+              onSave={handleSave}
+              saving={saving}
+              saveLabel={editing?'Update':'Post'}
+            >
+              <FormRow label="Title" required>
+                <TextField value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} size="small" fullWidth inputProps={{maxLength:200}}/>
+              </FormRow>
+              <FormRow label="Body" required>
+                <TextField value={form.body} onChange={e=>setForm(f=>({...f,body:e.target.value}))} size="small" fullWidth multiline rows={4} placeholder="Write the announcement here…"/>
+              </FormRow>
+              <FormRow label="Audience">
+                <TextField select value={form.audience} onChange={e=>setForm(f=>({...f,audience:e.target.value}))} size="small" fullWidth>
+                  <MenuItem value="all">Everyone</MenuItem>
+                  <MenuItem value="teachers">Teachers only</MenuItem>
+                  <MenuItem value="students">Students only</MenuItem>
+                </TextField>
+              </FormRow>
+              <FormRow label="Pin to top">
+                <Switch checked={form.isPinned} onChange={e=>setForm(f=>({...f,isPinned:e.target.checked}))} size="small" inputProps={{ id: 'pin-switch', name: 'pin-switch' }}/>
+              </FormRow>
+            </DetailPanel>
+          )}
+        </Box>
+      </Box>
+
       <Snack_ snack={snack} onClose={()=>setSnack(s=>({...s,open:false}))}/>
     </Card_>
   );
