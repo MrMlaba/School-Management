@@ -42,13 +42,13 @@ import SchoolLogoHeader from '../components/SchoolLogoHeader';
 ═══════════════════════════════════════════════════════════════ */
 const C = {
   brand:    '#1A3557', brandDark: '#122740',   // restored navy-blue (primary buttons / headers / accents)
-  accent:   '#5d5d5d',                       // semantic accent (active / success) — stays neutral
+  accent:   '#2E7D32',                       // semantic GREEN (active / success / present)
   sidebar:  '#f9f9f9', sidebarAct: '#eeeeee',
   border:   '#dadada',
-  text:     '#222222', muted: '#7a7a7a',
+  text:     '#000000', muted: '#7a7a7a',
   white:    '#ffffff', bg: '#f0f0f0',
-  danger:   '#575757', dangerBg: '#f1f1f1',
-  warn:     '#878787', warnBg: '#fafafa',
+  danger:   '#C62828', dangerBg: '#FFEBEE',   // semantic RED (delete / deactivate / absent)
+  warn:     '#D97706', warnBg: '#FFFBEB',
   headerBg: '#ededed',
   /* ── enterprise chrome ── */
   menubar:    '#111111',   // strong black top menu bar
@@ -103,10 +103,10 @@ const SectionHead = ({ title, subtitle, action }) => (
   </Box>
 );
 
-const InfoBanner = ({ children, color = C.warn, bg = C.warnBg, border = '#e2e2e2' }) => (
+const InfoBanner = ({ children, color = C.warn, bg = C.warnBg, border = '#FDE68A' }) => (
   <Box sx={{ background: bg, border: `1px solid ${border}`, borderRadius: '4px', p: 1.5, mb: 2, display: 'flex', gap: 1.5 }}>
     <InfoOutlinedIcon sx={{ color, fontSize: 18, mt: 0.1, flexShrink: 0 }} />
-    <Typography sx={{ fontSize:'0.7rem', color: '#535353', fontFamily: "'IBM Plex Sans', sans-serif", lineHeight: 1.5 }}>{children}</Typography>
+    <Typography sx={{ fontSize:'0.7rem', color: '#92400E', fontFamily: "'IBM Plex Sans', sans-serif", lineHeight: 1.5 }}>{children}</Typography>
   </Box>
 );
 
@@ -216,16 +216,15 @@ const OverviewSection = () => {
 }, []);
 
   const StatCard = ({ label, value, icon, bg, color, border, sub }) => (
-    <Box sx={{ flex:'1 1 180px', background:C.white, border:`1px solid ${border}`, borderRadius:'4px', p:2, boxShadow:'0 1px 4px rgba(0,0,0,0.05)' }}>
-      <Box sx={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-        <Box>
-          <Typography sx={{ fontSize:'0.6rem', fontWeight:600, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em', fontFamily:"'IBM Plex Sans', sans-serif" }}>{label}</Typography>
-          <Typography sx={{ fontSize:'1.67rem', fontWeight:800, color:C.text, lineHeight:1.2, mt:0.5, fontFamily:"'IBM Plex Sans', sans-serif" }}>{value ?? 0}</Typography>
-          {sub && <Typography sx={{ fontSize:'0.6rem', color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>{sub}</Typography>}
+    <Tooltip title={sub || ''} disableHoverListener={!sub}>
+      <Box sx={{ flex:'1 1 0', minWidth:0, display:'flex', alignItems:'center', gap:1, background:C.white, border:`1px solid ${border}`, borderRadius:'6px', px:1.25, py:0.85, boxShadow:'0 1px 2px rgba(0,0,0,0.04)' }}>
+        <Box sx={{ width:26, height:26, borderRadius:'6px', background:bg, display:'flex', alignItems:'center', justifyContent:'center', color, flexShrink:0 }}>{icon}</Box>
+        <Box sx={{ minWidth:0, overflow:'hidden' }}>
+          <Typography sx={{ fontSize:'0.92rem', fontWeight:800, color:C.text, lineHeight:1.1, fontFamily:"'IBM Plex Sans', sans-serif", whiteSpace:'nowrap' }}>{value ?? 0}</Typography>
+          <Typography sx={{ fontSize:'0.52rem', fontWeight:600, color:C.muted, textTransform:'uppercase', letterSpacing:'0.04em', fontFamily:"'IBM Plex Sans', sans-serif", whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{label}</Typography>
         </Box>
-        <Box sx={{ width:40, height:40, borderRadius:'8px', background:bg, display:'flex', alignItems:'center', justifyContent:'center', color }}>{icon}</Box>
       </Box>
-    </Box>
+    </Tooltip>
   );
 
   const [calDate,setCalDate] = useState(new Date());
@@ -243,11 +242,11 @@ const OverviewSection = () => {
 
         {/* ── LEFT: stat cards + attendance chart (wider) ── */}
         <Box sx={{flex:'2 1 480px',minWidth:320,display:'flex',flexDirection:'column',gap:2.5}}>
-          <Box sx={{display:'grid',gridTemplateColumns:'repeat(2, 1fr)',gap:2}}>
-            <StatCard label="Enrolled Students"  value={stats?.totalEnrolled}                     icon={<PeopleAltIcon sx={{fontSize:20}}/>}      bg="#f2f2f2" color="#5b5b5b" border="#d4d4d4"/>
-            <StatCard label="Teachers"           value={teachers.filter(t=>t.isActive).length}    icon={<SchoolIcon sx={{fontSize:20}}/>}         bg="#f8f8f8" color="#7b7b7b" border="#dedede"/>
-            <StatCard label="Parents"            value={stats?.totalParents}                       icon={<FamilyRestroomIcon sx={{fontSize:20}}/>} bg="#f8f8f8" color="#6f6f6f" border="#e1e1e1"/>
-            <StatCard label="Pending Enrollment" value={stats?.pendingEnrollment} sub="Awaiting physical arrival" icon={<HourglassTopIcon sx={{fontSize:20}}/>} bg="#f5f5f5" color="#5d5d5d" border="#dcdcdc"/>
+          <Box sx={{display:'flex',flexWrap:'nowrap',gap:1.5}}>
+            <StatCard label="Enrolled Students"  value={stats?.totalEnrolled}                     icon={<PeopleAltIcon sx={{fontSize:15}}/>}      bg="#f2f2f2" color="#5b5b5b" border="#d4d4d4"/>
+            <StatCard label="Teachers"           value={teachers.filter(t=>t.isActive).length}    icon={<SchoolIcon sx={{fontSize:15}}/>}         bg="#f8f8f8" color="#7b7b7b" border="#dedede"/>
+            <StatCard label="Parents"            value={stats?.totalParents}                       icon={<FamilyRestroomIcon sx={{fontSize:15}}/>} bg="#f8f8f8" color="#6f6f6f" border="#e1e1e1"/>
+            <StatCard label="Pending Enrollment" value={stats?.pendingEnrollment} sub="Awaiting physical arrival" icon={<HourglassTopIcon sx={{fontSize:15}}/>} bg="#f5f5f5" color="#5d5d5d" border="#dcdcdc"/>
           </Box>
 
           <Card_ sx={{mb:0}}>
@@ -259,8 +258,8 @@ const OverviewSection = () => {
                 <YAxis tick={{fontSize:11,fontFamily:"'IBM Plex Sans', sans-serif",fill:C.muted}} axisLine={false} tickLine={false}/>
                 <ReTip contentStyle={{fontFamily:"'IBM Plex Sans', sans-serif",fontSize:11,borderRadius:6,border:`1px solid ${C.border}`}}/>
                 <Legend wrapperStyle={{fontSize:11,fontFamily:"'IBM Plex Sans', sans-serif"}}/>
-                <Bar dataKey="present" fill={C.link} radius={[4,4,0,0]} name="Present"/>
-                <Bar dataKey="absent"  fill={C.text} radius={[4,4,0,0]} name="Absent"/>
+                <Bar dataKey="present" fill={C.accent} radius={[4,4,0,0]} name="Present"/>
+                <Bar dataKey="absent"  fill={C.danger} radius={[4,4,0,0]} name="Absent"/>
               </BarChart>
             </ResponsiveContainer>
           </Card_>
@@ -646,7 +645,7 @@ const StudentsSection = () => {
         </DialogTitle>
         <Divider/>
         <DialogContent sx={{pt:2.5}}>
-          <InfoBanner color={C.danger} bg={C.dangerBg} border="#b3b3b3">
+          <InfoBanner color={C.danger} bg={C.dangerBg} border="#EF9A9A">
             This will generate a new temporary password for{' '}
             <strong>{resetStudentDialog?.firstName} {resetStudentDialog?.lastName}</strong>.
             The old password will stop working immediately.
@@ -708,7 +707,7 @@ const StudentsSection = () => {
               Student No: {resetStudentResult?.studentNumber}
             </Typography>
           </Box>
-          <Box sx={{background:C.dangerBg,border:'1px solid #b3b3b3',borderRadius:'6px',p:1.5}}>
+          <Box sx={{background:C.dangerBg,border:'1px solid #EF9A9A',borderRadius:'6px',p:1.5}}>
             <Typography sx={{fontSize:'0.72rem',fontWeight:700,color:C.danger,fontFamily:"'IBM Plex Sans', sans-serif"}}>
               This password will NOT be shown again
             </Typography>
@@ -1026,7 +1025,7 @@ const TeachersSection = () => {
         </DialogTitle>
         <Divider/>
         <DialogContent sx={{pt:2.5}}>
-          <InfoBanner color={C.danger} bg={C.dangerBg} border="#b3b3b3">
+          <InfoBanner color={C.danger} bg={C.dangerBg} border="#EF9A9A">
             This will reset the password for{' '}
             <strong>{resetTeacherDialog?.firstName} {resetTeacherDialog?.lastName}</strong>.
             Their current password will stop working immediately.
@@ -1088,7 +1087,7 @@ const TeachersSection = () => {
               Username: {resetTeacherResult?.username}
             </Typography>
           </Box>
-          <Box sx={{background:C.dangerBg,border:'1px solid #b3b3b3',borderRadius:'6px',p:1.5}}>
+          <Box sx={{background:C.dangerBg,border:'1px solid #EF9A9A',borderRadius:'6px',p:1.5}}>
             <Typography sx={{fontSize:'0.72rem',fontWeight:700,color:C.danger,fontFamily:"'IBM Plex Sans', sans-serif"}}>
               This password will NOT be shown again
             </Typography>
@@ -2068,8 +2067,8 @@ const ReportsSection = () => {
     toast('Excel file downloaded');
   };
  
-  const attColor = (pct) => { if(pct===null)return C.muted; if(pct>=80)return'#6f6f6f'; if(pct>=60)return'#878787'; return'#575757'; };
-  const resColor = (pct) => { if(pct===null)return C.muted; if(pct>=75)return'#6f6f6f'; if(pct>=50)return'#878787'; return'#575757'; };
+  const attColor = (pct) => { if(pct===null)return C.muted; if(pct>=80)return C.accent; if(pct>=60)return C.warn; return C.danger; };
+  const resColor = (pct) => { if(pct===null)return C.muted; if(pct>=75)return C.accent; if(pct>=50)return C.warn; return C.danger; };
   const getSymbol = (pct) => { if(pct===null)return'—'; if(pct>=80)return'7'; if(pct>=70)return'6'; if(pct>=60)return'5'; if(pct>=50)return'4'; if(pct>=40)return'3'; if(pct>=30)return'2'; return'1'; };
  
   return (
@@ -2178,9 +2177,9 @@ const ReportsSection = () => {
                         <TableCell sx={{...bc,color:C.muted,textAlign:'center',width:40}}>{idx+1}</TableCell>
                         <TableCell sx={{...bc,fontFamily:'monospace',fontSize:'0.7rem',color:C.brand,fontWeight:700}}>{s.studentNumber}</TableCell>
                         <TableCell sx={{...bc,fontWeight:600}}>{s.firstName} {s.lastName}</TableCell>
-                        <TableCell sx={{...bc,color:'#6f6f6f',fontWeight:700,textAlign:'center'}}>{s.present}</TableCell>
-                        <TableCell sx={{...bc,color:'#575757',fontWeight:700,textAlign:'center'}}>{s.absent}</TableCell>
-                        <TableCell sx={{...bc,color:'#878787',fontWeight:700,textAlign:'center'}}>{s.late}</TableCell>
+                        <TableCell sx={{...bc,color:C.accent,fontWeight:700,textAlign:'center'}}>{s.present}</TableCell>
+                        <TableCell sx={{...bc,color:C.danger,fontWeight:700,textAlign:'center'}}>{s.absent}</TableCell>
+                        <TableCell sx={{...bc,color:C.warn,fontWeight:700,textAlign:'center'}}>{s.late}</TableCell>
                         <TableCell sx={{...bc,color:C.muted,textAlign:'center'}}>{s.excused}</TableCell>
                         <TableCell sx={{...bc,textAlign:'center'}}>{s.total}</TableCell>
                         <TableCell sx={{...bc}}>
