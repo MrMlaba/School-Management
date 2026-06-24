@@ -54,7 +54,7 @@ const C = {
   menubar:    '#111111',   // strong black top menu bar
   menubarHi:  '#262626',   // hover state on the menu bar
   menubarTxt: '#eeeeee',
-  link:       '#1565C0',   // restored link blue
+  link:       '#1565C0',   // restored link blue  
   tabBar:     '#e7e7e7',   // tab strip background
   tabIdle:    '#ededed',   // inactive tab
   dock:       '#f4f4f4',   // bottom icon dock
