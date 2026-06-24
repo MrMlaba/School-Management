@@ -41,8 +41,8 @@ import SchoolLogoHeader from '../components/SchoolLogoHeader';
    TOKENS
 ═══════════════════════════════════════════════════════════════ */
 const C = {
-  brand:    '#313131', brandDark: '#242424',
-  accent:   '#5d5d5d',                       // semantic accent (active / success)
+  brand:    '#1A3557', brandDark: '#122740',   // restored navy-blue (primary buttons / headers / accents)
+  accent:   '#5d5d5d',                       // semantic accent (active / success) — stays neutral
   sidebar:  '#f9f9f9', sidebarAct: '#eeeeee',
   border:   '#dadada',
   text:     '#222222', muted: '#7a7a7a',
@@ -51,10 +51,10 @@ const C = {
   warn:     '#878787', warnBg: '#fafafa',
   headerBg: '#ededed',
   /* ── enterprise chrome ── */
-  menubar:    '#434343',   // dark top menu bar
-  menubarHi:  '#555555',   // hover state on the menu bar
+  menubar:    '#111111',   // strong black top menu bar
+  menubarHi:  '#262626',   // hover state on the menu bar
   menubarTxt: '#eeeeee',
-  link:       '#404040',   // accent / link
+  link:       '#1565C0',   // restored link blue
   tabBar:     '#e7e7e7',   // tab strip background
   tabIdle:    '#ededed',   // inactive tab
   dock:       '#f4f4f4',   // bottom icon dock
@@ -239,132 +239,137 @@ const OverviewSection = () => {
 
   return (
     <Box>
-      <Box sx={{display:'flex',gap:2,flexWrap:'wrap',mb:3}}>
-        <StatCard label="Enrolled Students"  value={stats?.totalEnrolled}                     icon={<PeopleAltIcon sx={{fontSize:20}}/>}      bg="#f2f2f2" color="#5b5b5b" border="#d4d4d4"/>
-        <StatCard label="Teachers"           value={teachers.filter(t=>t.isActive).length}    icon={<SchoolIcon sx={{fontSize:20}}/>}         bg="#f8f8f8" color="#7b7b7b" border="#dedede"/>
-        <StatCard label="Parents"            value={stats?.totalParents}                       icon={<FamilyRestroomIcon sx={{fontSize:20}}/>} bg="#f8f8f8" color="#6f6f6f" border="#e1e1e1"/>
-        <StatCard label="Pending Enrollment" value={stats?.pendingEnrollment} sub="Awaiting physical arrival" icon={<HourglassTopIcon sx={{fontSize:20}}/>} bg="#f5f5f5" color="#5d5d5d" border="#dcdcdc"/>
-      </Box>
+      <Box sx={{display:'flex',gap:2.5,mb:2.5,flexWrap:'wrap',alignItems:'flex-start'}}>
 
-      <Box sx={{display:'flex',gap:2.5,mb:3,flexWrap:'wrap'}}>
-        <Card_ sx={{flex:'1 1 380px',mb:0}}>
-          <SectionHead title="Attendance This Week" subtitle="Daily present vs absent"/>
-          <ResponsiveContainer width="100%" height={190}>
-            <BarChart data={attData} barSize={16} barGap={3}>
-              <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false}/>
-              <XAxis dataKey="day" tick={{fontSize:11,fontFamily:"'IBM Plex Sans', sans-serif",fill:C.muted}} axisLine={false} tickLine={false}/>
-              <YAxis tick={{fontSize:11,fontFamily:"'IBM Plex Sans', sans-serif",fill:C.muted}} axisLine={false} tickLine={false}/>
-              <ReTip contentStyle={{fontFamily:"'IBM Plex Sans', sans-serif",fontSize:11,borderRadius:6,border:`1px solid ${C.border}`}}/>
-              <Legend wrapperStyle={{fontSize:11,fontFamily:"'IBM Plex Sans', sans-serif"}}/>
-              <Bar dataKey="present" fill="#898989" radius={[4,4,0,0]} name="Present"/>
-              <Bar dataKey="absent"  fill="#bfbfbf" radius={[4,4,0,0]} name="Absent"/>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card_>
+        {/* ── LEFT: stat cards + attendance chart (wider) ── */}
+        <Box sx={{flex:'2 1 480px',minWidth:320,display:'flex',flexDirection:'column',gap:2.5}}>
+          <Box sx={{display:'grid',gridTemplateColumns:'repeat(2, 1fr)',gap:2}}>
+            <StatCard label="Enrolled Students"  value={stats?.totalEnrolled}                     icon={<PeopleAltIcon sx={{fontSize:20}}/>}      bg="#f2f2f2" color="#5b5b5b" border="#d4d4d4"/>
+            <StatCard label="Teachers"           value={teachers.filter(t=>t.isActive).length}    icon={<SchoolIcon sx={{fontSize:20}}/>}         bg="#f8f8f8" color="#7b7b7b" border="#dedede"/>
+            <StatCard label="Parents"            value={stats?.totalParents}                       icon={<FamilyRestroomIcon sx={{fontSize:20}}/>} bg="#f8f8f8" color="#6f6f6f" border="#e1e1e1"/>
+            <StatCard label="Pending Enrollment" value={stats?.pendingEnrollment} sub="Awaiting physical arrival" icon={<HourglassTopIcon sx={{fontSize:20}}/>} bg="#f5f5f5" color="#5d5d5d" border="#dcdcdc"/>
+          </Box>
 
-        <Card_ sx={{width:260,flexShrink:0,mb:0}}>
-          <Box sx={{display:'flex',justifyContent:'space-between',alignItems:'center',mb:1.5}}>
-            <Typography sx={{fontWeight:700,fontSize:'0.75rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>
-              {calDate.toLocaleDateString('en-US',{month:'long',year:'numeric'})}
-            </Typography>
-            <Box sx={{display:'flex',gap:0.25}}>
-              {['‹','›'].map((ch,i)=>(
-                <Box key={i} onClick={()=>setCalDate(new Date(yr,mo+(i===0?-1:1),1))}
-                  sx={{width:22,height:22,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',borderRadius:'4px',fontSize:'0.75rem',color:C.muted,'&:hover':{background:C.sidebarAct}}}>
-                  {ch}
-                </Box>
+          <Card_ sx={{mb:0}}>
+            <SectionHead title="Attendance This Week" subtitle="Daily present vs absent"/>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={attData} barSize={16} barGap={3}>
+                <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false}/>
+                <XAxis dataKey="day" tick={{fontSize:11,fontFamily:"'IBM Plex Sans', sans-serif",fill:C.muted}} axisLine={false} tickLine={false}/>
+                <YAxis tick={{fontSize:11,fontFamily:"'IBM Plex Sans', sans-serif",fill:C.muted}} axisLine={false} tickLine={false}/>
+                <ReTip contentStyle={{fontFamily:"'IBM Plex Sans', sans-serif",fontSize:11,borderRadius:6,border:`1px solid ${C.border}`}}/>
+                <Legend wrapperStyle={{fontSize:11,fontFamily:"'IBM Plex Sans', sans-serif"}}/>
+                <Bar dataKey="present" fill={C.link} radius={[4,4,0,0]} name="Present"/>
+                <Bar dataKey="absent"  fill={C.text} radius={[4,4,0,0]} name="Absent"/>
+              </BarChart>
+            </ResponsiveContainer>
+          </Card_>
+        </Box>
+
+        {/* ── RIGHT: calendar + announcements + upcoming events (narrower) ── */}
+        <Box sx={{flex:'1 1 300px',minWidth:280,maxWidth:380,display:'flex',flexDirection:'column',gap:2.5}}>
+
+          <Card_ sx={{mb:0}}>
+            <Box sx={{display:'flex',justifyContent:'space-between',alignItems:'center',mb:1.5}}>
+              <Typography sx={{fontWeight:700,fontSize:'0.75rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+                {calDate.toLocaleDateString('en-US',{month:'long',year:'numeric'})}
+              </Typography>
+              <Box sx={{display:'flex',gap:0.25}}>
+                {['‹','›'].map((ch,i)=>(
+                  <Box key={i} onClick={()=>setCalDate(new Date(yr,mo+(i===0?-1:1),1))}
+                    sx={{width:22,height:22,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',borderRadius:'4px',fontSize:'0.75rem',color:C.muted,'&:hover':{background:C.sidebarAct}}}>
+                    {ch}
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+            <Box sx={{display:'grid',gridTemplateColumns:'repeat(7, 1fr)',mb:0.5}}>
+              {['M','T','W','T','F','S','S'].map((d,i)=>(
+                <Box key={i} sx={{textAlign:'center',fontSize:'0.58rem',fontWeight:600,color:C.muted,py:'2px',fontFamily:"'IBM Plex Sans', sans-serif"}}>{d}</Box>
               ))}
             </Box>
-          </Box>
-          <Box sx={{display:'grid',gridTemplateColumns:'repeat(7, 1fr)',mb:0.5}}>
-            {['M','T','W','T','F','S','S'].map((d,i)=>(
-              <Box key={i} sx={{textAlign:'center',fontSize:'0.58rem',fontWeight:600,color:C.muted,py:'2px',fontFamily:"'IBM Plex Sans', sans-serif"}}>{d}</Box>
-            ))}
-          </Box>
-          <Box sx={{display:'grid',gridTemplateColumns:'repeat(7, 1fr)',gap:'1px'}}>
-            {cells.map((d,i)=>{
-              const isToday=d&&today.getDate()===d&&today.getMonth()===mo&&today.getFullYear()===yr;
-              return <Box key={i} sx={{textAlign:'center',py:'4px',borderRadius:'50%',fontSize:'0.66rem',fontFamily:"'IBM Plex Sans', sans-serif",fontWeight:isToday?800:400,background:isToday?C.brand:'transparent',color:isToday?C.white:d?C.text:'transparent','&:hover':d&&!isToday?{background:C.sidebarAct}:{}}}>{d||''}</Box>;
-            })}
-          </Box>
-        </Card_>
-      </Box>
-      {/* ── Announcements + Events row ── */}
-      <Box sx={{ display: 'flex', gap: 2.5, mt: 3, mb: 2.5, flexWrap: 'wrap' }}>
+            <Box sx={{display:'grid',gridTemplateColumns:'repeat(7, 1fr)',gap:'1px'}}>
+              {cells.map((d,i)=>{
+                const isToday=d&&today.getDate()===d&&today.getMonth()===mo&&today.getFullYear()===yr;
+                return <Box key={i} sx={{textAlign:'center',py:'4px',borderRadius:'50%',fontSize:'0.66rem',fontFamily:"'IBM Plex Sans', sans-serif",fontWeight:isToday?800:400,background:isToday?C.brand:'transparent',color:isToday?C.white:d?C.text:'transparent','&:hover':d&&!isToday?{background:C.sidebarAct}:{}}}>{d||''}</Box>;
+              })}
+            </Box>
+          </Card_>
 
-        {/* Announcements */}
-        <Card_ sx={{ flex: '1 1 340px', mb: 0 }}>
-          <SectionHead title="Announcements" subtitle="Recent notices — all audiences shown"/>
-          {announcements.length === 0 ? (
-            <Typography sx={{ color: C.muted, fontSize:'0.77rem', fontFamily: "'IBM Plex Sans', sans-serif" }}>
-              No announcements yet.
-            </Typography>
-          ) : (
-            announcements.slice(0, 5).map(a => {
-              const AUDIENCE_COLOR = {
-                all:      { bg: '#f2f2f2', color: '#3f3f3f' },
-                teachers: { bg: '#f8f8f8', color: '#626262' },
-                students: { bg: '#f8f8f8', color: '#484848' },
-              };
-              const ac = AUDIENCE_COLOR[a.audience] || AUDIENCE_COLOR.all;
-              return (
-                <Box key={a.id} sx={{
-                  py: 1.25, borderBottom: `1px solid ${C.border}`,
-                  borderLeft: a.isPinned ? `3px solid ${C.brand}` : '3px solid transparent',
-                  pl: 1,
-                }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.25 }}>
-                    <Typography sx={{ fontWeight: 700, fontSize:'0.77rem', color: C.text, fontFamily: "'IBM Plex Sans', sans-serif" }}>
-                      {a.title}
-                    </Typography>
-                    <Chip label={a.audience} size="small"
-                      sx={{ height: 17, fontSize:'0.58rem', fontWeight: 700, bgcolor: ac.bg, color: ac.color, textTransform: 'capitalize' }} />
-                  </Box>
-                  <Typography sx={{ fontSize:'0.7rem', color: C.muted, fontFamily: "'IBM Plex Sans', sans-serif" }}>
-                    {a.body?.length > 100 ? a.body.slice(0, 100) + '…' : a.body}
-                  </Typography>
-                </Box>
-              );
-            })
-          )}
-        </Card_>
-
-        {/* Upcoming Events */}
-        <Card_ sx={{ flex: '1 1 340px', mb: 0 }}>
-          <SectionHead title="Upcoming Events" subtitle="This month's school calendar"/>
-          {events.length === 0 ? (
-            <Typography sx={{ color: C.muted, fontSize:'0.77rem', fontFamily: "'IBM Plex Sans', sans-serif" }}>
-              No events this month.
-            </Typography>
-          ) : (
-            events
-              
-              .slice(0, 5)
-              .map(ev => {
-                const EVENT_COLOR = {
-                  general: '#5b5b5b', exam: '#4a4a4a', holiday: '#484848',
-                  meeting: '#626262', sport: '#515151', other: '#404040',
+          {/* Announcements */}
+          <Card_ sx={{ mb: 0 }}>
+            <SectionHead title="Announcements" subtitle="Recent notices — all audiences shown"/>
+            {announcements.length === 0 ? (
+              <Typography sx={{ color: C.muted, fontSize:'0.77rem', fontFamily: "'IBM Plex Sans', sans-serif" }}>
+                No announcements yet.
+              </Typography>
+            ) : (
+              announcements.slice(0, 5).map(a => {
+                const AUDIENCE_COLOR = {
+                  all:      { bg: '#f2f2f2', color: '#3f3f3f' },
+                  teachers: { bg: '#f8f8f8', color: '#626262' },
+                  students: { bg: '#f8f8f8', color: '#484848' },
                 };
+                const ac = AUDIENCE_COLOR[a.audience] || AUDIENCE_COLOR.all;
                 return (
-                  <Box key={ev.id} sx={{ display: 'flex', gap: 1.5, py: 1.25, borderBottom: `1px solid ${C.border}`, alignItems: 'flex-start' }}>
-                    <Box sx={{ width: 4, alignSelf: 'stretch', borderRadius: '4px', flexShrink: 0,
-                      background: EVENT_COLOR[ev.type] || EVENT_COLOR.other }} />
-                    <Box sx={{ flex: 1 }}>
+                  <Box key={a.id} sx={{
+                    py: 1.25, borderBottom: `1px solid ${C.border}`,
+                    borderLeft: a.isPinned ? `3px solid ${C.brand}` : '3px solid transparent',
+                    pl: 1,
+                  }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.25 }}>
                       <Typography sx={{ fontWeight: 700, fontSize:'0.77rem', color: C.text, fontFamily: "'IBM Plex Sans', sans-serif" }}>
-                        {ev.title}
+                        {a.title}
                       </Typography>
-                      <Typography sx={{ fontSize:'0.66rem', color: C.muted, fontFamily: "'IBM Plex Sans', sans-serif" }}>
-                        {new Date((ev.eventDate||'').slice(0,10) + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}
-                        {ev.eventTime ? ` · ${ev.eventTime.slice(0,5)}` : ''}
-                        {ev.location  ? ` · ${ev.location}` : ''}
-                      </Typography>
+                      <Chip label={a.audience} size="small"
+                        sx={{ height: 17, fontSize:'0.58rem', fontWeight: 700, bgcolor: ac.bg, color: ac.color, textTransform: 'capitalize' }} />
                     </Box>
+                    <Typography sx={{ fontSize:'0.7rem', color: C.muted, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+                      {a.body?.length > 100 ? a.body.slice(0, 100) + '…' : a.body}
+                    </Typography>
                   </Box>
                 );
               })
-          )}
-        </Card_>
+            )}
+          </Card_>
 
+          {/* Upcoming Events */}
+          <Card_ sx={{ mb: 0 }}>
+            <SectionHead title="Upcoming Events" subtitle="This month's school calendar"/>
+            {events.length === 0 ? (
+              <Typography sx={{ color: C.muted, fontSize:'0.77rem', fontFamily: "'IBM Plex Sans', sans-serif" }}>
+                No events this month.
+              </Typography>
+            ) : (
+              events
+
+                .slice(0, 5)
+                .map(ev => {
+                  const EVENT_COLOR = {
+                    general: '#5b5b5b', exam: '#4a4a4a', holiday: '#484848',
+                    meeting: '#626262', sport: '#515151', other: '#404040',
+                  };
+                  return (
+                    <Box key={ev.id} sx={{ display: 'flex', gap: 1.5, py: 1.25, borderBottom: `1px solid ${C.border}`, alignItems: 'flex-start' }}>
+                      <Box sx={{ width: 4, alignSelf: 'stretch', borderRadius: '4px', flexShrink: 0,
+                        background: EVENT_COLOR[ev.type] || EVENT_COLOR.other }} />
+                      <Box sx={{ flex: 1 }}>
+                        <Typography sx={{ fontWeight: 700, fontSize:'0.77rem', color: C.text, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+                          {ev.title}
+                        </Typography>
+                        <Typography sx={{ fontSize:'0.66rem', color: C.muted, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+                          {new Date((ev.eventDate||'').slice(0,10) + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}
+                          {ev.eventTime ? ` · ${ev.eventTime.slice(0,5)}` : ''}
+                          {ev.location  ? ` · ${ev.location}` : ''}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  );
+                })
+            )}
+          </Card_>
+
+        </Box>
       </Box>
 
       <Card_ sx={{mb:0}}>
@@ -467,7 +472,7 @@ const StudentsSection = () => {
                 else toast(d.message||'Failed','error');
               }catch(e){ toast('Network error','error'); }
               setSaving(false);
-            }} sx={{background:'#414141',textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}} startIcon={<KeyIcon/>}>
+            }} sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}} startIcon={<KeyIcon/>}>
             {saving?'Working…':'Bulk Generate Logins'}
           </Button>
         </Box>
@@ -510,7 +515,7 @@ const StudentsSection = () => {
                               <Tooltip title="Set Login Credentials">
                                 <IconButton size="small"
                                   onClick={(e)=>{e.stopPropagation();setCredDialogStudent(s);setStudentCred({password:''}); }}
-                                  sx={{color:'#414141'}}>
+                                  sx={{color:C.brand}}>
                                   <KeyIcon sx={{fontSize:15}}/>
                                 </IconButton>
                               </Tooltip>
@@ -559,7 +564,7 @@ const StudentsSection = () => {
               <Box sx={{display:'flex',gap:1,mt:2,pt:2,borderTop:`1px solid ${C.border}`}}>
                 <Button size="small" variant="outlined" startIcon={<KeyIcon sx={{fontSize:15}}/>}
                   onClick={()=>{setCredDialogStudent(selectedStudent);setStudentCred({password:''});}}
-                  sx={{textTransform:'none',fontWeight:700,borderColor:'#414141',color:'#414141',fontFamily:"'IBM Plex Sans', sans-serif"}}>
+                  sx={{textTransform:'none',fontWeight:700,borderColor:C.brand,color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif"}}>
                   Set Login Credentials
                 </Button>
                 {selectedStudent.passwordHash!==null && selectedStudent.passwordHash!=='' && (
@@ -595,7 +600,7 @@ const StudentsSection = () => {
               else toast(d.message||'Failed','error');
             }catch(e){ toast('Network error','error'); }
             setSaving(false);
-          }} disabled={saving} sx={{background:'#414141',textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>
+          }} disabled={saving} sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>
             {saving?'Saving…':'Set Credentials'}
           </Button>
         </DialogActions>
@@ -887,7 +892,7 @@ const TeachersSection = () => {
                       <TableCell sx={{...bc,borderRight:'none'}}>
                         <Box sx={{display:'flex',gap:0.5}}>
                           <Tooltip title="Edit"><IconButton size="small" onClick={()=>openEdit(t)} sx={{color:C.brand}}><EditIcon sx={{fontSize:15}}/></IconButton></Tooltip>
-                          <Tooltip title="Set Login Credentials"><IconButton size="small" onClick={()=>{setCredDialog(t);setCred({username:'',password:''});}} sx={{color:'#414141'}}><KeyIcon sx={{fontSize:15}}/></IconButton></Tooltip>
+                          <Tooltip title="Set Login Credentials"><IconButton size="small" onClick={()=>{setCredDialog(t);setCred({username:'',password:''});}} sx={{color:C.brand}}><KeyIcon sx={{fontSize:15}}/></IconButton></Tooltip>
                           {t.username && (
                               <Tooltip title="Reset Password">
                                 <IconButton size="small"
@@ -1007,7 +1012,7 @@ const TeachersSection = () => {
         <DialogActions sx={{px:3,py:2,gap:1}}>
           <Button onClick={()=>setCredDialog(null)} sx={{textTransform:'none',color:C.muted}}>Cancel</Button>
           <Button variant="contained" onClick={handleSetCred} disabled={saving}
-            sx={{background:'#414141',textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>
+            sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>
             {saving?'Saving…':'Set Credentials'}
           </Button>
         </DialogActions>
@@ -2122,7 +2127,7 @@ const ReportsSection = () => {
             <Button variant="outlined" onClick={openClassPDF}
               disabled={pdfLoading==='class'}
               startIcon={pdfLoading==='class'?<CircularProgress size={14}/>:null}
-              sx={{borderColor:'#575757',color:'#575757',textTransform:'none',fontWeight:700,
+              sx={{borderColor:C.brand,color:C.brand,textTransform:'none',fontWeight:700,
                 fontFamily:"'IBM Plex Sans', sans-serif",'&:hover':{background:'#f8f8f8'}}}>
               {pdfLoading==='class'?'Preparing…':'Print All Report Cards'}
             </Button>
@@ -2130,7 +2135,7 @@ const ReportsSection = () => {
  
           {report && (
             <Button variant="outlined" onClick={exportExcel}
-              sx={{borderColor:C.accent,color:C.accent,textTransform:'none',fontWeight:700,
+              sx={{borderColor:C.brand,color:C.brand,textTransform:'none',fontWeight:700,
                 fontFamily:"'IBM Plex Sans', sans-serif",'&:hover':{background:'#f8f8f8'}}}>
               Export Excel
             </Button>
