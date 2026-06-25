@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Chip, Divider, Avatar, CircularProgress,
@@ -770,6 +770,15 @@ const TeachersSection = () => {
   }, []);
   useEffect(()=>{fetch_();},[fetch_]);
 
+  // Default-select the first teacher on landing (once), same as the Students tab.
+  const didDefaultSelect = useRef(false);
+  useEffect(()=>{
+    if (!didDefaultSelect.current && teachers.length>0) {
+      didDefaultSelect.current = true;
+      openEdit(teachers[0]);
+    }
+  }, [teachers]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Validation ──
   const validate = () => {
     const e = {};
@@ -862,7 +871,7 @@ const TeachersSection = () => {
                 </TableRow></TableHead>
                 <TableBody>
                   {teachers.map((t,idx)=>(
-                    <TableRow key={t.id} sx={{boxShadow:editing?.id===t.id&&dialog?`inset 3px 0 0 0 ${C.brand}`:'none',backgroundColor:editing?.id===t.id&&dialog?'#e3e3e3':idx%2===0?C.white:'#fbfbfb'}}>
+                    <TableRow key={t.id} onClick={()=>openEdit(t)} sx={{cursor:'pointer',boxShadow:editing?.id===t.id&&dialog?`inset 3px 0 0 0 ${C.brand}`:'none',backgroundColor:editing?.id===t.id&&dialog?'#e3e3e3':idx%2===0?C.white:'#fbfbfb'}}>
                       <TableCell sx={{...bc,color:C.muted,textAlign:'center',width:40}}>{idx+1}</TableCell>
                       <TableCell sx={{...bc,fontWeight:600}}>{t.firstName} {t.lastName}</TableCell>
                       <TableCell sx={{...bc,fontFamily:'monospace',fontSize:'0.7rem'}}>{t.employeeNumber||'—'}</TableCell>
@@ -890,18 +899,18 @@ const TeachersSection = () => {
                       </TableCell>
                       <TableCell sx={{...bc,borderRight:'none'}}>
                         <Box sx={{display:'flex',gap:0.5}}>
-                          <Tooltip title="Edit"><IconButton size="small" onClick={()=>openEdit(t)} sx={{color:C.brand}}><EditIcon sx={{fontSize:15}}/></IconButton></Tooltip>
-                          <Tooltip title="Set Login Credentials"><IconButton size="small" onClick={()=>{setCredDialog(t);setCred({username:'',password:''});}} sx={{color:C.brand}}><KeyIcon sx={{fontSize:15}}/></IconButton></Tooltip>
+                          <Tooltip title="Edit"><IconButton size="small" onClick={(e)=>{e.stopPropagation();openEdit(t);}} sx={{color:C.brand}}><EditIcon sx={{fontSize:15}}/></IconButton></Tooltip>
+                          <Tooltip title="Set Login Credentials"><IconButton size="small" onClick={(e)=>{e.stopPropagation();setCredDialog(t);setCred({username:'',password:''});}} sx={{color:C.brand}}><KeyIcon sx={{fontSize:15}}/></IconButton></Tooltip>
                           {t.username && (
                               <Tooltip title="Reset Password">
                                 <IconButton size="small"
-                                  onClick={()=>setResetTeacherDialog(t)}
+                                  onClick={(e)=>{e.stopPropagation();setResetTeacherDialog(t);}}
                                   sx={{color:C.danger}}>
                                   <RestoreIcon sx={{fontSize:15}}/>
                                 </IconButton>
                               </Tooltip>
                             )}
-                          {t.isActive&&<Tooltip title="Deactivate"><IconButton size="small" onClick={()=>handleDeactivate(t.id)} sx={{color:C.danger}}><DeleteIcon sx={{fontSize:15}}/></IconButton></Tooltip>}
+                          {t.isActive&&<Tooltip title="Deactivate"><IconButton size="small" onClick={(e)=>{e.stopPropagation();handleDeactivate(t.id);}} sx={{color:C.danger}}><DeleteIcon sx={{fontSize:15}}/></IconButton></Tooltip>}
                         </Box>
                       </TableCell>
                     </TableRow>
