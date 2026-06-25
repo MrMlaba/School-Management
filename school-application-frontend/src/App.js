@@ -48,6 +48,10 @@ const AppShell = () => {
   || location.pathname.startsWith('/student/timetable')   // ← ADD: hide navbar on assignment detail
   || location.pathname.startsWith('/student/quiz')
   || location.pathname.startsWith('/classroom-chat');
+  // Navbar is position:"absolute" so it floats on top of the Home hero image on purpose.
+  // Every other page has no hero to bleed behind it, so it must reserve the navbar's height
+  // as top padding or the navbar covers that page's own header content.
+  const isHome = location.pathname === '/';
 
   return (
     <Box sx={{
@@ -65,7 +69,7 @@ const AppShell = () => {
         sx={{
           flex: 1,
           width: '100%',
-          padding: isSystemRoute ? 0 : 0,
+          pt: (!hideNav && !isHome) ? { xs: '60px', sm: '68px' } : 0,
           overflowX: 'hidden',
           bgcolor: 'transparent',
         }}
