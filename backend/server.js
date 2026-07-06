@@ -25,7 +25,8 @@ const chatRoutes       = require('./routes/chatRoutes');
 const app  = express();
 const PORT = process.env.PORT || 8080;
 
-const SCHOOL_JWT_SECRET = process.env.JWT_SECRET || 'change_me_school';
+const SCHOOL_JWT_SECRET = process.env.JWT_SECRET;
+if (!SCHOOL_JWT_SECRET) throw new Error('JWT_SECRET environment variable is required');
 const TOKEN_EXPIRY      = '8h';
 
 // ─── FIX 1: Trust proxy — Railway sits behind a load balancer ────────────────
@@ -34,11 +35,22 @@ const TOKEN_EXPIRY      = '8h';
 app.set('trust proxy', 1);
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
+// Explicit origins (comma-separated) win first; ALLOWED_ORIGINS should list the
+// production Vercel domain and any custom domain. Beyond that, only THIS
+// project's own Vercel preview deployments are trusted — not "any *.vercel.app",
+// which would let any other Vercel-hosted site make credentialed requests here.
+const explicitAllowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://school-application.vercel.app')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+const VERCEL_PREVIEW_PREFIX = process.env.VERCEL_PROJECT_SLUG || 'school-application';
+
 app.use(cors({
   origin: function(origin, callback) {
     if (!origin) return callback(null, true);
     if (
-      origin.includes('vercel.app') ||
+      explicitAllowedOrigins.includes(origin) ||
+      (/^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin) && origin.startsWith(`https://${VERCEL_PREVIEW_PREFIX}-`)) ||
       origin.includes('localhost') ||
       origin.includes('127.0.0.1')
     ) {
@@ -226,11 +238,14 @@ const requireAnyAuth = (req, res, next) => {
   if (!header || !header.startsWith('Bearer '))
     return res.status(401).json({ message: 'No token provided' });
   const token = header.slice(7);
+  // These four env vars are guaranteed set — the modules that own them
+  // (auth.js, studentAuth.js, teacherRoutes.js, systemRoutes.js) throw at
+  // require()-time, which happens before this handler can ever run.
   const secrets = [
-    process.env.JWT_SECRET         || 'change_me_school',
-    process.env.STUDENT_JWT_SECRET || 'change_me_student',
-    process.env.TEACHER_JWT_SECRET || 'change_me_teacher',
-    process.env.SYSTEM_JWT_SECRET  || 'change_me_system',
+    process.env.JWT_SECRET,
+    process.env.STUDENT_JWT_SECRET,
+    process.env.TEACHER_JWT_SECRET,
+    process.env.SYSTEM_JWT_SECRET,
   ];
   for (const secret of secrets) {
     try { jwt.verify(token, secret); return next(); } catch {}

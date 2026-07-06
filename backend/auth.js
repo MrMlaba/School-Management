@@ -11,8 +11,10 @@ const crypto   = require('crypto');
 const pool     = require('./db');
 const router   = express.Router();
 
-const SCHOOL_JWT_SECRET = process.env.JWT_SECRET        || 'change_me_school';
-const SYSTEM_JWT_SECRET = process.env.SYSTEM_JWT_SECRET || 'change_me_system';
+const SCHOOL_JWT_SECRET = process.env.JWT_SECRET;
+const SYSTEM_JWT_SECRET = process.env.SYSTEM_JWT_SECRET;
+if (!SCHOOL_JWT_SECRET) throw new Error('JWT_SECRET environment variable is required');
+if (!SYSTEM_JWT_SECRET) throw new Error('SYSTEM_JWT_SECRET environment variable is required');
 const TOKEN_EXPIRY      = '8h';
 const SYSTEM_EXPIRY     = '4h';
 

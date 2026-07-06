@@ -14,7 +14,8 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 
-const SYSTEM_JWT_SECRET = process.env.SYSTEM_JWT_SECRET || 'change_me_system';
+const SYSTEM_JWT_SECRET = process.env.SYSTEM_JWT_SECRET;
+if (!SYSTEM_JWT_SECRET) throw new Error('SYSTEM_JWT_SECRET environment variable is required');
 
 // ─────────────────────────────────────────────────────────────
 //  MIDDLEWARE: System Admin Authentication

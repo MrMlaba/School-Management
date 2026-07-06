@@ -14,7 +14,8 @@ const fs      = require('fs');
 const path    = require('path');
 const crypto  = require('crypto');
 
-const TEACHER_JWT_SECRET = process.env.TEACHER_JWT_SECRET || 'change_me_teacher';
+const TEACHER_JWT_SECRET = process.env.TEACHER_JWT_SECRET;
+if (!TEACHER_JWT_SECRET) throw new Error('TEACHER_JWT_SECRET environment variable is required');
 const TOKEN_EXPIRY       = '8h';
 
 // ─────────────────────────────────────────────────────────────────────────────

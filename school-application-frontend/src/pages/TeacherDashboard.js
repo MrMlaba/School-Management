@@ -1721,8 +1721,6 @@ const TeacherDashboard = () => {
     } catch { return ''; }
   })();
 
-  useEffect(() => { if (!sessionStorage.getItem('teacherToken')) navigate('/teacher-login'); }, [navigate]);
-
   const handleLogout = () => {
     ['teacherToken','teacherFirstName','teacherLastName','teacherSchool'].forEach(k=>sessionStorage.removeItem(k));
     navigate('/teacher-login');

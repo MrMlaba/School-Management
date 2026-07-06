@@ -2327,8 +2327,6 @@ const ManagementDashboard = () => {
     } catch { return ''; }
   })();
 
-  useEffect(()=>{ if(!sessionStorage.getItem('adminToken')) navigate('/login'); },[navigate]);
-
   const handleLogout = () => {
     ['adminToken','adminSchool','adminName'].forEach(k=>sessionStorage.removeItem(k));
     navigate('/login');

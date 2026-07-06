@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-route
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Box } from '@mui/material';
 import useMediaQuery from '@mui/material/useMediaQuery';
+import { core, fontFamily } from './theme/tokens';
 
 // ── Public pages ──────────────────────────────────────────────
 import Navbar from './components/Navbar';
@@ -29,6 +30,9 @@ import SystemSchoolsPage  from './pages/system/SystemSchoolsPage';
 import SystemAdminsPage   from './pages/system/SystemAdminsPage';
 import SystemLogsPage     from './pages/system/SystemLogsPage';
 import SystemProtectedRoute from './components/system/SystemProtectedRoute';
+import AdminProtectedRoute from './components/AdminProtectedRoute';
+import TeacherProtectedRoute from './components/TeacherProtectedRoute';
+import StudentProtectedRoute from './components/StudentProtectedRoute';
 import TimetablePage from './pages/TimetablePage';
 import TeacherLoginPage from './pages/TeacherLoginPage';
 import TeacherDashboard from './pages/TeacherDashboard';
@@ -80,23 +84,23 @@ const AppShell = () => {
           <Route path="/apply"               element={<ApplyPage />} />
           <Route path="/login"               element={<LoginPage />} />
           <Route path="/admin-login"         element={<LoginPage />} />
-          <Route path="/admin"               element={<AdminPage />} />
+          <Route path="/admin"               element={<AdminProtectedRoute><AdminPage /></AdminProtectedRoute>} />
           <Route path="/login-applicant"     element={<LoginApplicant />} />
           <Route path="/applicant-dashboard" element={<ApplicantDashboard />} />
-          <Route path="/students"            element={<StudentsPage />} />
-          <Route path="/student-dashboard"   element={<StudentDashboard />} />
+          <Route path="/students"            element={<AdminProtectedRoute><StudentsPage /></AdminProtectedRoute>} />
+          <Route path="/student-dashboard"   element={<StudentProtectedRoute><StudentDashboard /></StudentProtectedRoute>} />
           <Route path="/student-login"       element={<StudentLogin />} />
-          <Route path="/student/change-password" element={<StudentChangePassword />} />
-          <Route path="/assignments/:id"     element={<AssignmentDetail />} />
-          <Route path="/student/timetable"   element={<StudentTimetable />} />  {/* ← ADD */}
-          <Route path="/student/quiz/:id" element={<StudentQuizAttempt />} />
-          <Route path="/classroom-chat/:classId" element={<ClassroomChat />} />
-          <Route path="/setup"               element={<SchoolSetupPage />} />
-          <Route path="/timetable"           element={<TimetablePage />} />
+          <Route path="/student/change-password" element={<StudentProtectedRoute><StudentChangePassword /></StudentProtectedRoute>} />
+          <Route path="/assignments/:id"     element={<StudentProtectedRoute><AssignmentDetail /></StudentProtectedRoute>} />
+          <Route path="/student/timetable"   element={<StudentProtectedRoute><StudentTimetable /></StudentProtectedRoute>} />
+          <Route path="/student/quiz/:id" element={<StudentProtectedRoute><StudentQuizAttempt /></StudentProtectedRoute>} />
+          <Route path="/classroom-chat/:classId" element={<StudentProtectedRoute><ClassroomChat /></StudentProtectedRoute>} />
+          <Route path="/setup"               element={<AdminProtectedRoute><SchoolSetupPage /></AdminProtectedRoute>} />
+          <Route path="/timetable"           element={<AdminProtectedRoute><TimetablePage /></AdminProtectedRoute>} />
           <Route path="/teacher-login"       element={<TeacherLoginPage />} />
-          <Route path="/teacher/dashboard"   element={<TeacherDashboard />} />
-          <Route path="/teacher/gradebook/:classId" element={<TeacherGradebook />} />
-          <Route path="/management"          element={<ManagementDashboard />} />
+          <Route path="/teacher/dashboard"   element={<TeacherProtectedRoute><TeacherDashboard /></TeacherProtectedRoute>} />
+          <Route path="/teacher/gradebook/:classId" element={<TeacherProtectedRoute><TeacherGradebook /></TeacherProtectedRoute>} />
+          <Route path="/management"          element={<AdminProtectedRoute><ManagementDashboard /></AdminProtectedRoute>} />
 
           {/* ── System admin routes ────────────────────────── */}
           <Route path="/system" element={<SystemLoginPage />} />
@@ -123,15 +127,17 @@ function App() {
   const theme = useMemo(() => createTheme({
     palette: {
       mode: 'light',
-      primary:   { main: '#1976d2' },
-      secondary: { main: '#dc004e' },
+      primary:   { main: core.brand, dark: core.brandDark },
+      secondary: { main: core.accent },
+      error:     { main: core.danger },
+      warning:   { main: core.warn },
       background: {
         default: '#ffffff',
         paper:   '#ffffff',
       },
     },
     typography: {
-      fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+      fontFamily: fontFamily.body,
       h1: { fontSize: '2.5rem', '@media (max-width:600px)': { fontSize: '2rem' } },
       h2: { fontSize: '2rem',   '@media (max-width:600px)': { fontSize: '1.75rem' } },
       h3: { fontSize: '1.75rem','@media (max-width:600px)': { fontSize: '1.5rem' } },

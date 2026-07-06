@@ -4,7 +4,8 @@ const jwt     = require('jsonwebtoken');
 const crypto  = require('crypto');
 const pool    = require('../db');
 
-const STUDENT_JWT_SECRET = process.env.STUDENT_JWT_SECRET || 'change_me_student';
+const STUDENT_JWT_SECRET = process.env.STUDENT_JWT_SECRET;
+if (!STUDENT_JWT_SECRET) throw new Error('STUDENT_JWT_SECRET environment variable is required');
 const TOKEN_EXPIRY       = '8h';
 const router             = express.Router();
 
