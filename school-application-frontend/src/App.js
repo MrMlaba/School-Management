@@ -29,6 +29,7 @@ import SystemDashboard    from './pages/system/SystemDashboard';
 import SystemSchoolsPage  from './pages/system/SystemSchoolsPage';
 import SystemAdminsPage   from './pages/system/SystemAdminsPage';
 import SystemLogsPage     from './pages/system/SystemLogsPage';
+import SystemTicketsPage  from './pages/system/SystemTicketsPage';
 import SystemProtectedRoute from './components/system/SystemProtectedRoute';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
 import TeacherProtectedRoute from './components/TeacherProtectedRoute';
@@ -122,6 +123,9 @@ const AppShell = () => {
           } />
           <Route path="/system/logs" element={
             <SystemProtectedRoute><SystemLogsPage /></SystemProtectedRoute>
+          } />
+          <Route path="/system/tickets" element={
+            <SystemProtectedRoute><SystemTicketsPage /></SystemProtectedRoute>
           } />
         </Routes>
       </Box>

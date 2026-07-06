@@ -36,6 +36,7 @@ import AssessmentIcon   from '@mui/icons-material/Assessment';
 import PushPinIcon      from '@mui/icons-material/PushPin';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import RestoreIcon from '@mui/icons-material/Restore';
+import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import SchoolLogoHeader from '../components/SchoolLogoHeader';
 /* ═══════════════════════════════════════════════════════════════
    TOKENS
@@ -2358,6 +2359,182 @@ const ReportsSection = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════════
+   SUPPORT (IT help desk — tickets to the platform's system admin)
+═══════════════════════════════════════════════════════════════ */
+const STATUS_COLORS = {
+  open:        { color: C.link,   bg: '#E3EEFB' },
+  in_progress: { color: C.warn,   bg: C.warnBg },
+  resolved:    { color: C.accent, bg: '#E8F5E9' },
+  closed:      { color: C.muted,  bg: '#F3F4F6' },
+};
+const PRIORITY_COLORS = {
+  low:    { color: C.muted,  bg: '#F3F4F6' },
+  normal: { color: C.link,   bg: '#E3EEFB' },
+  high:   { color: C.warn,   bg: C.warnBg },
+  urgent: { color: C.danger, bg: C.dangerBg },
+};
+
+const SupportSection = () => {
+  const [tickets, setTickets]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [newOpen, setNewOpen]   = useState(false);
+  const [newForm, setNewForm]   = useState({ subject: '', description: '', priority: 'normal' });
+  const [selected, setSelected] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [reply, setReply]       = useState('');
+  const [saving, setSaving]     = useState(false);
+  const [snack, setSnack]       = useState({ open: false, msg: '', sev: 'success' });
+  const toast = toast_(setSnack);
+
+  const fmt = d => new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  const load = useCallback(() => {
+    setLoading(true);
+    fetch(`${BASE}/api/management/support-tickets`, { headers: authH() })
+      .then(r => r.json()).then(d => setTickets(Array.isArray(d) ? d : [])).catch(() => setTickets([])).finally(() => setLoading(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const openTicket = async (id) => {
+    setDetailLoading(true); setSelected({ id });
+    try {
+      const res = await fetch(`${BASE}/api/management/support-tickets/${id}`, { headers: authH() });
+      const d = await res.json();
+      if (res.ok) setSelected(d); else { toast(d.message || 'Failed to load ticket', 'error'); setSelected(null); }
+    } catch { toast('Network error', 'error'); setSelected(null); }
+    setDetailLoading(false);
+  };
+
+  const submitNewTicket = async () => {
+    if (!newForm.subject.trim() || !newForm.description.trim()) { toast('Subject and description are required', 'error'); return; }
+    setSaving(true);
+    try {
+      const res = await fetch(`${BASE}/api/management/support-tickets`, { method: 'POST', headers: jsonH(), body: JSON.stringify(newForm) });
+      const d = await res.json();
+      if (res.ok) { toast('Ticket submitted'); setNewOpen(false); setNewForm({ subject: '', description: '', priority: 'normal' }); load(); }
+      else toast(d.message || 'Failed to submit ticket', 'error');
+    } catch { toast('Network error', 'error'); }
+    setSaving(false);
+  };
+
+  const sendReply = async () => {
+    if (!reply.trim() || !selected) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${BASE}/api/management/support-tickets/${selected.id}/reply`, { method: 'POST', headers: jsonH(), body: JSON.stringify({ message: reply.trim() }) });
+      if (res.ok) { setReply(''); openTicket(selected.id); load(); }
+      else { const d = await res.json(); toast(d.message || 'Failed to send reply', 'error'); }
+    } catch { toast('Network error', 'error'); }
+    setSaving(false);
+  };
+
+  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress sx={{ color: C.brand }} /></Box>;
+
+  return (
+    <Card_ sx={{ p: 2.5 }}>
+      <SectionHead title="Support" subtitle="Get help from your platform's IT support team"
+        action={<Button size="small" variant="contained" startIcon={<AddIcon />} onClick={() => setNewOpen(true)}
+          sx={{ background: C.brand, textTransform: 'none', fontWeight: 700, boxShadow: 'none', fontFamily: "'IBM Plex Sans', sans-serif" }}>
+          New Ticket
+        </Button>}
+      />
+      {tickets.length === 0 ? (
+        <Box sx={{ textAlign: 'center', py: 5 }}>
+          <Typography sx={{ color: C.muted, fontFamily: "'IBM Plex Sans', sans-serif" }}>No support tickets yet. Raise one if you run into an issue.</Typography>
+        </Box>
+      ) : (
+        <TableContainer component={Paper} elevation={0} sx={{ border: `1px solid ${C.border}`, borderRadius: '4px' }}>
+          <Table size="small">
+            <TableHead><TableRow>
+              {['Subject', 'Priority', 'Status', 'Replies', 'Updated'].map(h => <TableCell key={h} sx={hc}>{h}</TableCell>)}
+            </TableRow></TableHead>
+            <TableBody>
+              {tickets.map(t => (
+                <TableRow key={t.id} hover onClick={() => openTicket(t.id)} sx={{ cursor: 'pointer' }}>
+                  <TableCell sx={bc}>{t.subject}</TableCell>
+                  <TableCell sx={bc}><Chip label={t.priority} size="small" sx={{ fontWeight: 700, fontSize: '0.62rem', textTransform: 'capitalize', ...PRIORITY_COLORS[t.priority] }} /></TableCell>
+                  <TableCell sx={bc}><Chip label={t.status.replace('_', ' ')} size="small" sx={{ fontWeight: 700, fontSize: '0.62rem', textTransform: 'capitalize', ...STATUS_COLORS[t.status] }} /></TableCell>
+                  <TableCell sx={bc}>{t.replyCount}</TableCell>
+                  <TableCell sx={{ ...bc, borderRight: 'none' }}>{fmt(t.updatedAt)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      {/* New ticket dialog */}
+      <Dialog open={newOpen} onClose={() => setNewOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: '10px' } }}>
+        <DialogTitle sx={{ fontWeight: 700, color: C.brand, fontFamily: "'IBM Plex Sans', sans-serif" }}>New Support Ticket</DialogTitle>
+        <Divider />
+        <DialogContent sx={{ pt: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <TextField label="Subject" value={newForm.subject} onChange={e => setNewForm(f => ({ ...f, subject: e.target.value }))} size="small" fullWidth />
+          <TextField label="Priority" select value={newForm.priority} onChange={e => setNewForm(f => ({ ...f, priority: e.target.value }))} size="small" fullWidth>
+            {['low', 'normal', 'high', 'urgent'].map(p => <MenuItem key={p} value={p} sx={{ textTransform: 'capitalize' }}>{p}</MenuItem>)}
+          </TextField>
+          <TextField label="Describe the issue" value={newForm.description} onChange={e => setNewForm(f => ({ ...f, description: e.target.value }))} size="small" fullWidth multiline minRows={4} />
+        </DialogContent>
+        <Divider />
+        <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+          <Button onClick={() => setNewOpen(false)} sx={{ textTransform: 'none', color: C.muted }}>Cancel</Button>
+          <Button variant="contained" disabled={saving} onClick={submitNewTicket} sx={{ background: C.brand, textTransform: 'none', fontWeight: 700, boxShadow: 'none', fontFamily: "'IBM Plex Sans', sans-serif" }}>
+            {saving ? 'Submitting…' : 'Submit Ticket'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Ticket detail dialog */}
+      <Dialog open={!!selected} onClose={() => setSelected(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: '10px' } }}>
+        {(detailLoading || !selected?.description) ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress sx={{ color: C.brand }} /></Box>
+        ) : (
+          <>
+            <DialogTitle sx={{ fontWeight: 700, color: C.brand, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+              {selected.subject}
+              <Box sx={{ mt: 0.5 }}>
+                <Chip label={selected.status.replace('_', ' ')} size="small" sx={{ fontWeight: 700, fontSize: '0.62rem', textTransform: 'capitalize', mr: 1, ...STATUS_COLORS[selected.status] }} />
+                <Chip label={selected.priority} size="small" sx={{ fontWeight: 700, fontSize: '0.62rem', textTransform: 'capitalize', ...PRIORITY_COLORS[selected.priority] }} />
+              </Box>
+            </DialogTitle>
+            <Divider />
+            <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2.5 }}>
+              <Box sx={{ p: 1.5, background: C.bg, borderRadius: '6px', border: `1px solid ${C.border}` }}>
+                <Typography sx={{ fontSize: '0.8rem', color: C.text, whiteSpace: 'pre-wrap', fontFamily: "'IBM Plex Sans', sans-serif" }}>{selected.description}</Typography>
+              </Box>
+              <Box sx={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                {selected.replies?.map(r => (
+                  <Box key={r.id} sx={{
+                    alignSelf: r.authorRole === 'school_admin' ? 'flex-end' : 'flex-start', maxWidth: '85%',
+                    background: r.authorRole === 'school_admin' ? C.brand : '#F3F4F6', color: r.authorRole === 'school_admin' ? '#fff' : C.text,
+                    borderRadius: '8px', px: 1.5, py: 1,
+                  }}>
+                    <Typography sx={{ fontSize: '0.62rem', fontWeight: 700, opacity: 0.75, mb: 0.3, fontFamily: "'IBM Plex Sans', sans-serif" }}>{r.author} · {fmt(r.createdAt)}</Typography>
+                    <Typography sx={{ fontSize: '0.78rem', whiteSpace: 'pre-wrap', fontFamily: "'IBM Plex Sans', sans-serif" }}>{r.message}</Typography>
+                  </Box>
+                ))}
+                {(!selected.replies || selected.replies.length === 0) && (
+                  <Typography sx={{ fontSize: '0.72rem', color: C.muted, textAlign: 'center', py: 1, fontFamily: "'IBM Plex Sans', sans-serif" }}>No replies yet.</Typography>
+                )}
+              </Box>
+              <TextField multiline minRows={2} placeholder="Reply…" value={reply} onChange={e => setReply(e.target.value)} size="small" fullWidth />
+            </DialogContent>
+            <Divider />
+            <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+              <Button onClick={() => setSelected(null)} sx={{ textTransform: 'none', color: C.muted }}>Close</Button>
+              <Button variant="contained" disabled={saving || !reply.trim()} onClick={sendReply} sx={{ background: C.brand, textTransform: 'none', fontWeight: 700, boxShadow: 'none', fontFamily: "'IBM Plex Sans', sans-serif" }}>
+                {saving ? 'Sending…' : 'Send Reply'}
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
+
+      <Snack_ snack={snack} onClose={() => setSnack(s => ({ ...s, open: false }))} />
+    </Card_>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
    NAV + ROOT
 ═══════════════════════════════════════════════════════════════ */
 const NAV = [
@@ -2369,6 +2546,7 @@ const NAV = [
   {key:'events',   label:'Events',        icon:<EventIcon sx={{fontSize:19}}/> },
   {key:'announcements', label:'Announcements', icon:<CampaignIcon sx={{fontSize:19}}/> },
   {key:'reports',  label:'Reports',       icon:<AssessmentIcon sx={{fontSize:19}}/> },
+  {key:'support',  label:'Support',       icon:<SupportAgentIcon sx={{fontSize:19}}/> },
 ];
 
 // Top dark menu bar groups → jump to a representative section
@@ -2485,6 +2663,7 @@ const ManagementDashboard = () => {
         {active==='announcements'  && <AnnouncementsSection/>}
         {active==='reports'        && <ReportsSection/>}
         {active==='setup'          && <SetupSection/>}
+        {active==='support'        && <SupportSection/>}
       </Box>
 
       {/* ── Bottom icon dock ── */}

@@ -15,6 +15,7 @@ const { router: authRouter, requireSchoolAdmin, requireSystemAdmin, logAudit, sc
 const { router: teacherRouter, requireTeacher, login: teacherLogin, setTeacherCredentials } = require('./routes/teacherRoutes');
 const { setStudentCredentials, resetStudentPassword, bulkGenerate, studentLogin, studentChangePassword, requireStudent } = require('./routes/studentAuth');
 const { requireParent, resetParentCredentials, parentLogin, parentChangePassword } = require('./routes/parentAuth');
+const { schoolAdminTicketsRouter, systemAdminTicketsRouter } = require('./routes/supportRoutes');
 const { router: systemRouter, requireSystemAdmin: requireSystemAdminFromSystem } = require('./routes/systemRoutes');
 const managementRoutes = require('./routes/managementRoutes');
 const phase2Routes     = require('./routes/phase2Routes');
@@ -80,11 +81,66 @@ app.use(authRouter);
 
 // ─── System Admin Routes ──────────────────────────────────────────────────────
 app.use('/api/system', systemRouter);
+app.use('/api/system', requireSystemAdmin, systemAdminTicketsRouter);
+
+// GET /api/system/health — real infrastructure status, not app-level stats.
+// Pings the database directly rather than trusting the pool's last-known state,
+// so a genuinely down DB shows up even if no query has been attempted recently.
+app.get('/api/system/health', requireSystemAdmin, async (req, res) => {
+  const start = Date.now();
+  let dbConnected = false;
+  let dbLatencyMs = null;
+  try {
+    await pool.query('SELECT 1');
+    dbConnected = true;
+    dbLatencyMs = Date.now() - start;
+  } catch {}
+
+  let errors24h = null;
+  if (dbConnected) {
+    try {
+      const { rows } = await pool.query(
+        `SELECT COUNT(*) AS count FROM system_errors WHERE created_at > NOW() - INTERVAL '24 hours'`
+      );
+      errors24h = Number(rows[0].count);
+    } catch {}
+  }
+
+  res.json({
+    status: dbConnected ? 'operational' : 'degraded',
+    database: { connected: dbConnected, latencyMs: dbLatencyMs },
+    server: {
+      uptimeSeconds: Math.round(process.uptime()),
+      nodeVersion:   process.version,
+      memoryMb:      Math.round(process.memoryUsage().rss / 1024 / 1024),
+    },
+    errors24h,
+    checkedAt: new Date().toISOString(),
+  });
+});
+
+// GET /api/system/errors — recent unhandled server errors, for the health panel.
+// Only unhandled/crash-level errors land here (see the global error handler near
+// the bottom of this file) — routes that already return their own 4xx/5xx via
+// try/catch are working as designed and aren't "errors" in this sense.
+app.get('/api/system/errors', requireSystemAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, method, path, message, created_at AS "createdAt"
+       FROM system_errors ORDER BY created_at DESC LIMIT 50`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[system errors list]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/management', requireSchoolAdmin, managementRoutes);
 app.use('/api/setup',      requireSchoolAdmin, phase2Routes);
 app.use('/api/management', requireSchoolAdmin, phase3Routes);
+app.use('/api/management', requireSchoolAdmin, schoolAdminTicketsRouter);
 
 app.post('/api/admin-login', schoolAdminLoginLimiter, async (req, res) => {
   const { username, password } = req.body;
@@ -1334,6 +1390,46 @@ async function ensureTables() {
     console.warn('Migration note (reference_code):', err.message);
   }
 
+  // support_tickets / support_ticket_replies — the school-admin ↔ system-admin
+  // helpdesk. school_id ties a ticket to the reporting school; replies carry
+  // author_role so the UI can tell provider responses from the school's own.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS support_tickets (
+      id                  SERIAL PRIMARY KEY,
+      school_id           INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      created_by_admin_id INTEGER REFERENCES school_admins(id),
+      subject             VARCHAR(200) NOT NULL,
+      description         TEXT NOT NULL,
+      priority            VARCHAR(20) NOT NULL DEFAULT 'normal',
+      status              VARCHAR(20) NOT NULL DEFAULT 'open',
+      created_at          TIMESTAMPTZ DEFAULT NOW(),
+      updated_at          TIMESTAMPTZ DEFAULT NOW(),
+      resolved_at         TIMESTAMPTZ
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS support_ticket_replies (
+      id          SERIAL PRIMARY KEY,
+      ticket_id   INTEGER NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+      author      VARCHAR(200) NOT NULL,
+      author_role VARCHAR(20)  NOT NULL,
+      message     TEXT NOT NULL,
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  // system_errors — populated by the global error handler; backs /api/system/health
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS system_errors (
+      id         SERIAL PRIMARY KEY,
+      method     VARCHAR(10),
+      path       TEXT,
+      message    TEXT,
+      stack      TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
   // term_weights — per (class, subject, term) split between assignment marks and exam marks
   // used by the report-card calculator to compute each subject's final percentage
   await pool.query(`
@@ -1352,6 +1448,20 @@ async function ensureTables() {
 
   console.log('✅ All tables verified');
 }
+
+// ─── Global error handler — must be registered after all routes ─────────────
+// Catches anything passed to next(err) or thrown in middleware and logs it to
+// system_errors so /api/system/health has a real signal to report on. Routes
+// that already catch their own errors and return a 4xx/5xx never reach this.
+app.use((err, req, res, next) => {
+  console.error('[unhandled error]', err);
+  pool.query(
+    'INSERT INTO system_errors (method, path, message, stack) VALUES ($1,$2,$3,$4)',
+    [req.method, req.originalUrl, err.message, err.stack]
+  ).catch(() => {});
+  if (res.headersSent) return next(err);
+  res.status(500).json({ message: 'Server error' });
+});
 
 // Listen immediately — Railway needs fast response
 app.listen(PORT, '0.0.0.0', () => console.log(`Backend running on http://localhost:${PORT}`));

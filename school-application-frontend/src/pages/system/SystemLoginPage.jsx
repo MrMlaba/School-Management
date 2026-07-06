@@ -2,16 +2,17 @@
 import { useNavigate } from 'react-router-dom';
 import {
   Box, TextField, Button, Typography, CircularProgress,
-  InputAdornment, IconButton, GlobalStyles,
+  InputAdornment, IconButton,
 } from '@mui/material';
 import API_BASE from '../../config';
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import VisibilityIcon     from '@mui/icons-material/Visibility';
 import VisibilityOffIcon  from '@mui/icons-material/VisibilityOff';
+import { core } from '../../theme/tokens';
 
 // ── Constants defined OUTSIDE component — never recreated on render ───────────
 const FONT = "'IBM Plex Sans', sans-serif";
-const BLUE = '#38bdf8';
+const BLUE = core.brand; // matches the system-admin dashboard's accent
 
 // fieldSx defined outside — stable object, never triggers unnecessary re-renders
 const fieldSx = {
@@ -35,13 +36,6 @@ const fieldSx = {
   '& .MuiInputLabel-root.Mui-focused':{ color: BLUE },
   '& .MuiFormHelperText-root':        { fontFamily: FONT, fontSize: '0.72rem', ml: 0 },
 };
-
-// ── Font import via GlobalStyles — injected once, never on re-render ──────────
-// Using <style> tags inside a component re-injects on every keystroke,
-// causing browser reflow that steals input focus. GlobalStyles avoids this.
-const FontImport = () => (
-  <GlobalStyles styles="@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');" />
-);
 
 // ── Component ─────────────────────────────────────────────────────────────────
 const SystemLoginPage = () => {
@@ -86,17 +80,14 @@ const SystemLoginPage = () => {
   };
 
   return (
-    <>
-      <FontImport />
-
       <Box sx={{
         minHeight: '100vh',
         bgcolor: '#0f172a',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         px: 2,
         backgroundImage: `
-          linear-gradient(rgba(56,189,248,0.04) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(56,189,248,0.04) 1px, transparent 1px)
+          linear-gradient(rgba(26,53,87,0.06) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(26,53,87,0.06) 1px, transparent 1px)
         `,
         backgroundSize: '40px 40px',
       }}>
@@ -119,7 +110,7 @@ const SystemLoginPage = () => {
               bgcolor: BLUE, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <ShieldOutlinedIcon sx={{ fontSize: 20, color: '#000' }} />
+              <ShieldOutlinedIcon sx={{ fontSize: 20, color: '#fff' }} />
             </Box>
             <Box>
               <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '0.95rem', color: '#fff' }}>
@@ -184,11 +175,11 @@ const SystemLoginPage = () => {
               sx={{
                 fontFamily: FONT, fontWeight: 700, fontSize: '0.9rem',
                 textTransform: 'none', py: 1.1, borderRadius: '7px',
-                bgcolor: BLUE, color: '#000', boxShadow: 'none',
-                '&:hover':    { bgcolor: '#7dd3fc', boxShadow: 'none' },
+                bgcolor: BLUE, color: '#fff', boxShadow: 'none',
+                '&:hover':    { bgcolor: core.brandDark, boxShadow: 'none' },
                 '&:disabled': { bgcolor: '#e2e8f0', color: '#94a3b8' },
               }}>
-              {loading ? <CircularProgress size={18} sx={{ color: '#000' }} /> : 'Sign In'}
+              {loading ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : 'Sign In'}
             </Button>
 
             <Typography sx={{
@@ -200,7 +191,6 @@ const SystemLoginPage = () => {
           </Box>
         </Box>
       </Box>
-    </>
   );
 };
 
