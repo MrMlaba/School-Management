@@ -210,6 +210,7 @@ export default function LoginApplicant() {
               {[
                 { label: 'Apply to a school',   sub: 'Start a new application',   path: '/' },
                 { label: 'Student Portal',      sub: 'Sign in as a student',       path: '/student-login' },
+                { label: 'Parent Portal',       sub: 'Sign in as a parent',        path: '/parent-login' },
                 { label: 'Teacher / Admin',     sub: 'Staff portal access',        path: '/login' },
               ].map(link => (
                 <Box key={link.path} onClick={() => navigate(link.path)} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, borderRadius: '8px', cursor: 'pointer', border: `1px solid ${B.border}`, bgcolor: B.white, transition: 'all 0.15s', '&:hover': { borderColor: B.accent, bgcolor: B.brandLt } }}>

@@ -123,6 +123,7 @@ export default function LoginPage() {
           {[
             { label: 'Teacher Portal',            sub: 'Sign in as a teacher',          path: '/teacher-login' },
             { label: 'Student Portal',            sub: 'Sign in as a student',          path: '/student-login' },
+            { label: 'Parent Portal',              sub: 'Sign in as a parent',           path: '/parent-login' },
             { label: 'Check Application Status',  sub: 'Track your school application', path: '/login-applicant' },
           ].map(link => (
             <Box
