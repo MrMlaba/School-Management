@@ -14,6 +14,7 @@ const pool = require('./db');
 const { router: authRouter, requireSchoolAdmin, requireSystemAdmin, logAudit, schoolAdminSelfReset } = require('./auth');
 const { router: teacherRouter, requireTeacher, login: teacherLogin, setTeacherCredentials } = require('./routes/teacherRoutes');
 const { setStudentCredentials, resetStudentPassword, bulkGenerate, studentLogin, studentChangePassword, requireStudent } = require('./routes/studentAuth');
+const { requireParent, resetParentCredentials, parentLogin, parentChangePassword } = require('./routes/parentAuth');
 const { router: systemRouter, requireSystemAdmin: requireSystemAdminFromSystem } = require('./routes/systemRoutes');
 const managementRoutes = require('./routes/managementRoutes');
 const phase2Routes     = require('./routes/phase2Routes');
@@ -70,8 +71,11 @@ const studentLoginLimiter     = rateLimit({ windowMs: 15*60*1000, max: 15, skipS
 const teacherLoginLimiter     = rateLimit({ windowMs: 15*60*1000, max: 10, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { success: false, message: 'Too many login attempts. Try again in 15 minutes.' } });
 const schoolAdminLoginLimiter = rateLimit({ windowMs: 30*60*1000, max:  8, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { success: false, message: 'Too many login attempts. Try again in 30 minutes.' } });
 const systemAdminLoginLimiter = rateLimit({ windowMs: 60*60*1000, max:  5, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { success: false, message: 'Too many login attempts. Try again in 60 minutes.' } });
+const applicantLookupLimiter  = rateLimit({ windowMs: 15*60*1000, max: 20, standardHeaders: true, legacyHeaders: false, message: { success: false, message: 'Too many lookup attempts. Try again in 15 minutes.' } });
+const parentLoginLimiter      = rateLimit({ windowMs: 15*60*1000, max: 10, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { success: false, message: 'Too many login attempts. Try again in 15 minutes.' } });
 
 app.use('/api/system/login', systemAdminLoginLimiter);
+app.use('/api/applicant-applications', applicantLookupLimiter);
 app.use(authRouter);
 
 // ─── System Admin Routes ──────────────────────────────────────────────────────
@@ -115,6 +119,7 @@ app.post('/api/admin-login', schoolAdminLoginLimiter, async (req, res) => {
 
 app.post('/api/teacher-login', teacherLoginLimiter, teacherLogin);
 app.post('/api/student-login', studentLoginLimiter, studentLogin);
+app.post('/api/parent-login',  parentLoginLimiter,  parentLogin);
 
 app.use('/api/teacher', requireTeacher, teacherRouter);
 app.post('/api/management/teachers/:id/set-credentials', requireSchoolAdmin, setTeacherCredentials);
@@ -123,6 +128,8 @@ app.post('/api/management/students/:id/set-credentials', requireSchoolAdmin, set
 app.post('/api/management/students/generate-credentials',requireSchoolAdmin, bulkGenerate);
 app.post('/api/management/students/:id/reset-password',  requireSchoolAdmin, resetStudentPassword);
 app.post('/api/admin/change-password',                   requireSchoolAdmin, schoolAdminSelfReset);
+app.post('/api/parent/change-password',                  requireParent,      parentChangePassword);
+app.post('/api/management/parents/:id/reset-password',   requireSchoolAdmin, resetParentCredentials);
 
 app.post('/api/management/teachers/:id/reset-password', requireSchoolAdmin, async (req, res) => {
   const schoolId  = req.admin.schoolId;
@@ -238,14 +245,15 @@ const requireAnyAuth = (req, res, next) => {
   if (!header || !header.startsWith('Bearer '))
     return res.status(401).json({ message: 'No token provided' });
   const token = header.slice(7);
-  // These four env vars are guaranteed set — the modules that own them
-  // (auth.js, studentAuth.js, teacherRoutes.js, systemRoutes.js) throw at
-  // require()-time, which happens before this handler can ever run.
+  // These env vars are guaranteed set — the modules that own them
+  // (auth.js, studentAuth.js, teacherRoutes.js, systemRoutes.js, parentAuth.js)
+  // throw at require()-time, which happens before this handler can ever run.
   const secrets = [
     process.env.JWT_SECRET,
     process.env.STUDENT_JWT_SECRET,
     process.env.TEACHER_JWT_SECRET,
     process.env.SYSTEM_JWT_SECRET,
+    process.env.PARENT_JWT_SECRET,
   ];
   for (const secret of secrets) {
     try { jwt.verify(token, secret); return next(); } catch {}
@@ -541,6 +549,83 @@ app.post('/api/assignments/:id/submit', requireStudent, upload.single('file'), a
   }
 });
 
+// ─── Parent endpoints ─────────────────────────────────────────────────────────
+app.get('/api/parent/children', requireParent, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT es.id, es.student_number AS "studentNumber", es.first_name AS "firstName",
+              es.last_name AS "lastName", es.grade, es.stream
+       FROM student_parents sp
+       JOIN enrolled_students es ON es.id = sp.student_id
+       WHERE sp.parent_id = $1 AND es.school_id = $2 AND es.is_active = true
+       ORDER BY es.first_name`,
+      [req.parent.id, req.parent.schoolId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[parent children]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Confirms the requesting parent is actually linked to this student before
+// returning anything for them — otherwise a parent could read any student's
+// records just by changing the studentId in the URL.
+async function assertParentChild(parentId, studentId) {
+  const { rows } = await pool.query(
+    'SELECT 1 FROM student_parents WHERE parent_id = $1 AND student_id = $2',
+    [parentId, studentId]
+  );
+  return rows.length > 0;
+}
+
+app.get('/api/parent/children/:studentId/attendance', requireParent, async (req, res) => {
+  const { studentId } = req.params;
+  try {
+    if (!(await assertParentChild(req.parent.id, studentId)))
+      return res.status(403).json({ message: 'Not linked to this student' });
+    const { rows } = await pool.query(
+      `SELECT date, status, note
+       FROM attendance
+       WHERE student_id = $1 AND school_id = $2
+       ORDER BY date DESC LIMIT 90`,
+      [studentId, req.parent.schoolId]
+    );
+    const total   = rows.length;
+    const present = rows.filter(r => ['present', 'late'].includes(r.status)).length;
+    res.json({
+      records: rows,
+      summary: { total, present, percentage: total ? Math.round((present / total) * 100) : null },
+    });
+  } catch (err) {
+    console.error('[parent child attendance]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.get('/api/parent/children/:studentId/results', requireParent, async (req, res) => {
+  const { studentId } = req.params;
+  try {
+    if (!(await assertParentChild(req.parent.id, studentId)))
+      return res.status(403).json({ message: 'Not linked to this student' });
+    const { rows } = await pool.query(
+      `SELECT r.id, r.marks_obtained AS "marksObtained", r.percentage, r.captured_at AS "capturedAt",
+              e.id AS "examId", e.title AS "examTitle", e.exam_date AS "examDate",
+              e.total_marks AS "totalMarks", e.type, ss.name AS "subjectName"
+       FROM results r
+       JOIN exams e ON e.id = r.exam_id
+       JOIN school_subjects ss ON ss.id = e.subject_id
+       WHERE r.student_id = $1 AND r.school_id = $2
+       ORDER BY r.captured_at DESC`,
+      [studentId, req.parent.schoolId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[parent child results]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // ─── Gradebook endpoints ──────────────────────────────────────────────────────
 app.post('/api/assessments', requireTeacher, async (req, res) => {
   try {
@@ -674,7 +759,8 @@ async function sendStatusEmail(to, applicantName, school, status) {
 // ─── DB row → camelCase mapper ────────────────────────────────────────────────
 function toApp(row) {
   return {
-    id: row.id, nationalId: row.national_id, firstName: row.first_name, lastName: row.last_name,
+    id: row.id, referenceCode: row.reference_code,
+    nationalId: row.national_id, firstName: row.first_name, lastName: row.last_name,
     dateOfBirth: row.date_of_birth, gender: row.gender, email: row.email, phone: row.phone,
     address: row.address, city: row.city, parentName: row.parent_name, parentPhone: row.parent_phone,
     parentEmail: row.parent_email, parentOccupation: row.parent_occupation, relationship: row.relationship,
@@ -684,6 +770,14 @@ function toApp(row) {
     requiredDocuments: row.required_documents, status: row.status, comment: row.comment,
     submittedAt: row.submitted_at, updatedAt: row.updated_at,
   };
+}
+
+// Public-facing lookup key for /api/applicant-applications. Deliberately NOT the
+// sequential primary key — that would let anyone enumerate every application in
+// the system by counting 1, 2, 3... This is random enough that guessing one is
+// infeasible, so it's safe to hand out without pairing it with a national ID.
+function generateReferenceCode() {
+  return crypto.randomBytes(6).toString('hex').toUpperCase();
 }
 
 // ─── School Admin Login ───────────────────────────────────────────────────────
@@ -861,9 +955,9 @@ app.post('/api/applications', upload.array('documents', 10), async (req, res) =>
     const insertedApps = [];
     for (const school of schools) {
       const { rows } = await pool.query(
-        `INSERT INTO applications (national_id,first_name,last_name,date_of_birth,gender,email,phone,address,city,parent_name,parent_phone,parent_email,parent_occupation,relationship,school,grade,subject,previous_school,achievements,why_attend,emergency_contact,emergency_phone,documents,document_count,required_documents,status,comment,submitted_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,'pending','',$26) RETURNING *`,
-        [nationalId,firstName,lastName,dateOfBirth||null,gender,email,phone,address,city,parentName,parentPhone,parentEmail,parentOccupation,relationship,school,grade,subject||null,previousSchool,achievements,whyAttend,emergencyContact||null,emergencyPhone||null,JSON.stringify(uploadedTypes),documents.length,JSON.stringify(requiredDocuments),new Date().toISOString()]
+        `INSERT INTO applications (national_id,first_name,last_name,date_of_birth,gender,email,phone,address,city,parent_name,parent_phone,parent_email,parent_occupation,relationship,school,grade,subject,previous_school,achievements,why_attend,emergency_contact,emergency_phone,documents,document_count,required_documents,status,comment,submitted_at,reference_code)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,'pending','',$26,$27) RETURNING *`,
+        [nationalId,firstName,lastName,dateOfBirth||null,gender,email,phone,address,city,parentName,parentPhone,parentEmail,parentOccupation,relationship,school,grade,subject||null,previousSchool,achievements,whyAttend,emergencyContact||null,emergencyPhone||null,JSON.stringify(uploadedTypes),documents.length,JSON.stringify(requiredDocuments),new Date().toISOString(),generateReferenceCode()]
       );
       insertedApps.push(toApp(rows[0]));
     }
@@ -892,7 +986,10 @@ app.get('/api/applicant-applications', async (req, res) => {
       return res.json(rows.map(toApp));
     }
     if (applicationId) {
-      const { rows } = await pool.query('SELECT * FROM applications WHERE id = $1', [applicationId]);
+      // Looked up by the opaque reference_code, NOT the sequential id — the id
+      // is trivially enumerable (1, 2, 3...) and would otherwise let anyone
+      // pull any applicant's full record (address, parent contact, documents).
+      const { rows } = await pool.query('SELECT * FROM applications WHERE reference_code = $1', [applicationId]);
       return res.json(rows.map(toApp));
     }
     res.status(400).json({ success: false, message: 'nationalId or applicationId required' });
@@ -1209,6 +1306,32 @@ async function ensureTables() {
     try { await pool.query(col); } catch (err) {
       console.warn('Migration note:', err.message);
     }
+  }
+
+  // Parent portal login — parents rows are created during enrollment with only
+  // contact info (see managementRoutes.js), so credentials are added on top here.
+  for (const col of [
+    `ALTER TABLE parents ADD COLUMN IF NOT EXISTS username VARCHAR(50) UNIQUE`,
+    `ALTER TABLE parents ADD COLUMN IF NOT EXISTS password_hash TEXT`,
+    `ALTER TABLE parents ADD COLUMN IF NOT EXISTS temp_password_flag BOOLEAN DEFAULT true`,
+    `ALTER TABLE parents ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ`,
+  ]) {
+    try { await pool.query(col); } catch (err) {
+      console.warn('Migration note (parents auth):', err.message);
+    }
+  }
+
+  // Opaque public reference code for applications — see generateReferenceCode().
+  // Backfills any rows submitted before this column existed.
+  try {
+    await pool.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS reference_code VARCHAR(20)`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS applications_reference_code_idx ON applications(reference_code) WHERE reference_code IS NOT NULL`);
+    const { rows: missingCodes } = await pool.query(`SELECT id FROM applications WHERE reference_code IS NULL`);
+    for (const { id } of missingCodes) {
+      await pool.query(`UPDATE applications SET reference_code = $1 WHERE id = $2`, [generateReferenceCode(), id]);
+    }
+  } catch (err) {
+    console.warn('Migration note (reference_code):', err.message);
   }
 
   // term_weights — per (class, subject, term) split between assignment marks and exam marks

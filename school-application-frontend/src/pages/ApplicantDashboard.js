@@ -296,7 +296,7 @@ const ApplicantDashboard = () => {
                       <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography sx={{ fontSize: 12, color: C.slateLight }}>Application ID</Typography>
                         <Typography sx={{ fontSize: 12, fontWeight: 600, color: C.navy, fontFamily: 'monospace' }}>
-                          {app.id}
+                          {app.referenceCode || app.id}
                         </Typography>
                       </Box>
                     </Box>

@@ -415,6 +415,8 @@ const StudentsSection = () => {
   const [bulkDialog, setBulkDialog] = useState(null);
   const [resetStudentDialog, setResetStudentDialog] = useState(null);   // student being reset
   const [resetStudentResult, setResetStudentResult] = useState(null);
+  const [parentCredDialog, setParentCredDialog] = useState(null);   // parent being issued a login
+  const [parentCredResult, setParentCredResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const [snack, setSnack] = useState({ open: false, msg: '', sev: 'success' });
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -560,6 +562,27 @@ const StudentsSection = () => {
               <FormRow label="Login">
                 <Chip label={selectedStudent.passwordHash?'Set':'Not set'} size="small" sx={{fontWeight:700,fontSize:'0.62rem',bgcolor:selectedStudent.passwordHash?'#f2f2f2':'#f7f7f7',color:selectedStudent.passwordHash?'#3f3f3f':C.danger}}/>
               </FormRow>
+              <FormRow label="Parents">
+                {selectedStudent.parents?.length ? (
+                  <Box sx={{display:'flex',flexDirection:'column',gap:0.75}}>
+                    {selectedStudent.parents.map(p=>(
+                      <Box key={p.id} sx={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:1}}>
+                        <Box>
+                          <Typography sx={{fontSize:'0.75rem',fontWeight:600}}>{p.firstName} {p.lastName}</Typography>
+                          <Typography sx={{fontSize:'0.68rem',color:C.muted}}>{p.relationship||'Guardian'}{p.phone?` · ${p.phone}`:''}</Typography>
+                        </Box>
+                        <Button size="small" startIcon={<KeyIcon sx={{fontSize:14}}/>}
+                          onClick={()=>{setParentCredDialog(p);setParentCredResult(null);}}
+                          sx={{textTransform:'none',fontSize:'0.68rem',fontWeight:700,color:C.brand,whiteSpace:'nowrap'}}>
+                          Generate Login
+                        </Button>
+                      </Box>
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography sx={{fontSize:'0.75rem',color:C.muted}}>No parent/guardian on file.</Typography>
+                )}
+              </FormRow>
               <Box sx={{display:'flex',gap:1,mt:2,pt:2,borderTop:`1px solid ${C.border}`}}>
                 <Button size="small" variant="outlined" startIcon={<KeyIcon sx={{fontSize:15}}/>}
                   onClick={()=>{setCredDialogStudent(selectedStudent);setStudentCred({password:''});}}
@@ -602,6 +625,49 @@ const StudentsSection = () => {
           }} disabled={saving} sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>
             {saving?'Saving…':'Set Credentials'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Parent portal login dialog */}
+      <Dialog open={!!parentCredDialog} onClose={()=>{setParentCredDialog(null);setParentCredResult(null);}} maxWidth="xs" fullWidth PaperProps={{sx:{borderRadius:'10px'}}}>
+        <DialogTitle sx={{fontWeight:700,color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+          Parent Portal Login — {parentCredDialog?.firstName} {parentCredDialog?.lastName}
+        </DialogTitle>
+        <Divider/>
+        <DialogContent sx={{pt:2.5,display:'flex',flexDirection:'column',gap:2}}>
+          {parentCredResult ? (
+            <>
+              <InfoBanner color={C.accent} bg="#E8F5E9" border="#A5D6A7">
+                Write this down now — the password will not be shown again.
+              </InfoBanner>
+              <FormRow label="Username"><Typography sx={{fontFamily:'monospace',fontWeight:700}}>{parentCredResult.username}</Typography></FormRow>
+              <FormRow label="Temp Password"><Typography sx={{fontFamily:'monospace',fontWeight:700,color:C.danger}}>{parentCredResult.tempPassword}</Typography></FormRow>
+            </>
+          ) : (
+            <InfoBanner>This generates a new login for this parent on the Parent Portal. Any previous password for this parent will stop working.</InfoBanner>
+          )}
+        </DialogContent>
+        <Divider/>
+        <DialogActions sx={{px:3,py:2,gap:1}}>
+          {parentCredResult ? (
+            <Button onClick={()=>{setParentCredDialog(null);setParentCredResult(null);}} sx={{textTransform:'none'}}>Done</Button>
+          ) : (
+            <>
+              <Button onClick={()=>setParentCredDialog(null)} sx={{textTransform:'none',color:C.muted}}>Cancel</Button>
+              <Button variant="contained" disabled={saving} onClick={async()=>{
+                setSaving(true);
+                try{
+                  const res = await fetch(`${BASE}/api/management/parents/${parentCredDialog.id}/reset-password`, { method:'POST', headers: authH() });
+                  const d = await res.json();
+                  if(res.ok){ setParentCredResult(d); }
+                  else toast(d.message||'Failed','error');
+                }catch(e){ toast('Network error','error'); }
+                setSaving(false);
+              }} sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>
+                {saving?'Working…':'Generate Login'}
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
 

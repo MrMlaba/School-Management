@@ -38,6 +38,9 @@ import TeacherLoginPage from './pages/TeacherLoginPage';
 import TeacherDashboard from './pages/TeacherDashboard';
 import TeacherGradebook from './pages/TeacherGradebook';
 import ManagementDashboard from './pages/ManagementDashboard';
+import ParentLoginPage from './pages/ParentLoginPage';
+import ParentDashboard from './pages/ParentDashboard';
+import ParentProtectedRoute from './components/ParentProtectedRoute';
 
 
 // ── Wrapper: hides public Navbar on /system/* routes ─────────
@@ -51,7 +54,8 @@ const AppShell = () => {
   || location.pathname.startsWith('/assignments')
   || location.pathname.startsWith('/student/timetable')   // ← ADD: hide navbar on assignment detail
   || location.pathname.startsWith('/student/quiz')
-  || location.pathname.startsWith('/classroom-chat');
+  || location.pathname.startsWith('/classroom-chat')
+  || location.pathname.startsWith('/parent/dashboard');
   // Navbar is position:"absolute" so it floats on top of the Home hero image on purpose.
   // Every other page has no hero to bleed behind it, so it must reserve the navbar's height
   // as top padding or the navbar covers that page's own header content.
@@ -101,6 +105,8 @@ const AppShell = () => {
           <Route path="/teacher/dashboard"   element={<TeacherProtectedRoute><TeacherDashboard /></TeacherProtectedRoute>} />
           <Route path="/teacher/gradebook/:classId" element={<TeacherProtectedRoute><TeacherGradebook /></TeacherProtectedRoute>} />
           <Route path="/management"          element={<AdminProtectedRoute><ManagementDashboard /></AdminProtectedRoute>} />
+          <Route path="/parent-login"        element={<ParentLoginPage />} />
+          <Route path="/parent/dashboard"    element={<ParentProtectedRoute><ParentDashboard /></ParentProtectedRoute>} />
 
           {/* ── System admin routes ────────────────────────── */}
           <Route path="/system" element={<SystemLoginPage />} />
