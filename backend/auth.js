@@ -64,11 +64,12 @@ router.post('/api/system/login', async (req, res) => {
     return res.status(400).json({ error: 'Username and password required' });
   try {
     const result = await pool.query(
-      'SELECT id, username, password_hash FROM system_admin WHERE username = $1',
+      'SELECT id, username, password_hash, is_active FROM system_admin WHERE username = $1',
       [username]
     );
     const sys = result.rows[0];
     if (!sys) return res.status(401).json({ error: 'Invalid credentials' });
+    if (sys.is_active === false) return res.status(403).json({ error: 'Account suspended.' });
     const valid = await bcrypt.compare(password, sys.password_hash);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
     await pool.query('UPDATE system_admin SET last_login = NOW() WHERE id = $1', [sys.id]);
@@ -90,7 +91,8 @@ router.get('/api/system/admins', requireSystemAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT sa.id, sa.name, sa.username, sa.is_active, sa.temp_password_flag,
-              sa.created_at, sa.last_login, s.name AS school, s.id AS school_id
+              sa.created_at, sa.created_by, sa.updated_by, sa.updated_at, sa.last_login,
+              s.name AS school, s.id AS school_id
        FROM school_admins sa
        JOIN schools s ON s.id = sa.school_id
        ORDER BY s.name, sa.username`
@@ -110,9 +112,9 @@ router.post('/api/system/admins', requireSystemAdmin, async (req, res) => {
   try {
     const hash   = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      `INSERT INTO school_admins (name, username, password_hash, school_id, temp_password_flag)
-       VALUES ($1,$2,$3,$4,true) RETURNING id, name, username, school_id, is_active, created_at`,
-      [name, username, hash, schoolId]
+      `INSERT INTO school_admins (name, username, password_hash, school_id, temp_password_flag, created_by)
+       VALUES ($1,$2,$3,$4,true,$5) RETURNING id, name, username, school_id, is_active, created_at, created_by`,
+      [name, username, hash, schoolId, req.sysAdmin.username]
     );
     const school = await pool.query('SELECT name FROM schools WHERE id=$1', [schoolId]);
     await logAudit(pool, { actor: req.sysAdmin.username, actorRole: 'system_admin', action: 'CREATE_ADMIN', target: username, school: school.rows[0]?.name || schoolId });
@@ -135,10 +137,10 @@ router.patch('/api/system/admins/:id/reset-password', requireSystemAdmin, async 
 
     const result = await pool.query(
       `UPDATE school_admins
-       SET password_hash = $1, temp_password_flag = true
-       WHERE id = $2
+       SET password_hash = $1, temp_password_flag = true, updated_by = $2, updated_at = NOW()
+       WHERE id = $3
        RETURNING username, school_id`,
-      [hash, req.params.id]
+      [hash, req.sysAdmin.username, req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Admin not found' });
 
@@ -220,9 +222,9 @@ const schoolAdminSelfReset = async (req, res) => {
 router.patch('/api/system/admins/:id/toggle-active', requireSystemAdmin, async (req, res) => {
   try {
     const result = await pool.query(
-      `UPDATE school_admins SET is_active = NOT is_active WHERE id = $1
+      `UPDATE school_admins SET is_active = NOT is_active, updated_by = $1, updated_at = NOW() WHERE id = $2
        RETURNING id, username, is_active, school_id`,
-      [req.params.id]
+      [req.sysAdmin.username, req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Admin not found' });
     const { username, is_active, school_id } = result.rows[0];
@@ -242,6 +244,101 @@ router.delete('/api/system/admins/:id', requireSystemAdmin, async (req, res) => 
     if (!result.rows[0]) return res.status(404).json({ error: 'Admin not found' });
     const school = await pool.query('SELECT name FROM schools WHERE id=$1', [result.rows[0].school_id]);
     await logAudit(pool, { actor: req.sysAdmin.username, actorRole: 'system_admin', action: 'DELETE_ADMIN', target: result.rows[0].username, school: school.rows[0]?.name });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+//  IT SUPPORT TEAM — other system admin (service-provider) logins
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/system/team
+router.get('/api/system/team', requireSystemAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, username, is_active, created_by, created_at, last_login
+       FROM system_admin ORDER BY created_at ASC`
+    );
+    return res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/system/team — add another IT support team member
+router.post('/api/system/team', requireSystemAdmin, async (req, res) => {
+  const { name, username, password } = req.body;
+  if (!name?.trim() || !username?.trim() || !password)
+    return res.status(400).json({ error: 'Name, username, and password are required' });
+  if (password.length < 8)
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  try {
+    const hash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      `INSERT INTO system_admin (name, username, password_hash, created_by)
+       VALUES ($1,$2,$3,$4) RETURNING id, name, username, is_active, created_by, created_at`,
+      [name.trim(), username.trim(), hash, req.sysAdmin.username]
+    );
+    await logAudit(pool, { actor: req.sysAdmin.username, actorRole: 'system_admin', action: 'CREATE_TEAM_MEMBER', target: username.trim(), school: null });
+    return res.status(201).json({ success: true, member: result.rows[0] });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Username already exists' });
+    console.error(err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /api/system/team/:id/reset-password
+router.patch('/api/system/team/:id/reset-password', requireSystemAdmin, async (req, res) => {
+  try {
+    const tempPass = genTempPassword();
+    const hash     = await bcrypt.hash(tempPass, 10);
+    const result = await pool.query(
+      `UPDATE system_admin SET password_hash = $1 WHERE id = $2 RETURNING username`,
+      [hash, req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Team member not found' });
+    await logAudit(pool, { actor: req.sysAdmin.username, actorRole: 'system_admin', action: 'RESET_TEAM_PASSWORD', target: result.rows[0].username, school: null });
+    return res.json({
+      success: true, username: result.rows[0].username, tempPassword: tempPass,
+      message: 'Password reset. Share this password with them directly — it will not be shown again.',
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /api/system/team/:id/toggle-active — a member can't suspend themselves
+router.patch('/api/system/team/:id/toggle-active', requireSystemAdmin, async (req, res) => {
+  if (String(req.sysAdmin.id) === String(req.params.id))
+    return res.status(400).json({ error: 'You cannot suspend your own account' });
+  try {
+    const result = await pool.query(
+      `UPDATE system_admin SET is_active = NOT is_active WHERE id = $1 RETURNING id, username, is_active`,
+      [req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Team member not found' });
+    await logAudit(pool, { actor: req.sysAdmin.username, actorRole: 'system_admin', action: result.rows[0].is_active ? 'REACTIVATE_TEAM_MEMBER' : 'SUSPEND_TEAM_MEMBER', target: result.rows[0].username, school: null });
+    return res.json({ success: true, isActive: result.rows[0].is_active });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE /api/system/team/:id — a member can't delete themselves
+router.delete('/api/system/team/:id', requireSystemAdmin, async (req, res) => {
+  if (String(req.sysAdmin.id) === String(req.params.id))
+    return res.status(400).json({ error: 'You cannot remove your own account' });
+  try {
+    const result = await pool.query('DELETE FROM system_admin WHERE id=$1 RETURNING username', [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Team member not found' });
+    await logAudit(pool, { actor: req.sysAdmin.username, actorRole: 'system_admin', action: 'DELETE_TEAM_MEMBER', target: result.rows[0].username, school: null });
     return res.json({ success: true });
   } catch (err) {
     console.error(err);

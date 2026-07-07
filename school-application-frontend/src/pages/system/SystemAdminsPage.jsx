@@ -1,19 +1,14 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Box, Typography, Button, Card, CardContent, Table, TableHead,
-  TableRow, TableCell, TableBody, TableContainer, Chip, IconButton,
+  Box, Typography, Button, Table, TableHead,
+  TableRow, TableCell, TableBody, TableContainer, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  Stack, CircularProgress, Tooltip, MenuItem, Select, FormControl,
-  InputLabel, Snackbar, Alert, InputAdornment,
+  Stack, CircularProgress, MenuItem, Select, FormControl,
+  InputLabel, Snackbar, Alert,
 } from '@mui/material';
-import AddIcon          from '@mui/icons-material/Add';
-import LockResetIcon    from '@mui/icons-material/LockReset';
-import BlockIcon        from '@mui/icons-material/Block';
-import CheckCircleIcon  from '@mui/icons-material/CheckCircle';
-import DeleteIcon       from '@mui/icons-material/Delete';
-import VisibilityIcon      from '@mui/icons-material/Visibility';
-import VisibilityOffIcon   from '@mui/icons-material/VisibilityOff';
-import SystemLayout, { FONT, BLUE } from '../../components/system/SystemLayout';
+import SystemLayout, { FONT, BLUE, BORDER, INK, INK_SOFT, INK_FAINT } from '../../components/system/SystemLayout';
+import LedgerSheet from '../../components/system/LedgerSheet';
+import { core } from '../../theme/tokens';
 import API_BASE from '../../config';
 
 const API   = API_BASE;
@@ -31,6 +26,30 @@ const fieldSx = {
   '& .MuiInputLabel-root.Mui-focused': { color: BLUE },
   '& .MuiFormHelperText-root': { fontFamily: FONT, fontSize: '0.72rem', ml: 0 },
 };
+
+const fmt = (d) => d ? new Date(d).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+
+// "Who touched this, latest only" — not a history trail, just the most recent stamp.
+const Provenance = ({ createdBy, createdAt, updatedBy, updatedAt }) => (
+  <Box sx={{ mt: 0.4 }}>
+    {createdBy && (
+      <Typography sx={{ fontFamily: FONT, fontSize: '0.68rem', color: INK_FAINT }}>
+        Created by {createdBy}{createdAt ? ` · ${fmt(createdAt)}` : ''}
+      </Typography>
+    )}
+    {updatedBy && (
+      <Typography sx={{ fontFamily: FONT, fontSize: '0.68rem', color: INK_FAINT }}>
+        Modified by {updatedBy}{updatedAt ? ` · ${fmt(updatedAt)}` : ''}
+      </Typography>
+    )}
+  </Box>
+);
+
+const TextAction = ({ onClick, color, children }) => (
+  <Box component="span" onClick={onClick} sx={{ fontFamily: FONT, fontSize: '0.75rem', fontWeight: 600, color, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
+    {children}
+  </Box>
+);
 
 const SystemAdminsPage = () => {
   const [admins, setAdmins]         = useState([]);
@@ -53,7 +72,6 @@ const SystemAdminsPage = () => {
       fetch(`${API}/api/system/admins`,  { headers: hdr() }).then(r => r.json()),
       fetch(`${API}/api/system/schools`, { headers: hdr() }).then(r => r.json()),
     ])
-      // ✅ FIX: safely extract arrays regardless of response shape
       .then(([a, s]) => {
         setAdmins(Array.isArray(a) ? a : a.admins || a.data || []);
         setSchools(Array.isArray(s) ? s : s.schools || s.data || []);
@@ -66,7 +84,6 @@ const SystemAdminsPage = () => {
 
   const notify = (msg, sev = 'success') => setSnack({ open: true, msg, sev });
 
-  // ── Create admin ─────────────────────────────────────────────
   const handleCreate = async () => {
     const { name, username, password, schoolId } = createForm;
     if (!name || !username || !password || !schoolId) {
@@ -91,7 +108,6 @@ const SystemAdminsPage = () => {
     finally { setSaving(false); }
   };
 
-  // ── Reset password ───────────────────────────────────────────
   const handleReset = async () => {
     if (!newPassword || newPassword.length < 6) {
       notify('Minimum 6 characters.', 'error'); return;
@@ -107,6 +123,7 @@ const SystemAdminsPage = () => {
         notify(`Password reset for ${selectedAdmin.username}.`);
         setResetOpen(false);
         setNewPassword('');
+        load();
       } else {
         notify(data.error || 'Reset failed.', 'error');
       }
@@ -114,7 +131,6 @@ const SystemAdminsPage = () => {
     finally { setSaving(false); }
   };
 
-  // ── Toggle suspend/activate ──────────────────────────────────
   const handleToggle = async (admin) => {
     try {
       const res = await fetch(`${API}/api/system/admins/${admin.id}/toggle-active`, {
@@ -127,7 +143,6 @@ const SystemAdminsPage = () => {
     } catch { notify('Network error.', 'error'); }
   };
 
-  // ── Delete ───────────────────────────────────────────────────
   const handleDelete = async (admin) => {
     try {
       const res = await fetch(`${API}/api/system/admins/${admin.id}`, {
@@ -143,104 +158,86 @@ const SystemAdminsPage = () => {
 
   return (
     <SystemLayout title="School Admins" subtitle="Create and manage school administrator accounts">
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}
-          sx={{
-            fontFamily: FONT, fontWeight: 700, fontSize: '0.85rem',
-            textTransform: 'none', px: 2.5, py: 1, borderRadius: '7px',
-            bgcolor: BLUE, color: '#000', boxShadow: 'none',
-            '&:hover': { bgcolor: '#7dd3fc', boxShadow: 'none' },
-          }}>
-          Create Admin
-        </Button>
-      </Box>
-
-      <Card elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: '10px', bgcolor: '#fff' }}>
-        <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-              <CircularProgress sx={{ color: BLUE }} size={28} />
-            </Box>
-          ) : (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    {['Name', 'Username', 'School', 'Last Login', 'Status', 'Actions'].map(h => (
-                      <TableCell key={h} sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '0.7rem', color: '#94a3b8', bgcolor: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #e2e8f0', py: 1.5 }}>
-                        {h}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {admins.map((a) => (
-                    <TableRow key={a.id} hover sx={{ '& td': { py: 1.5 }, '&:last-child td': { border: 0 } }}>
-                      <TableCell>
-                        <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.85rem', color: '#1e293b' }}>
-                          {a.name}
-                        </Typography>
-                        {a.temp_password_flag && (
-                          <Typography sx={{ fontFamily: FONT, fontSize: '0.68rem', color: '#f59e0b' }}>
-                            ⚠ Temp password
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.82rem', color: '#475569' }}>
-                        {a.username}
-                      </TableCell>
-                      <TableCell sx={{ fontFamily: FONT, fontSize: '0.82rem', color: '#475569' }}>{a.school}</TableCell>
-                      <TableCell sx={{ fontFamily: FONT, fontSize: '0.78rem', color: '#94a3b8' }}>
-                        {a.last_login
-                          ? new Date(a.last_login).toLocaleString('en-ZA', { dateStyle: 'short', timeStyle: 'short' })
-                          : 'Never'}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={a.is_active ? 'Active' : 'Suspended'}
-                          size="small"
-                          color={a.is_active ? 'success' : 'error'}
-                          sx={{ fontFamily: FONT, fontSize: '0.68rem', fontWeight: 700, height: 22 }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Stack direction="row" spacing={0.5}>
-                          <Tooltip title="Reset password">
-                            <IconButton size="small"
-                              onClick={() => { setSelected(a); setResetOpen(true); setNewPassword(''); }}
-                              sx={{ color: '#64748b', '&:hover': { color: BLUE, bgcolor: 'rgba(56,189,248,0.08)' } }}>
-                              <LockResetIcon sx={{ fontSize: 16 }} />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title={a.is_active ? 'Suspend' : 'Reactivate'}>
-                            <IconButton size="small" onClick={() => handleToggle(a)}
-                              sx={{ color: a.is_active ? '#f59e0b' : '#22c55e', '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' } }}>
-                              {a.is_active
-                                ? <BlockIcon sx={{ fontSize: 16 }} />
-                                : <CheckCircleIcon sx={{ fontSize: 16 }} />}
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Delete admin">
-                            <IconButton size="small" onClick={() => setConfirmDelete(a)}
-                              sx={{ color: '#f87171', '&:hover': { bgcolor: 'rgba(248,113,113,0.08)' } }}>
-                              <DeleteIcon sx={{ fontSize: 16 }} />
-                            </IconButton>
-                          </Tooltip>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
+      <LedgerSheet
+        title="Admins"
+        meta={
+          <Box component="span" onClick={() => setCreateOpen(true)} sx={{ cursor: 'pointer', color: core.link, fontWeight: 700 }}>
+            + Create Admin
+          </Box>
+        }
+      >
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+            <CircularProgress sx={{ color: BLUE }} size={28} />
+          </Box>
+        ) : (
+          <TableContainer sx={{ border: `1px solid ${BORDER}`, borderRadius: '6px' }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  {['Name', 'Username', 'School', 'Last Login', 'Status', 'Actions'].map(h => (
+                    <TableCell key={h} sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '0.7rem', color: INK_FAINT, bgcolor: '#F8FAFC', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `1px solid ${BORDER}`, py: 1.5 }}>
+                      {h}
+                    </TableCell>
                   ))}
-                  {admins.length === 0 && !loading && (
-                    <TableRow><TableCell colSpan={6} align="center" sx={{ py: 5 }}>
-                      <Typography sx={{ fontFamily: FONT, fontSize: '0.85rem', color: '#94a3b8' }}>No admins found.</Typography>
-                    </TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </CardContent>
-      </Card>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {admins.map((a) => (
+                  <TableRow key={a.id} hover sx={{ '& td': { py: 1.5 }, '&:last-child td': { border: 0 } }}>
+                    <TableCell>
+                      <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.85rem', color: INK }}>
+                        {a.name}
+                      </Typography>
+                      {a.temp_password_flag && (
+                        <Typography sx={{ fontFamily: FONT, fontSize: '0.68rem', color: core.warn }}>
+                          Temp password
+                        </Typography>
+                      )}
+                      <Provenance createdBy={a.created_by} createdAt={a.created_at} updatedBy={a.updated_by} updatedAt={a.updated_at} />
+                    </TableCell>
+                    <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.82rem', color: INK_SOFT }}>
+                      {a.username}
+                    </TableCell>
+                    <TableCell sx={{ fontFamily: FONT, fontSize: '0.82rem', color: INK_SOFT }}>{a.school}</TableCell>
+                    <TableCell sx={{ fontFamily: FONT, fontSize: '0.78rem', color: INK_FAINT }}>
+                      {a.last_login
+                        ? new Date(a.last_login).toLocaleString('en-ZA', { dateStyle: 'short', timeStyle: 'short' })
+                        : 'Never'}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={a.is_active ? 'Active' : 'Suspended'}
+                        size="small"
+                        color={a.is_active ? 'success' : 'error'}
+                        sx={{ fontFamily: FONT, fontSize: '0.68rem', fontWeight: 700, height: 22 }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Stack direction="row" spacing={1.5}>
+                        <TextAction color={core.link} onClick={() => { setSelected(a); setResetOpen(true); setNewPassword(''); }}>
+                          Reset
+                        </TextAction>
+                        <TextAction color={a.is_active ? core.warn : core.accent} onClick={() => handleToggle(a)}>
+                          {a.is_active ? 'Suspend' : 'Reactivate'}
+                        </TextAction>
+                        <TextAction color={core.danger} onClick={() => setConfirmDelete(a)}>
+                          Delete
+                        </TextAction>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {admins.length === 0 && !loading && (
+                  <TableRow><TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                    <Typography sx={{ fontFamily: FONT, fontSize: '0.85rem', color: INK_FAINT }}>No admins found.</Typography>
+                  </TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </LedgerSheet>
 
       {/* ── Create admin dialog ── */}
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="xs" fullWidth
@@ -262,16 +259,10 @@ const SystemAdminsPage = () => {
               value={createForm.password}
               onChange={e => setCreateForm(p => ({ ...p, password: e.target.value }))}
               helperText="Admin must change this on first login"
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setShowPass(p => !p)}>
-                      {showPass ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
             />
+            <Box onClick={() => setShowPass(p => !p)} sx={{ fontFamily: FONT, fontSize: '0.72rem', color: core.link, fontWeight: 600, cursor: 'pointer', mt: -1 }}>
+              {showPass ? 'Hide password' : 'Show password'}
+            </Box>
             <FormControl size="small" fullWidth sx={fieldSx}>
               <InputLabel>Assign to School *</InputLabel>
               <Select value={createForm.schoolId} label="Assign to School *"
@@ -290,8 +281,8 @@ const SystemAdminsPage = () => {
           <Button onClick={() => setCreateOpen(false)}
             sx={{ fontFamily: FONT, textTransform: 'none', color: '#64748b' }}>Cancel</Button>
           <Button variant="contained" onClick={handleCreate} disabled={saving}
-            sx={{ fontFamily: FONT, fontWeight: 700, textTransform: 'none', px: 3, borderRadius: '7px', bgcolor: BLUE, color: '#000', boxShadow: 'none', '&:hover': { bgcolor: '#7dd3fc', boxShadow: 'none' } }}>
-            {saving ? <CircularProgress size={16} sx={{ color: '#000' }} /> : 'Create'}
+            sx={{ fontFamily: FONT, fontWeight: 700, textTransform: 'none', px: 3, borderRadius: '7px', bgcolor: BLUE, color: '#fff', boxShadow: 'none', '&:hover': { bgcolor: core.brandDark, boxShadow: 'none' } }}>
+            {saving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -310,23 +301,17 @@ const SystemAdminsPage = () => {
             type={showNew ? 'text' : 'password'}
             value={newPassword}
             onChange={e => setNewPassword(e.target.value)}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton size="small" onClick={() => setShowNew(p => !p)}>
-                    {showNew ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
           />
+          <Box onClick={() => setShowNew(p => !p)} sx={{ fontFamily: FONT, fontSize: '0.72rem', color: core.link, fontWeight: 600, cursor: 'pointer', mt: 0.75 }}>
+            {showNew ? 'Hide password' : 'Show password'}
+          </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #f1f5f9', gap: 1 }}>
           <Button onClick={() => setResetOpen(false)}
             sx={{ fontFamily: FONT, textTransform: 'none', color: '#64748b' }}>Cancel</Button>
           <Button variant="contained" onClick={handleReset} disabled={saving}
-            sx={{ fontFamily: FONT, fontWeight: 700, textTransform: 'none', px: 3, borderRadius: '7px', bgcolor: BLUE, color: '#000', boxShadow: 'none', '&:hover': { bgcolor: '#7dd3fc', boxShadow: 'none' } }}>
-            {saving ? <CircularProgress size={16} sx={{ color: '#000' }} /> : 'Reset Password'}
+            sx={{ fontFamily: FONT, fontWeight: 700, textTransform: 'none', px: 3, borderRadius: '7px', bgcolor: BLUE, color: '#fff', boxShadow: 'none', '&:hover': { bgcolor: core.brandDark, boxShadow: 'none' } }}>
+            {saving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Reset Password'}
           </Button>
         </DialogActions>
       </Dialog>

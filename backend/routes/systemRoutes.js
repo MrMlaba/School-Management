@@ -314,9 +314,10 @@ router.delete('/schools/:schoolId/logo', requireSystemAdmin, async (req, res) =>
 router.get('/schools', requireSystemAdmin, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT 
+      `SELECT
          s.id, s.name, s.location, s.phone, s.email, s.principal,
          s.grades, s.streams, s.is_active, s.created_at, s.image_id, s.logo_id,
+         s.created_by, s.updated_by, s.updated_at,
          COUNT(DISTINCT sa.id) AS admin_count,
          COUNT(DISTINCT a.id) AS application_count
        FROM schools s
@@ -344,8 +345,8 @@ router.post('/schools', requireSystemAdmin, async (req, res) => {
   try {
     // Create school
     const schoolResult = await pool.query(
-      `INSERT INTO schools (name, location, phone, email, principal, grades, streams)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO schools (name, location, phone, email, principal, grades, streams, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         name.trim(),
@@ -354,7 +355,8 @@ router.post('/schools', requireSystemAdmin, async (req, res) => {
         email || null,
         principal || null,
         JSON.stringify(grades || ['Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12']),
-        JSON.stringify(streams || ['Physics', 'Commerce', 'Humanities'])
+        JSON.stringify(streams || ['Physics', 'Commerce', 'Humanities']),
+        req.sysAdmin.username,
       ]
     );
 
@@ -526,6 +528,15 @@ router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
       }
     }
 
+    // Every successful PATCH counts as a modification — stamp who and when,
+    // regardless of which specific fields above actually changed. Only the
+    // latest stamp is kept; the full history already lives in audit_logs.
+    const stamp = await pool.query(
+      `UPDATE schools SET updated_by = $1, updated_at = NOW() WHERE id = $2 RETURNING updated_by, updated_at`,
+      [req.sysAdmin.username, schoolId]
+    );
+    updatedSchool = { ...updatedSchool, ...stamp.rows[0] };
+
     return res.json({
       success: true,
       school: updatedSchool
@@ -570,7 +581,8 @@ router.get('/schools/:schoolId/admins', requireSystemAdmin, async (req, res) => 
 
   try {
     const result = await pool.query(
-      `SELECT id, name, username, is_active, temp_password_flag, created_at, last_login
+      `SELECT id, name, username, is_active, temp_password_flag,
+              created_at, created_by, updated_by, updated_at, last_login
        FROM school_admins
        WHERE school_id = $1
        ORDER BY created_at DESC`,
@@ -607,10 +619,10 @@ router.post('/schools/:schoolId/admins', requireSystemAdmin, async (req, res) =>
     const hash = await bcrypt.hash(password, 10);
 
     const result = await pool.query(
-      `INSERT INTO school_admins (name, username, password_hash, school_id, temp_password_flag)
-       VALUES ($1, $2, $3, $4, false)
-       RETURNING id, name, username, is_active, temp_password_flag, created_at`,
-      [name.trim(), username.trim(), hash, schoolId]
+      `INSERT INTO school_admins (name, username, password_hash, school_id, temp_password_flag, created_by)
+       VALUES ($1, $2, $3, $4, false, $5)
+       RETURNING id, name, username, is_active, temp_password_flag, created_at, created_by`,
+      [name.trim(), username.trim(), hash, schoolId, req.sysAdmin.username]
     );
 
     return res.status(201).json({
@@ -650,6 +662,10 @@ router.patch('/schools/:schoolId/admins/:adminId', requireSystemAdmin, async (re
       return res.status(400).json({ error: 'No fields to update' });
     }
 
+    updates.push(`updated_by = $${idx++}`);
+    values.push(req.sysAdmin.username);
+    updates.push('updated_at = NOW()');
+
     values.push(adminId);
     values.push(schoolId);
 
@@ -657,7 +673,7 @@ router.patch('/schools/:schoolId/admins/:adminId', requireSystemAdmin, async (re
       `UPDATE school_admins
        SET ${updates.join(', ')}
        WHERE id = $${idx} AND school_id = $${idx + 1}
-       RETURNING id, name, username, is_active, created_at`,
+       RETURNING id, name, username, is_active, created_at, created_by, updated_by, updated_at`,
       values
     );
 
@@ -715,10 +731,10 @@ router.patch('/schools/:schoolId/admins/:adminId/reset-password', requireSystemA
 
     const result = await pool.query(
       `UPDATE school_admins
-       SET password_hash = $1, temp_password_flag = false
-       WHERE id = $2 AND school_id = $3
+       SET password_hash = $1, temp_password_flag = false, updated_by = $2, updated_at = NOW()
+       WHERE id = $3 AND school_id = $4
        RETURNING id, username, is_active`,
-      [hash, adminId, schoolId]
+      [hash, req.sysAdmin.username, adminId, schoolId]
     );
 
     if (!result.rows[0]) {

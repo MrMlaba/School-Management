@@ -5,8 +5,8 @@ import {
   TextField, Stack, CircularProgress, Snackbar, Alert, Button, Divider,
   MenuItem, Select, FormControl, InputLabel,
 } from '@mui/material';
-import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
 import SystemLayout, { FONT, BLUE, BORDER, INK, INK_SOFT, INK_FAINT } from '../../components/system/SystemLayout';
+import LedgerSheet from '../../components/system/LedgerSheet';
 import { core } from '../../theme/tokens';
 import API_BASE from '../../config';
 
@@ -125,61 +125,62 @@ const SystemTicketsPage = () => {
 
   return (
     <SystemLayout title="Support Tickets" subtitle="IT requests from every school, in one queue">
-      {/* Filter tabs */}
-      <Stack direction="row" spacing={1} sx={{ mb: 2.5, flexWrap: 'wrap' }}>
-        {STATUS_FILTERS.map(f => (
-          <Chip
-            key={f.value}
-            label={f.label}
-            onClick={() => setFilter(f.value)}
-            sx={{
-              fontFamily: FONT, fontWeight: 600, fontSize: '0.78rem',
-              bgcolor: filter === f.value ? BLUE : '#fff',
-              color: filter === f.value ? '#fff' : INK_SOFT,
-              border: `1px solid ${filter === f.value ? BLUE : BORDER}`,
-              '&:hover': { bgcolor: filter === f.value ? BLUE : '#F3F4F6' },
-            }}
-          />
-        ))}
-      </Stack>
+      <LedgerSheet title="Ticket Queue" meta={`${tickets.length} in view`}>
+        {/* Filter tabs */}
+        <Stack direction="row" spacing={1} sx={{ mb: 2.5, flexWrap: 'wrap' }}>
+          {STATUS_FILTERS.map(f => (
+            <Chip
+              key={f.value}
+              label={f.label}
+              onClick={() => setFilter(f.value)}
+              sx={{
+                fontFamily: FONT, fontWeight: 600, fontSize: '0.78rem',
+                bgcolor: filter === f.value ? BLUE : '#fff',
+                color: filter === f.value ? '#fff' : INK_SOFT,
+                border: `1px solid ${filter === f.value ? BLUE : BORDER}`,
+                '&:hover': { bgcolor: filter === f.value ? BLUE : '#F3F4F6' },
+              }}
+            />
+          ))}
+        </Stack>
 
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress sx={{ color: BLUE }} size={30} />
-        </Box>
-      ) : (
-        <TableContainer sx={{ border: `1px solid ${BORDER}`, borderRadius: '10px', bgcolor: '#fff' }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                {['School', 'Subject', 'Priority', 'Status', 'Replies', 'Updated'].map(h => (
-                  <TableCell key={h} sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '0.7rem', color: INK_FAINT, bgcolor: '#F8FAFC', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `1px solid ${BORDER}` }}>
-                    {h}
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {tickets.length === 0 && (
-                <TableRow><TableCell colSpan={6} sx={{ textAlign: 'center', py: 5, border: 'none' }}>
-                  <ConfirmationNumberOutlinedIcon sx={{ color: BORDER, fontSize: 34, mb: 1 }} />
-                  <Typography sx={{ fontFamily: FONT, color: INK_FAINT, fontSize: '0.85rem' }}>No tickets in this view.</Typography>
-                </TableCell></TableRow>
-              )}
-              {tickets.map(t => (
-                <TableRow key={t.id} hover onClick={() => openTicket(t.id)} sx={{ cursor: 'pointer', '&:last-child td': { border: 0 } }}>
-                  <TableCell sx={{ fontFamily: FONT, fontSize: '0.8rem', color: INK, fontWeight: 600 }}>{t.school}</TableCell>
-                  <TableCell sx={{ fontFamily: FONT, fontSize: '0.8rem', color: INK }}>{t.subject}</TableCell>
-                  <TableCell><PriorityChip value={t.priority} /></TableCell>
-                  <TableCell><StatusChip value={t.status} /></TableCell>
-                  <TableCell sx={{ fontFamily: FONT, fontSize: '0.8rem', color: INK_SOFT }}>{t.replyCount}</TableCell>
-                  <TableCell sx={{ fontFamily: FONT, fontSize: '0.78rem', color: INK_FAINT }}>{fmt(t.updatedAt)}</TableCell>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress sx={{ color: BLUE }} size={30} />
+          </Box>
+        ) : (
+          <TableContainer sx={{ border: `1px solid ${BORDER}`, borderRadius: '6px', bgcolor: '#fff' }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  {['School', 'Subject', 'Priority', 'Status', 'Replies', 'Updated'].map(h => (
+                    <TableCell key={h} sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '0.7rem', color: INK_FAINT, bgcolor: '#F8FAFC', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `1px solid ${BORDER}` }}>
+                      {h}
+                    </TableCell>
+                  ))}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
+              </TableHead>
+              <TableBody>
+                {tickets.length === 0 && (
+                  <TableRow><TableCell colSpan={6} sx={{ textAlign: 'center', py: 5, border: 'none' }}>
+                    <Typography sx={{ fontFamily: FONT, color: INK_FAINT, fontSize: '0.85rem' }}>No tickets in this view.</Typography>
+                  </TableCell></TableRow>
+                )}
+                {tickets.map(t => (
+                  <TableRow key={t.id} hover onClick={() => openTicket(t.id)} sx={{ cursor: 'pointer', '&:last-child td': { border: 0 } }}>
+                    <TableCell sx={{ fontFamily: FONT, fontSize: '0.8rem', color: INK, fontWeight: 600 }}>{t.school}</TableCell>
+                    <TableCell sx={{ fontFamily: FONT, fontSize: '0.8rem', color: INK }}>{t.subject}</TableCell>
+                    <TableCell><PriorityChip value={t.priority} /></TableCell>
+                    <TableCell><StatusChip value={t.status} /></TableCell>
+                    <TableCell sx={{ fontFamily: FONT, fontSize: '0.8rem', color: INK_SOFT }}>{t.replyCount}</TableCell>
+                    <TableCell sx={{ fontFamily: FONT, fontSize: '0.78rem', color: INK_FAINT }}>{fmt(t.updatedAt)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </LedgerSheet>
 
       {/* Ticket detail dialog */}
       <Dialog open={!!selected} onClose={() => setSelected(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: '12px' } }}>

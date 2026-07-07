@@ -1,21 +1,14 @@
 ﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Box, Typography, Button, Card, CardContent, Table, TableHead,
-  TableRow, TableCell, TableBody, TableContainer, Chip, IconButton,
+  Box, Typography, Button, Table, TableHead,
+  TableRow, TableCell, TableBody, TableContainer, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  Stack, CircularProgress, Tooltip, Grid, Snackbar, Alert,
-  FormGroup, FormControlLabel, Checkbox, Divider, Tabs, Tab,
+  Stack, CircularProgress, Grid, Snackbar, Alert,
+  FormGroup, FormControlLabel, Checkbox, Divider,
 } from '@mui/material';
-import AddIcon          from '@mui/icons-material/Add';
-import EditIcon         from '@mui/icons-material/Edit';
-import DeleteIcon       from '@mui/icons-material/Delete';
-import PowerIcon        from '@mui/icons-material/Power';
-import PowerOffIcon     from '@mui/icons-material/PowerOff';
-import CloudUploadIcon  from '@mui/icons-material/CloudUpload';
-import ImageIcon        from '@mui/icons-material/Image';
-import PersonAddIcon    from '@mui/icons-material/PersonAdd';
-import LockResetIcon    from '@mui/icons-material/LockReset';
-import SystemLayout, { FONT, BLUE } from '../../components/system/SystemLayout';
+import SystemLayout, { FONT, BLUE, BORDER, INK, INK_SOFT, INK_FAINT } from '../../components/system/SystemLayout';
+import LedgerSheet from '../../components/system/LedgerSheet';
+import { core } from '../../theme/tokens';
 import API_BASE from '../../config';
 
 const API   = API_BASE;
@@ -37,6 +30,24 @@ const EMPTY_FORM = {
 const EMPTY_ADMIN = {
   name: '', username: '', password: '',
 };
+
+const fmt = (d) => d ? new Date(d).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+
+// "Who touched this, latest only" — not a history trail, just the most recent stamp.
+const Provenance = ({ createdBy, createdAt, updatedBy, updatedAt }) => (
+  <Box sx={{ mt: 0.4 }}>
+    {createdBy && (
+      <Typography sx={{ fontFamily: FONT, fontSize: '0.68rem', color: INK_FAINT }}>
+        Created by {createdBy}{createdAt ? ` · ${fmt(createdAt)}` : ''}
+      </Typography>
+    )}
+    {updatedBy && (
+      <Typography sx={{ fontFamily: FONT, fontSize: '0.68rem', color: INK_FAINT }}>
+        Modified by {updatedBy}{updatedAt ? ` · ${fmt(updatedAt)}` : ''}
+      </Typography>
+    )}
+  </Box>
+);
 
 const fieldSx = {
   '& .MuiOutlinedInput-root': {
@@ -130,15 +141,13 @@ const ImageUploader = ({
               alignItems: 'center', justifyContent: 'center',
               opacity: 0, transition: 'opacity 0.2s', '&:hover': { opacity: 1 },
             }}>
-              <CloudUploadIcon sx={{ color: '#fff', fontSize: 28 }} />
-              <Typography sx={{ fontFamily: FONT, fontSize: '0.78rem', color: '#fff', mt: 0.5 }}>
+              <Typography sx={{ fontFamily: FONT, fontSize: '0.78rem', color: '#fff', fontWeight: 600 }}>
                 Click to change
               </Typography>
             </Box>
           </>
         ) : (
-          <Stack alignItems="center" spacing={1}>
-            <ImageIcon sx={{ fontSize: 36, color: '#cbd5e1' }} />
+          <Stack alignItems="center" spacing={0.5}>
             <Typography sx={{ fontFamily: FONT, fontSize: '0.8rem', color: '#94a3b8', fontWeight: 500 }}>
               Click to upload
             </Typography>
@@ -401,167 +410,110 @@ const SystemSchoolsPage = () => {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <SystemLayout title="Schools & Admins" subtitle="Manage partner schools, set administrators, and store images in database">
-      {/* Toolbar */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={openCreate}
-          sx={{
-            fontFamily: FONT, fontWeight: 700, fontSize: '0.85rem',
-            textTransform: 'none', px: 2.5, py: 1, borderRadius: '7px',
-            bgcolor: BLUE, color: '#000', boxShadow: 'none',
-            '&:hover': { bgcolor: '#7dd3fc', boxShadow: 'none' },
-          }}>
-          Add School
-        </Button>
-      </Box>
-
-      {/* Schools Table */}
-      <Card elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: '10px', bgcolor: '#fff', mb: 3 }}>
-        <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-              <CircularProgress sx={{ color: BLUE }} size={28} />
-            </Box>
-          ) : (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    {['School', 'Location', 'Grades', 'Applications', 'Admins', 'Status', 'Actions'].map(h => (
-                      <TableCell
-                        key={h}
-                        sx={{
-                          fontFamily: FONT, fontWeight: 700, fontSize: '0.7rem',
-                          color: '#94a3b8', bgcolor: '#f8fafc',
-                          textTransform: 'uppercase', letterSpacing: '0.06em',
-                          borderBottom: '1px solid #e2e8f0', py: 1.5,
-                        }}>
-                        {h}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {schools.map((s) => {
-                    const grades = Array.isArray(s.grades)
-                      ? s.grades
-                      : (typeof s.grades === 'string' ? JSON.parse(s.grades || '[]') : []);
-                    return (
-                      <TableRow
-                        key={s.id}
-                        hover
-                        sx={{ '& td': { py: 1.5 }, '&:last-child td': { border: 0 } }}>
-                        <TableCell>
-                          <Stack direction="row" alignItems="center" spacing={1.25}>
-                            {s.logo_id ? (
-                              <Box
-                                component="img"
-                                src={`${API}/api/system/schools/${s.id}/logo?v=${s.logo_id}`}
-                                alt={s.name}
-                                sx={{ width: 34, height: 34, borderRadius: '8px', objectFit: 'contain', bgcolor: '#fff', border: '1px solid #e2e8f0', flexShrink: 0 }}
-                                onError={(e) => { e.target.style.display = 'none'; }}
-                              />
-                            ) : s.image_id ? (
-                              <Box
-                                component="img"
-                                src={`${API}/api/system/schools/${s.id}/image?v=${s.image_id}`}
-                                alt={s.name}
-                                sx={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-                                onError={(e) => { e.target.style.display = 'none'; }}
-                              />
-                            ) : (
-                              <Box
-                                sx={{
-                                  width: 34, height: 34, borderRadius: '50%', bgcolor: '#f1f5f9',
-                                  flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                }}>
-                                <ImageIcon sx={{ fontSize: 16, color: '#cbd5e1' }} />
-                              </Box>
-                            )}
-                            <Box>
-                              <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.85rem', color: '#1e293b' }}>
-                                {s.name}
-                              </Typography>
-                              {s.principal && (
-                                <Typography sx={{ fontFamily: FONT, fontSize: '0.7rem', color: '#94a3b8' }}>
-                                  {s.principal}
-                                </Typography>
-                              )}
-                            </Box>
-                          </Stack>
-                        </TableCell>
-                        <TableCell sx={{ fontFamily: FONT, fontSize: '0.82rem', color: '#475569' }}>
-                          {s.location}
-                        </TableCell>
-                        <TableCell>
-                          <Typography sx={{ fontFamily: FONT, fontSize: '0.78rem', color: '#475569' }}>
-                            {grades.length > 0 ? `Gr ${grades.map(g => g.replace('Grade ', '')).join(', ')}` : '—'}
+      <LedgerSheet
+        title="Schools"
+        meta={
+          <Box component="span" onClick={openCreate} sx={{ cursor: 'pointer', color: core.link, fontWeight: 700 }}>
+            + Add School
+          </Box>
+        }
+      >
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+            <CircularProgress sx={{ color: BLUE }} size={28} />
+          </Box>
+        ) : (
+          <TableContainer sx={{ border: `1px solid ${BORDER}`, borderRadius: '6px' }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  {['School', 'Location', 'Grades', 'Applications', 'Admins', 'Status', 'Actions'].map(h => (
+                    <TableCell
+                      key={h}
+                      sx={{
+                        fontFamily: FONT, fontWeight: 700, fontSize: '0.7rem',
+                        color: INK_FAINT, bgcolor: '#F8FAFC',
+                        textTransform: 'uppercase', letterSpacing: '0.06em',
+                        borderBottom: `1px solid ${BORDER}`, py: 1.5,
+                      }}>
+                      {h}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {schools.map((s) => {
+                  const grades = Array.isArray(s.grades)
+                    ? s.grades
+                    : (typeof s.grades === 'string' ? JSON.parse(s.grades || '[]') : []);
+                  return (
+                    <TableRow
+                      key={s.id}
+                      hover
+                      sx={{ '& td': { py: 1.5 }, '&:last-child td': { border: 0 } }}>
+                      <TableCell>
+                        <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.85rem', color: INK }}>
+                          {s.name}
+                        </Typography>
+                        {s.principal && (
+                          <Typography sx={{ fontFamily: FONT, fontSize: '0.7rem', color: INK_SOFT }}>
+                            {s.principal}
                           </Typography>
-                        </TableCell>
-                        <TableCell sx={{ fontFamily: FONT, fontSize: '0.82rem', color: '#475569' }}>
-                          {s.application_count || 0}
-                        </TableCell>
-                        <TableCell sx={{ fontFamily: FONT, fontSize: '0.82rem', color: '#475569' }}>
-                          {s.admin_count || 0}
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={s.is_active ? 'Active' : 'Inactive'}
-                            size="small"
-                            color={s.is_active ? 'success' : 'default'}
-                            sx={{ fontFamily: FONT, fontSize: '0.68rem', fontWeight: 700, height: 22 }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Stack direction="row" spacing={0.5}>
-                            <Tooltip title="Edit school">
-                              <IconButton
-                                size="small"
-                                onClick={() => openEdit(s)}
-                                sx={{ color: '#64748b', '&:hover': { color: BLUE, bgcolor: 'rgba(56,189,248,0.08)' } }}>
-                                <EditIcon sx={{ fontSize: 16 }} />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Manage admins">
-                              <IconButton
-                                size="small"
-                                onClick={() => openAddAdmin(s)}
-                                sx={{ color: '#64748b', '&:hover': { color: BLUE, bgcolor: 'rgba(56,189,248,0.08)' } }}>
-                                <PersonAddIcon sx={{ fontSize: 16 }} />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title={s.is_active ? 'Deactivate' : 'Activate'}>
-                              <IconButton
-                                size="small"
-                                onClick={() => toggleActive(s)}
-                                sx={{ color: s.is_active ? '#f87171' : '#22c55e', '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' } }}>
-                                {s.is_active
-                                  ? <PowerOffIcon sx={{ fontSize: 16 }} />
-                                  : <PowerIcon sx={{ fontSize: 16 }} />}
-                              </IconButton>
-                            </Tooltip>
-                          </Stack>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {schools.length === 0 && !loading && (
-                    <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
-                        <Typography sx={{ fontFamily: FONT, fontSize: '0.85rem', color: '#94a3b8' }}>
-                          No schools yet. Click "Add School" to create the first one.
+                        )}
+                        <Provenance createdBy={s.created_by} createdAt={s.created_at} updatedBy={s.updated_by} updatedAt={s.updated_at} />
+                      </TableCell>
+                      <TableCell sx={{ fontFamily: FONT, fontSize: '0.82rem', color: INK_SOFT }}>
+                        {s.location}
+                      </TableCell>
+                      <TableCell>
+                        <Typography sx={{ fontFamily: FONT, fontSize: '0.78rem', color: INK_SOFT }}>
+                          {grades.length > 0 ? `Gr ${grades.map(g => g.replace('Grade ', '')).join(', ')}` : '—'}
                         </Typography>
                       </TableCell>
+                      <TableCell sx={{ fontFamily: FONT, fontSize: '0.82rem', color: INK_SOFT }}>
+                        {s.application_count || 0}
+                      </TableCell>
+                      <TableCell sx={{ fontFamily: FONT, fontSize: '0.82rem', color: INK_SOFT }}>
+                        {s.admin_count || 0}
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={s.is_active ? 'Active' : 'Inactive'}
+                          size="small"
+                          color={s.is_active ? 'success' : 'default'}
+                          sx={{ fontFamily: FONT, fontSize: '0.68rem', fontWeight: 700, height: 22 }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={1.5}>
+                          <Box component="span" onClick={() => openEdit(s)} sx={{ fontFamily: FONT, fontSize: '0.75rem', fontWeight: 600, color: core.link, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
+                            Edit
+                          </Box>
+                          <Box component="span" onClick={() => openAddAdmin(s)} sx={{ fontFamily: FONT, fontSize: '0.75rem', fontWeight: 600, color: core.link, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
+                            Admins
+                          </Box>
+                          <Box component="span" onClick={() => toggleActive(s)} sx={{ fontFamily: FONT, fontSize: '0.75rem', fontWeight: 600, color: s.is_active ? core.danger : core.accent, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
+                            {s.is_active ? 'Deactivate' : 'Activate'}
+                          </Box>
+                        </Stack>
+                      </TableCell>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </CardContent>
-      </Card>
+                  );
+                })}
+                {schools.length === 0 && !loading && (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                      <Typography sx={{ fontFamily: FONT, fontSize: '0.85rem', color: INK_FAINT }}>
+                        No schools yet. Click "Add School" to create the first one.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </LedgerSheet>
 
       {/* ── Add / Edit School Dialog ── */}
       <Dialog
@@ -705,11 +657,11 @@ const SystemSchoolsPage = () => {
             sx={{
               fontFamily: FONT, fontWeight: 700, textTransform: 'none',
               px: 3.5, py: 1, borderRadius: '7px',
-              bgcolor: BLUE, color: '#000', boxShadow: 'none',
-              '&:hover': { bgcolor: '#7dd3fc', boxShadow: 'none' },
+              bgcolor: BLUE, color: '#fff', boxShadow: 'none',
+              '&:hover': { bgcolor: core.brandDark, boxShadow: 'none' },
             }}>
             {saving
-              ? <CircularProgress size={16} sx={{ color: '#000' }} />
+              ? <CircularProgress size={16} sx={{ color: '#fff' }} />
               : editSchool ? 'Save Changes' : 'Create School'}
           </Button>
         </DialogActions>
@@ -805,13 +757,14 @@ const SystemSchoolsPage = () => {
                         <Typography sx={{ fontFamily: FONT, fontSize: '0.75rem', color: '#94a3b8' }}>
                           @{admin.username}
                         </Typography>
+                        <Provenance createdBy={admin.created_by} createdAt={admin.created_at} updatedBy={admin.updated_by} updatedAt={admin.updated_at} />
                       </Box>
-                      <IconButton
-                        size="small"
+                      <Box
+                        component="span"
                         onClick={() => deleteAdmin(admin.id)}
-                        sx={{ color: '#f87171', '&:hover': { bgcolor: 'rgba(248,113,113,0.1)' } }}>
-                        <DeleteIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
+                        sx={{ fontFamily: FONT, fontSize: '0.75rem', fontWeight: 600, color: core.danger, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
+                        Remove
+                      </Box>
                     </Box>
                   ))}
                 </Stack>

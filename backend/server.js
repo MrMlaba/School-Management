@@ -1364,6 +1364,25 @@ async function ensureTables() {
     }
   }
 
+  // Multi-account system admin (IT support team) + created/modified tracking.
+  // Only the LATEST modifier is kept per row (updated_by/updated_at) — full
+  // history already lives in audit_logs for whoever needs to dig further.
+  for (const col of [
+    `ALTER TABLE system_admin  ADD COLUMN IF NOT EXISTS is_active  BOOLEAN DEFAULT true`,
+    `ALTER TABLE system_admin  ADD COLUMN IF NOT EXISTS created_by VARCHAR(100)`,
+    `ALTER TABLE system_admin  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()`,
+    `ALTER TABLE schools       ADD COLUMN IF NOT EXISTS created_by VARCHAR(100)`,
+    `ALTER TABLE schools       ADD COLUMN IF NOT EXISTS updated_by VARCHAR(100)`,
+    `ALTER TABLE schools       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`,
+    `ALTER TABLE school_admins ADD COLUMN IF NOT EXISTS created_by VARCHAR(100)`,
+    `ALTER TABLE school_admins ADD COLUMN IF NOT EXISTS updated_by VARCHAR(100)`,
+    `ALTER TABLE school_admins ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`,
+  ]) {
+    try { await pool.query(col); } catch (err) {
+      console.warn('Migration note (system admin / audit tracking):', err.message);
+    }
+  }
+
   // Parent portal login — parents rows are created during enrollment with only
   // contact info (see managementRoutes.js), so credentials are added on top here.
   for (const col of [
