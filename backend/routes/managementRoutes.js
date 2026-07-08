@@ -11,9 +11,10 @@
 //  has one (optional — falls back to the 🏫 emoji when no logo is set).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const express = require('express');
-const router  = express.Router();
-const pool    = require('../db');
+const express   = require('express');
+const router    = express.Router();
+const pool      = require('../db');
+const puppeteer = require('puppeteer');
 
 // ── Stream derivation (exact match) ──────────────────────────────────────────
 const deriveStream = (grade, subject) => {
@@ -409,10 +410,35 @@ router.get('/reports/results', async (req, res) => {
 //  GET /api/management/reports/student/:studentId/pdf   — individual report card
 //  GET /api/management/reports/class/:classId/pdf       — full class PDF
 //
-//  Uses pure HTML → PDF via a simple HTML string sent as a downloadable file.
-//  No external PDF library needed — the browser prints/saves it as PDF.
-//  The endpoint returns an HTML page styled for A4 printing.
+//  The HTML/CSS report template below is rendered to a real PDF with a headless
+//  browser (Puppeteer), reusing the exact same print-styled HTML this app
+//  already builds — no separate PDF layout to maintain.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// One headless browser is launched lazily and reused across every report —
+// launching Chromium per-request would add ~1-2s and real memory overhead
+// to every single report card download.
+let browserPromise = null;
+function getBrowser() {
+  if (!browserPromise) {
+    browserPromise = puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'], // required in most container hosts, incl. Railway
+    });
+  }
+  return browserPromise;
+}
+
+async function htmlToPdfBuffer(html) {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+  try {
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    return await page.pdf({ format: 'A4', printBackground: true });
+  } finally {
+    await page.close();
+  }
+}
 
 // ── Term weights helper ───────────────────────────────────────────────────────
 // Returns a map of subjectId -> { assignmentWeight, examWeight } for a class+term.
@@ -910,9 +936,10 @@ router.get('/reports/student/:studentId/pdf', async (req, res) => {
 
     const logo = await getSchoolLogoUrl(req, schoolId);
     const html = buildReportCardHTML(data, logo);
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Content-Disposition', `inline; filename="report_${data.student.studentNumber}.html"`);
-    res.send(html);
+    const pdf  = await htmlToPdfBuffer(html);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="report_${data.student.studentNumber}.pdf"`);
+    res.send(pdf);
   } catch (err) {
     console.error('[reports/student/pdf]', err);
     res.status(500).json({ message: 'Failed to generate report card' });
@@ -1041,9 +1068,10 @@ ${pages.join('\n')}
 </body>
 </html>`;
 
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Content-Disposition', `inline; filename="class_report_${cls.name}.html"`);
-    res.send(fullHTML);
+    const pdf = await htmlToPdfBuffer(fullHTML);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="class_report_${cls.name}.pdf"`);
+    res.send(pdf);
   } catch (err) {
     console.error('[reports/class/pdf]', err);
     res.status(500).json({ message: 'Failed to generate class report' });

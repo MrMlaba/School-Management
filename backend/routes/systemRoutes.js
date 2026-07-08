@@ -11,7 +11,6 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 
 const SYSTEM_JWT_SECRET = process.env.SYSTEM_JWT_SECRET;
@@ -69,61 +68,6 @@ async function storeSchoolLogo(schoolId, logoBase64) {
   await pool.query('UPDATE schools SET logo_id = $1 WHERE id = $2', [logoId, schoolId]);
   return logoId;
 }
-
-// ─────────────────────────────────────────────────────────────
-//  SYSTEM ADMIN AUTHENTICATION
-// ─────────────────────────────────────────────────────────────
-
-// POST /api/system/login - System admin login
-router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
-  }
-
-  try {
-    // Query system_admin table (singular)
-    const result = await pool.query(
-      'SELECT id, username, name, password_hash FROM system_admin WHERE username = $1',
-      [username]
-    );
-
-    if (!result.rows[0]) {
-      return res.status(401).json({ error: 'Invalid username or password' });
-    }
-
-    const admin = result.rows[0];
-    const passwordMatch = await bcrypt.compare(password, admin.password_hash);
-
-    if (!passwordMatch) {
-      return res.status(401).json({ error: 'Invalid username or password' });
-    }
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { id: admin.id, username: admin.username, name: admin.name },
-      SYSTEM_JWT_SECRET,
-      { expiresIn: '8h' }
-    );
-
-    // Update last login
-    await pool.query(
-      'UPDATE system_admin SET last_login = NOW() WHERE id = $1',
-      [admin.id]
-    );
-
-    return res.json({
-      success: true,
-      token,
-      username: admin.username,
-      name: admin.name
-    });
-  } catch (err) {
-    console.error('[system-login error]', err);
-    return res.status(500).json({ error: 'Server error' });
-  }
-});
 
 // ─────────────────────────────────────────────────────────────
 //  IMAGE MANAGEMENT (home-page picture)
@@ -596,159 +540,9 @@ router.get('/schools/:schoolId/admins', requireSystemAdmin, async (req, res) => 
   }
 });
 
-// POST /api/system/schools/:schoolId/admins - Create admin for school
-router.post('/schools/:schoolId/admins', requireSystemAdmin, async (req, res) => {
-  const { schoolId } = req.params;
-  const { name, username, password } = req.body;
-
-  if (!name?.trim() || !username?.trim() || !password) {
-    return res.status(400).json({ error: 'Name, username, and password are required' });
-  }
-
-  if (password.length < 8) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters' });
-  }
-
-  try {
-    // Verify school exists
-    const school = await pool.query('SELECT id, name FROM schools WHERE id = $1', [schoolId]);
-    if (!school.rows[0]) {
-      return res.status(404).json({ error: 'School not found' });
-    }
-
-    const hash = await bcrypt.hash(password, 10);
-
-    const result = await pool.query(
-      `INSERT INTO school_admins (name, username, password_hash, school_id, temp_password_flag, created_by)
-       VALUES ($1, $2, $3, $4, false, $5)
-       RETURNING id, name, username, is_active, temp_password_flag, created_at, created_by`,
-      [name.trim(), username.trim(), hash, schoolId, req.sysAdmin.username]
-    );
-
-    return res.status(201).json({
-      success: true,
-      admin: result.rows[0],
-      schoolName: school.rows[0].name
-    });
-  } catch (err) {
-    if (err.code === '23505') {
-      return res.status(409).json({ error: 'Username already exists' });
-    }
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// PATCH /api/system/schools/:schoolId/admins/:adminId - Update admin
-router.patch('/schools/:schoolId/admins/:adminId', requireSystemAdmin, async (req, res) => {
-  const { schoolId, adminId } = req.params;
-  const { name, email, isActive } = req.body;
-
-  try {
-    const updates = [];
-    const values = [];
-    let idx = 1;
-
-    if (name !== undefined) {
-      updates.push(`name = $${idx++}`);
-      values.push(name);
-    }
-    if (isActive !== undefined) {
-      updates.push(`is_active = $${idx++}`);
-      values.push(isActive);
-    }
-
-    if (updates.length === 0) {
-      return res.status(400).json({ error: 'No fields to update' });
-    }
-
-    updates.push(`updated_by = $${idx++}`);
-    values.push(req.sysAdmin.username);
-    updates.push('updated_at = NOW()');
-
-    values.push(adminId);
-    values.push(schoolId);
-
-    const result = await pool.query(
-      `UPDATE school_admins
-       SET ${updates.join(', ')}
-       WHERE id = $${idx} AND school_id = $${idx + 1}
-       RETURNING id, name, username, is_active, created_at, created_by, updated_by, updated_at`,
-      values
-    );
-
-    if (!result.rows[0]) {
-      return res.status(404).json({ error: 'Admin not found' });
-    }
-
-    return res.json({
-      success: true,
-      admin: result.rows[0]
-    });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// DELETE /api/system/schools/:schoolId/admins/:adminId - Delete admin
-router.delete('/schools/:schoolId/admins/:adminId', requireSystemAdmin, async (req, res) => {
-  const { schoolId, adminId } = req.params;
-
-  try {
-    const result = await pool.query(
-      `DELETE FROM school_admins
-       WHERE id = $1 AND school_id = $2
-       RETURNING username`,
-      [adminId, schoolId]
-    );
-
-    if (!result.rows[0]) {
-      return res.status(404).json({ error: 'Admin not found' });
-    }
-
-    return res.json({
-      success: true,
-      message: `Admin "${result.rows[0].username}" removed`
-    });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// PATCH /api/system/schools/:schoolId/admins/:adminId/reset-password - Reset admin password
-router.patch('/schools/:schoolId/admins/:adminId/reset-password', requireSystemAdmin, async (req, res) => {
-  const { schoolId, adminId } = req.params;
-  const { password } = req.body;
-
-  if (!password || password.length < 8) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters' });
-  }
-
-  try {
-    const hash = await bcrypt.hash(password, 10);
-
-    const result = await pool.query(
-      `UPDATE school_admins
-       SET password_hash = $1, temp_password_flag = false, updated_by = $2, updated_at = NOW()
-       WHERE id = $3 AND school_id = $4
-       RETURNING id, username, is_active`,
-      [hash, req.sysAdmin.username, adminId, schoolId]
-    );
-
-    if (!result.rows[0]) {
-      return res.status(404).json({ error: 'Admin not found' });
-    }
-
-    return res.json({
-      success: true,
-      message: 'Password updated successfully'
-    });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
-  }
-});
+// Creating, editing, deleting, and resetting passwords for school-admin
+// accounts all now live solely under /api/system/admins/* (backend/auth.js) —
+// see SystemAdminsPage.jsx. This file keeps only the read-only per-school
+// list above, used for the read-only summary on the Schools page.
 
 module.exports = { router, requireSystemAdmin };

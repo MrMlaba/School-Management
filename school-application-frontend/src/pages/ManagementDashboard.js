@@ -2078,8 +2078,7 @@ const ReportsSection = () => {
     const url = `${BASE}/api/management/reports/student/${studentId}/pdf${termParam}`;
     const res = await fetch(url, {headers:authH()});
     if (res.ok) {
-      const html = await res.text();
-      const blob = new Blob([html], {type:'text/html'});
+      const blob = await res.blob();
       window.open(URL.createObjectURL(blob), '_blank');
     } else {
       toast('Failed to generate report card','error');
@@ -2095,8 +2094,7 @@ const ReportsSection = () => {
     const url = `${BASE}/api/management/reports/class/${selClass}/pdf${termParam}`;
     const res = await fetch(url, {headers:authH()});
     if (res.ok) {
-      const html = await res.text();
-      const blob = new Blob([html], {type:'text/html'});
+      const blob = await res.blob();
       window.open(URL.createObjectURL(blob), '_blank');
     } else {
       toast('Failed to generate class report cards','error');
