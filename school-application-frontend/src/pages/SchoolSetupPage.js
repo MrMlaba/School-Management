@@ -26,7 +26,7 @@ const C = {
   headerBg: '#F0F4F8',
   rowHover: '#F7FAFC',
   rowAlt:   '#FAFBFC',
-  text:     '#1A2332',
+  text:     '#000000',
   muted:    '#6B7C93',
   white:    '#FFFFFF',
   danger:   '#C62828',
@@ -36,7 +36,7 @@ const C = {
 const BASE = 'https://school-management-production-6167.up.railway.app';
 
 const headCell = {
-  backgroundColor: C.headerBg, color: C.brand, fontWeight: 700,
+  backgroundColor: C.headerBg, color: C.text, fontWeight: 700,
   fontSize: '0.75rem', letterSpacing: '0.06em', textTransform: 'uppercase',
   borderBottom: `2px solid ${C.brand}`, borderRight: `1px solid ${C.border}`,
   padding: '9px 14px', whiteSpace: 'nowrap', fontFamily: "'IBM Plex Sans', sans-serif",
@@ -90,7 +90,7 @@ const Section = ({ title, subtitle, children, action }) => (
   <Box sx={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: '8px', p: 3, mb: 3 }}>
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
       <Box>
-        <Typography sx={{ fontWeight: 700, fontSize: '1rem', color: C.brand, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+        <Typography sx={{ fontWeight: 700, fontSize: '1rem', color: C.text, fontFamily: "'IBM Plex Sans', sans-serif" }}>
           {title}
         </Typography>
         {subtitle && (
@@ -330,7 +330,7 @@ const SchoolSetupPage = () => {
                   {saved
                     ? <CheckCircleIcon sx={{ color: C.accent, fontSize: 18 }} />
                     : <RadioButtonUncheckedIcon sx={{ color: C.muted, fontSize: 18 }} />}
-                  <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: C.brand, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: C.text, fontFamily: "'IBM Plex Sans', sans-serif" }}>
                     Term {t}
                   </Typography>
                 </Box>
@@ -563,7 +563,7 @@ const SchoolSetupPage = () => {
 
         {/* Add subjects */}
         <Box sx={{ background: C.headerBg, border: `1px solid ${C.border}`, borderRadius: '6px', p: 2, mb: 3 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', color: C.brand, mb: 1.5, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', color: C.text, mb: 1.5, fontFamily: "'IBM Plex Sans', sans-serif" }}>
             Add Subjects
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -737,7 +737,7 @@ const SchoolSetupPage = () => {
 
         {/* Add class form */}
         <Box sx={{ background: C.headerBg, border: `1px solid ${C.border}`, borderRadius: '6px', p: 2, mb: 3 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', color: C.brand, mb: 1.5, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', color: C.text, mb: 1.5, fontFamily: "'IBM Plex Sans', sans-serif" }}>
             Add New Class
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -781,7 +781,7 @@ const SchoolSetupPage = () => {
 
           {grade && letter && (
             <Typography sx={{ fontSize: '0.8rem', color: C.muted, mt: 1.5, fontFamily: "'IBM Plex Sans', sans-serif" }}>
-              Preview: <strong style={{ color: C.brand }}>{grade}{letter}{stream ? ` — ${stream}` : ''}</strong> · Capacity: {capacity}
+              Preview: <strong style={{ color: C.text }}>{grade}{letter}{stream ? ` — ${stream}` : ''}</strong> · Capacity: {capacity}
             </Typography>
           )}
         </Box>
@@ -814,7 +814,7 @@ const SchoolSetupPage = () => {
               <TableBody>
                 {filtered.map((cls, idx) => (
                   <TableRow key={cls.id} sx={{ backgroundColor: idx % 2 === 0 ? C.white : C.rowAlt, '&:hover': { backgroundColor: C.rowHover } }}>
-                    <TableCell sx={{ ...bodyCell, fontWeight: 700, color: C.brand, fontFamily: 'monospace', fontSize: '0.9rem' }}>{cls.name}</TableCell>
+                    <TableCell sx={{ ...bodyCell, fontWeight: 700, color: C.text, fontFamily: 'monospace', fontSize: '0.9rem' }}>{cls.name}</TableCell>
                     <TableCell sx={bodyCell}>Grade {cls.grade}</TableCell>
                     <TableCell sx={bodyCell}>
                       {cls.stream

@@ -66,7 +66,7 @@ const authH = () => ({ Authorization: `Bearer ${sessionStorage.getItem('adminTok
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 
 const hc = {
-  background: C.headerBg, color: C.brand, fontWeight: 700,
+  background: C.headerBg, color: C.text, fontWeight: 700,
   fontSize:'0.63rem', letterSpacing: '0.05em', textTransform: 'uppercase',
   borderBottom: `2px solid ${C.brand}`, borderRight: `1px solid ${C.border}`,
   padding: '8px 12px', whiteSpace: 'nowrap', fontFamily: "'IBM Plex Sans', sans-serif",
@@ -97,7 +97,7 @@ const Card_ = ({ children, sx = {} }) => (
 const SectionHead = ({ title, subtitle, action }) => (
   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
     <Box sx={{ pl: 1.25, borderLeft: `3px solid ${C.brand}` }}>
-      <Typography sx={{ fontWeight: 700, fontSize:'0.88rem', color: C.brand, fontFamily: "'IBM Plex Sans', sans-serif" }}>{title}</Typography>
+      <Typography sx={{ fontWeight: 700, fontSize:'0.88rem', color: C.text, fontFamily: "'IBM Plex Sans', sans-serif" }}>{title}</Typography>
       {subtitle && <Typography sx={{ fontSize:'0.7rem', color: C.muted, mt: 0.25, fontFamily: "'IBM Plex Sans', sans-serif" }}>{subtitle}</Typography>}
     </Box>
     {action}
@@ -140,7 +140,7 @@ const DetailEmpty = ({ icon, text }) => (
 const DetailPanel = ({ title, onClose, createdAt, fmt, onReset, onSave, saving, saveLabel, footer = true, children }) => (
   <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.25, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
-      <Typography sx={{ fontWeight: 700, fontSize:'0.77rem', color: C.brand, fontFamily: "'IBM Plex Sans', sans-serif" }}>{title}</Typography>
+      <Typography sx={{ fontWeight: 700, fontSize:'0.77rem', color: C.text, fontFamily: "'IBM Plex Sans', sans-serif" }}>{title}</Typography>
       <IconButton size="small" onClick={onClose} sx={{ color: C.muted }}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
     </Box>
     <Box sx={{ flex: 1, overflowY: 'auto', p: 2.5 }}>
@@ -387,7 +387,7 @@ const OverviewSection = () => {
               <TableBody>
                 {recent.map((s,idx)=>(
                   <TableRow key={s.id} sx={{backgroundColor:idx%2===0?C.white:'#fbfbfb','&:hover':{backgroundColor:'#f9f9f9'}}}>
-                    <TableCell sx={{...bc,fontFamily:'monospace',fontSize:'0.7rem',color:C.brand,fontWeight:700}}>{s.studentNumber}</TableCell>
+                    <TableCell sx={{...bc,fontFamily:'monospace',fontSize:'0.7rem',color:C.text,fontWeight:700}}>{s.studentNumber}</TableCell>
                     <TableCell sx={{...bc,fontWeight:600}}>{s.firstName} {s.lastName}</TableCell>
                     <TableCell sx={bc}>{s.grade}</TableCell>
                     <TableCell sx={bc}>{s.stream?<Chip label={s.stream} size="small" sx={{fontSize:'0.62rem',fontWeight:700,bgcolor:'#f2f2f2',color:'#3f3f3f'}}/>:'—'}</TableCell>
@@ -492,7 +492,7 @@ const StudentsSection = () => {
               <Box key={grade} sx={{mb:3}}>
                 <Box sx={{display:'flex',alignItems:'center',gap:1,mb:1}}>
                   <SchoolIcon sx={{color:C.brand,fontSize:18}}/>
-                  <Typography sx={{fontWeight:700,fontSize:'0.79rem',color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif"}}> {grade}</Typography>
+                  <Typography sx={{fontWeight:700,fontSize:'0.79rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}> {grade}</Typography>
                   <Chip label={grouped[grade].length} size="small" sx={{height:20,fontSize:'0.62rem',fontWeight:700,bgcolor:'#f0f0f0',color:C.accent}}/>
                 </Box>
                 <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'4px'}}>
@@ -506,7 +506,7 @@ const StudentsSection = () => {
                       {grouped[grade].map((s,idx)=>(
                         <TableRow key={s.id} onClick={()=>setSelectedStudent(s)} sx={{cursor:'pointer',boxShadow:selectedStudent?.id===s.id?`inset 3px 0 0 0 ${C.brand}`:'none',backgroundColor:selectedStudent?.id===s.id?'#e3e3e3':idx%2===0?C.white:'#fbfbfb','&:hover':{backgroundColor:selectedStudent?.id===s.id?'#e3e3e3':'#f9f9f9'}}}>
                           <TableCell sx={{...bc,color:C.muted,textAlign:'center',width:40}}>{idx+1}</TableCell>
-                          <TableCell sx={{...bc,fontFamily:'monospace',fontSize:'0.7rem',color:C.brand,fontWeight:700}}>{s.studentNumber}</TableCell>
+                          <TableCell sx={{...bc,fontFamily:'monospace',fontSize:'0.7rem',color:C.text,fontWeight:700}}>{s.studentNumber}</TableCell>
                           <TableCell sx={{...bc,fontWeight:600}}>{s.firstName} {s.lastName}</TableCell>
                           <TableCell sx={{...bc,fontFamily:'monospace',fontSize:'0.7rem'}}>{s.nationalId||'—'}</TableCell>
                           <TableCell sx={{...bc,color:'#575757'}}>{s.email||'—'}</TableCell>
@@ -553,7 +553,7 @@ const StudentsSection = () => {
               onClose={()=>setSelectedStudent(null)}
               footer={false}
             >
-              <FormRow label="Student No."><Typography sx={{fontFamily:'monospace',fontSize:'0.75rem',color:C.brand,fontWeight:700}}>{selectedStudent.studentNumber}</Typography></FormRow>
+              <FormRow label="Student No."><Typography sx={{fontFamily:'monospace',fontSize:'0.75rem',color:C.text,fontWeight:700}}>{selectedStudent.studentNumber}</Typography></FormRow>
               <FormRow label="Grade"><Typography sx={{fontSize:'0.75rem'}}> {selectedStudent.grade}</Typography></FormRow>
               <FormRow label="National ID"><Typography sx={{fontFamily:'monospace',fontSize:'0.75rem'}}>{selectedStudent.nationalId||'—'}</Typography></FormRow>
               <FormRow label="Email"><Typography sx={{fontSize:'0.75rem',color:'#575757'}}>{selectedStudent.email||'—'}</Typography></FormRow>
@@ -605,7 +605,7 @@ const StudentsSection = () => {
 
       {/* Student credential dialog */}
       <Dialog open={!!credDialogStudent} onClose={()=>setCredDialogStudent(null)} maxWidth="xs" fullWidth PaperProps={{sx:{borderRadius:'10px'}}}>
-        <DialogTitle sx={{fontWeight:700,color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif"}}>Set Login — {credDialogStudent?.firstName} {credDialogStudent?.lastName}</DialogTitle>
+        <DialogTitle sx={{fontWeight:700,color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>Set Login — {credDialogStudent?.firstName} {credDialogStudent?.lastName}</DialogTitle>
         <Divider/>
         <DialogContent sx={{pt:2.5,display:'flex',flexDirection:'column',gap:2}}>
           <InfoBanner>The student will use these credentials to log in to the Student Portal.</InfoBanner>
@@ -631,7 +631,7 @@ const StudentsSection = () => {
 
       {/* Parent portal login dialog */}
       <Dialog open={!!parentCredDialog} onClose={()=>{setParentCredDialog(null);setParentCredResult(null);}} maxWidth="xs" fullWidth PaperProps={{sx:{borderRadius:'10px'}}}>
-        <DialogTitle sx={{fontWeight:700,color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+        <DialogTitle sx={{fontWeight:700,color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>
           Parent Portal Login — {parentCredDialog?.firstName} {parentCredDialog?.lastName}
         </DialogTitle>
         <Divider/>
@@ -674,7 +674,7 @@ const StudentsSection = () => {
 
       {/* Bulk generation results dialog */}
       <Dialog open={!!bulkDialog} onClose={()=>setBulkDialog(null)} maxWidth="md" fullWidth PaperProps={{sx:{borderRadius:'10px'}}}>
-        <DialogTitle sx={{fontWeight:700,color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif"}}>Bulk Generated Credentials</DialogTitle>
+        <DialogTitle sx={{fontWeight:700,color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>Bulk Generated Credentials</DialogTitle>
         <Divider/>
         <DialogContent>
           {bulkDialog?.details?.length>0 ? (
@@ -767,7 +767,7 @@ const StudentsSection = () => {
             <Typography sx={{fontSize:'0.66rem',color:C.muted,mb:0.5,fontFamily:"'IBM Plex Sans', sans-serif",textTransform:'uppercase',letterSpacing:'0.06em'}}>
               Temporary password for {resetStudentResult?.firstName} {resetStudentResult?.lastName}
             </Typography>
-            <Typography sx={{fontSize:'1.41rem',fontWeight:800,fontFamily:'monospace',letterSpacing:'0.15em',color:C.brand}}>
+            <Typography sx={{fontSize:'1.41rem',fontWeight:800,fontFamily:'monospace',letterSpacing:'0.15em',color:C.text}}>
               {resetStudentResult?.tempPassword}
             </Typography>
             <Typography sx={{fontSize:'0.63rem',color:C.muted,mt:0.5,fontFamily:"'IBM Plex Sans', sans-serif"}}>
@@ -1074,7 +1074,7 @@ const TeachersSection = () => {
 
       {/* Credentials dialog */}
       <Dialog open={!!credDialog} onClose={()=>setCredDialog(null)} maxWidth="xs" fullWidth PaperProps={{sx:{borderRadius:'10px'}}}>
-        <DialogTitle sx={{fontWeight:700,color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+        <DialogTitle sx={{fontWeight:700,color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>
           Set Login — {credDialog?.firstName} {credDialog?.lastName}
         </DialogTitle>
         <Divider/>
@@ -1156,7 +1156,7 @@ const TeachersSection = () => {
             <Typography sx={{fontSize:'0.66rem',color:C.muted,mb:0.5,fontFamily:"'IBM Plex Sans', sans-serif",textTransform:'uppercase',letterSpacing:'0.06em'}}>
               Temporary password for {resetTeacherResult?.firstName} {resetTeacherResult?.lastName}
             </Typography>
-            <Typography sx={{fontSize:'1.41rem',fontWeight:800,fontFamily:'monospace',letterSpacing:'0.15em',color:C.brand}}>
+            <Typography sx={{fontSize:'1.41rem',fontWeight:800,fontFamily:'monospace',letterSpacing:'0.15em',color:C.text}}>
               {resetTeacherResult?.tempPassword}
             </Typography>
             <Typography sx={{fontSize:'0.63rem',color:C.muted,mt:0.5,fontFamily:"'IBM Plex Sans', sans-serif"}}>
@@ -1268,7 +1268,7 @@ const TimetableSection = () => {
             <Box sx={{display:'flex',flexWrap:'wrap',gap:2}}>
               {classes.map(cls=>(
                 <Box key={cls.id} onClick={()=>loadTimetable(cls)} sx={{width:140,p:2.5,borderRadius:'4px',cursor:'pointer',border:`1.5px solid ${C.border}`,background:C.white,textAlign:'center','&:hover':{borderColor:C.brand,background:'#f5f5f5'},transition:'all 0.15s'}}>
-                  <Typography sx={{fontWeight:800,fontSize:'1.5rem',color:C.brand,lineHeight:1,fontFamily:"'IBM Plex Sans', sans-serif"}}>{cls.name}</Typography>
+                  <Typography sx={{fontWeight:800,fontSize:'1.5rem',color:C.text,lineHeight:1,fontFamily:"'IBM Plex Sans', sans-serif"}}>{cls.name}</Typography>
                   <Typography sx={{fontSize:'0.63rem',color:C.muted,mt:0.5,fontFamily:"'IBM Plex Sans', sans-serif"}}>{cls.grade}</Typography>
                   {cls.stream&&<Chip label={cls.stream} size="small" sx={{mt:0.75,fontSize:'0.58rem',fontWeight:700,bgcolor:'#f2f2f2',color:'#3f3f3f'}}/>}
                 </Box>
@@ -1310,7 +1310,7 @@ const TimetableSection = () => {
                 <TableBody>
                   {DAYS.map(day=>(
                     <TableRow key={day}>
-                      <TableCell sx={{...bc,background:C.headerBg,fontWeight:700,fontSize:'0.75rem',color:C.brand,whiteSpace:'nowrap'}}>{day.slice(0,3)}</TableCell>
+                      <TableCell sx={{...bc,background:C.headerBg,fontWeight:700,fontSize:'0.75rem',color:C.text,whiteSpace:'nowrap'}}>{day.slice(0,3)}</TableCell>
                       {ttData.periods.map((period,i)=>{
                         if(period.isBreak)return(
                           <TableCell key={period.id} sx={{...bc,background:'#f5f5f5',textAlign:'center',...(i===ttData.periods.length-1?{borderRight:'none'}:{})}}>
@@ -1322,7 +1322,7 @@ const TimetableSection = () => {
                           <TableCell key={period.id} onClick={()=>openSlot(period.id,day)} sx={{...bc,p:'4px',cursor:'pointer',background:slot?'#f0f0f0':C.white,border:`1px solid ${slot?'#c2c2c2':C.border}`,'&:hover':{background:slot?'#e3e3e3':'#f5f5f5'},minWidth:120,...(i===ttData.periods.length-1?{borderRight:'none'}:{})}}>
                             {slot?(
                               <Box sx={{p:'4px 6px',position:'relative'}}>
-                                <Typography sx={{fontWeight:700,fontSize:'0.66rem',color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif",lineHeight:1.3}}>{slot.subjectName}</Typography>
+                                <Typography sx={{fontWeight:700,fontSize:'0.66rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif",lineHeight:1.3}}>{slot.subjectName}</Typography>
                                 <Typography sx={{fontSize:'0.6rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>{slot.teacherFirstName} {slot.teacherLastName}</Typography>
                                 <IconButton size="small" onClick={e=>{e.stopPropagation();removeSlot(slot);}} sx={{position:'absolute',top:0,right:0,width:16,height:16,p:0,color:C.muted,opacity:0,'.MuiTableCell-root:hover &':{opacity:1},'&:hover':{color:C.danger}}}>
                                   <CloseIcon sx={{fontSize:11}}/>
@@ -1345,7 +1345,7 @@ const TimetableSection = () => {
 
           {/* Slot dialog */}
           <Dialog open={!!slotDlg} onClose={()=>setSlotDlg(null)} maxWidth="xs" fullWidth PaperProps={{sx:{borderRadius:'10px'}}}>
-            <DialogTitle sx={{fontWeight:700,color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif",pb:1}}>
+            <DialogTitle sx={{fontWeight:700,color:C.text,fontFamily:"'IBM Plex Sans', sans-serif",pb:1}}>
               {slotDlg?.existing?'Edit Slot':'Assign Slot'}
               {slotDlg&&<Typography sx={{fontSize:'0.69rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>{slotDlg.day} · {ttData?.periods?.find(p=>p.id===slotDlg?.periodId)?.name}</Typography>}
             </DialogTitle>
@@ -1555,7 +1555,7 @@ const SetupSection = () => {
               <Box key={n} sx={{display:'flex',alignItems:'center',gap:2,flexWrap:'wrap',p:1.5,borderRadius:'8px',background:saved?'#f8f8f8':C.bg,border:`1px solid ${saved?'#e1e1e1':C.border}`}}>
                 <Box sx={{display:'flex',alignItems:'center',gap:1,minWidth:90}}>
                   {saved?<CheckCircleIcon sx={{color:C.accent,fontSize:18}}/>:<RadioButtonUncheckedIcon sx={{color:C.muted,fontSize:18}}/>}
-                  <Typography sx={{fontWeight:700,fontSize:'0.79rem',color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif"}}>Term {n}</Typography>
+                  <Typography sx={{fontWeight:700,fontSize:'0.79rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>Term {n}</Typography>
                 </Box>
                 <TextField label="Start Date" type="date" size="small" value={tDates[n]?.s||''} onChange={e=>setTDates(p=>({...p,[n]:{...p[n],s:e.target.value}}))} InputLabelProps={{shrink:true}} disabled={!summary?.hasCurrentYear} sx={{width:170}}/>
                 <TextField label="End Date" type="date" size="small" value={tDates[n]?.e||''} onChange={e=>setTDates(p=>({...p,[n]:{...p[n],e:e.target.value}}))} InputLabelProps={{shrink:true}} disabled={!summary?.hasCurrentYear} sx={{width:170}}/>
@@ -1599,7 +1599,7 @@ const SetupSection = () => {
         <Box>
           {!summary?.hasCurrentYear&&<InfoBanner>Set academic year first.</InfoBanner>}
           <Box sx={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:'8px',p:2,mb:3}}>
-            <Typography sx={{fontWeight:700,fontSize:'0.75rem',color:C.brand,mb:1.5,fontFamily:"'IBM Plex Sans', sans-serif"}}>Add Subjects</Typography>
+            <Typography sx={{fontWeight:700,fontSize:'0.75rem',color:C.text,mb:1.5,fontFamily:"'IBM Plex Sans', sans-serif"}}>Add Subjects</Typography>
             <Box sx={{display:'flex',gap:2,flexWrap:'wrap',mb:1.5}}>
               <TextField select label="Grade" value={addGrade} onChange={e=>{setAddGrade(e.target.value);setSelNat([]);}} size="small" sx={{width:120}}>
                 {GRADES.map(g=><MenuItem key={g} value={g}>Grade {g}</MenuItem>)}
@@ -1652,7 +1652,7 @@ const SetupSection = () => {
         <Box>
           {!summary?.hasCurrentYear&&<InfoBanner>Set academic year first.</InfoBanner>}
           <Box sx={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:'8px',p:2,mb:3}}>
-            <Typography sx={{fontWeight:700,fontSize:'0.75rem',color:C.brand,mb:1.5,fontFamily:"'IBM Plex Sans', sans-serif"}}>Add Class</Typography>
+            <Typography sx={{fontWeight:700,fontSize:'0.75rem',color:C.text,mb:1.5,fontFamily:"'IBM Plex Sans', sans-serif"}}>Add Class</Typography>
             <Box sx={{display:'flex',gap:2,flexWrap:'wrap',alignItems:'flex-end'}}>
               <TextField select label="Grade" value={clsForm.grade} onChange={e=>setClsForm(f=>({...f,grade:e.target.value,stream:''}))} size="small" sx={{width:120}}>
                 {GRADES.map(g=><MenuItem key={g} value={g}>Grade {g}</MenuItem>)}
@@ -1673,7 +1673,7 @@ const SetupSection = () => {
             </Box>
             {clsForm.grade&&clsForm.letter&&(
               <Typography sx={{fontSize:'0.69rem',color:C.muted,mt:1,fontFamily:"'IBM Plex Sans', sans-serif"}}>
-                Preview: <strong style={{color:C.brand}}>{clsForm.grade}{clsForm.letter}{clsForm.stream?` — ${clsForm.stream}`:''}</strong>
+                Preview: <strong style={{color:C.text}}>{clsForm.grade}{clsForm.letter}{clsForm.stream?` — ${clsForm.stream}`:''}</strong>
               </Typography>
             )}
           </Box>
@@ -1681,7 +1681,7 @@ const SetupSection = () => {
             <Box sx={{display:'flex',flexWrap:'wrap',gap:1.5}}>
               {classes.map(cls=>(
                 <Box key={cls.id} sx={{position:'relative',p:2,borderRadius:'4px',border:`1.5px solid ${C.border}`,background:C.white,textAlign:'center',minWidth:120,'&:hover .del-btn':{opacity:1}}}>
-                  <Typography sx={{fontWeight:800,fontSize:'1.32rem',color:C.brand,lineHeight:1,fontFamily:"'IBM Plex Sans', sans-serif"}}>{cls.name}</Typography>
+                  <Typography sx={{fontWeight:800,fontSize:'1.32rem',color:C.text,lineHeight:1,fontFamily:"'IBM Plex Sans', sans-serif"}}>{cls.name}</Typography>
                   <Typography sx={{fontSize:'0.62rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>{cls.grade}</Typography>
                   {cls.stream&&<Chip label={cls.stream} size="small" sx={{mt:0.5,fontSize:'0.58rem',fontWeight:700,bgcolor:'#f2f2f2',color:'#3f3f3f'}}/>}
                   <IconButton className="del-btn" size="small" onClick={()=>removeClass(cls.id,cls.name)}
@@ -2181,7 +2181,7 @@ const ReportsSection = () => {
  
       {/* Term report release control */}
       <Box sx={{background:C.white,border:`1px solid ${C.border}`,borderRadius:'8px',p:2,mb:3}}>
-        <Typography sx={{fontWeight:700,fontSize:'0.78rem',color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif",mb:0.5}}>
+        <Typography sx={{fontWeight:700,fontSize:'0.78rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif",mb:0.5}}>
           Term Report Release
         </Typography>
         <Typography sx={{fontSize:'0.68rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif",mb:1.5}}>
@@ -2280,7 +2280,7 @@ const ReportsSection = () => {
           {/* Report header */}
           <Box sx={{display:'flex',alignItems:'center',justifyContent:'space-between',mb:2,flexWrap:'wrap',gap:1}}>
             <Box>
-              <Typography sx={{fontWeight:700,fontSize:'0.88rem',color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+              <Typography sx={{fontWeight:700,fontSize:'0.88rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>
                 {tab==='attendance'?'Attendance Report':'Results Report'} — {report.class?.name}
                 {report.class?.stream?` (${report.class.stream})`:''}
               </Typography>
@@ -2306,7 +2306,7 @@ const ReportsSection = () => {
                     report.students.map((s,idx)=>(
                       <TableRow key={s.id} sx={{backgroundColor:idx%2===0?C.white:'#fbfbfb'}}>
                         <TableCell sx={{...bc,color:C.muted,textAlign:'center',width:40}}>{idx+1}</TableCell>
-                        <TableCell sx={{...bc,fontFamily:'monospace',fontSize:'0.7rem',color:C.brand,fontWeight:700}}>{s.studentNumber}</TableCell>
+                        <TableCell sx={{...bc,fontFamily:'monospace',fontSize:'0.7rem',color:C.text,fontWeight:700}}>{s.studentNumber}</TableCell>
                         <TableCell sx={{...bc,fontWeight:600}}>{s.firstName} {s.lastName}</TableCell>
                         <TableCell sx={{...bc,color:C.accent,fontWeight:700,textAlign:'center'}}>{s.present}</TableCell>
                         <TableCell sx={{...bc,color:C.danger,fontWeight:700,textAlign:'center'}}>{s.absent}</TableCell>
@@ -2520,7 +2520,7 @@ const SupportSection = () => {
 
       {/* New ticket dialog */}
       <Dialog open={newOpen} onClose={() => setNewOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: '10px' } }}>
-        <DialogTitle sx={{ fontWeight: 700, color: C.brand, fontFamily: "'IBM Plex Sans', sans-serif" }}>New Support Ticket</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, color: C.text, fontFamily: "'IBM Plex Sans', sans-serif" }}>New Support Ticket</DialogTitle>
         <Divider />
         <DialogContent sx={{ pt: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
           <TextField label="Subject" value={newForm.subject} onChange={e => setNewForm(f => ({ ...f, subject: e.target.value }))} size="small" fullWidth />
@@ -2544,7 +2544,7 @@ const SupportSection = () => {
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress sx={{ color: C.brand }} /></Box>
         ) : (
           <>
-            <DialogTitle sx={{ fontWeight: 700, color: C.brand, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+            <DialogTitle sx={{ fontWeight: 700, color: C.text, fontFamily: "'IBM Plex Sans', sans-serif" }}>
               {selected.subject}
               <Box sx={{ mt: 0.5 }}>
                 <Chip label={selected.status.replace('_', ' ')} size="small" sx={{ fontWeight: 700, fontSize: '0.62rem', textTransform: 'capitalize', mr: 1, ...STATUS_COLORS[selected.status] }} />

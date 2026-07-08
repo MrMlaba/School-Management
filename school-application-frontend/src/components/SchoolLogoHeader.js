@@ -69,7 +69,7 @@ const SchoolLogoHeader = ({
               sx={{
                 fontSize: '0.9rem',
                 fontWeight: 600,
-                color: '#1A3557',
+                color: '#000000',
                 fontFamily: "'IBM Plex Sans', sans-serif"
               }}
             >

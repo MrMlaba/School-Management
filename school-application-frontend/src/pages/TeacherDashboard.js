@@ -46,7 +46,7 @@ const C = {
   headerBg:  '#F8FAFC',
   bg:        '#F0F4F8',
   rowAlt:    '#FAFBFC',
-  text:      '#1A2332',
+  text:      '#000000',
   muted:     '#64748B',
   white:     '#FFFFFF',
   danger:    '#C62828',
@@ -76,7 +76,7 @@ const DAY_S = { Monday:'Mon', Tuesday:'Tue', Wednesday:'Wed', Thursday:'Thu', Fr
 const SIDEBAR_W = 220;
 
 const headCell = {
-  backgroundColor: C.headerBg, color: C.brand, fontWeight: 700,
+  backgroundColor: C.headerBg, color: C.text, fontWeight: 700,
   fontSize: '0.72rem', letterSpacing: '0.06em', textTransform: 'uppercase',
   borderBottom: `2px solid ${C.brand}`, borderRight: `1px solid ${C.border}`,
   padding: '9px 14px', whiteSpace: 'nowrap', fontFamily: "'IBM Plex Sans', sans-serif",
@@ -111,7 +111,7 @@ const CardHeader = ({ title, subtitle, action }) => (
   <Box sx={{ px:2.5, pt:2.5, pb:1.5 }}>
     <Box sx={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
       <Box>
-        <Typography sx={{ fontWeight:700, fontSize:'0.92rem', color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif" }}>{title}</Typography>
+        <Typography sx={{ fontWeight:700, fontSize:'0.92rem', color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>{title}</Typography>
         {subtitle && <Typography sx={{ fontSize:'0.78rem', color:C.muted, mt:0.25, fontFamily:"'IBM Plex Sans', sans-serif" }}>{subtitle}</Typography>}
       </Box>
       {action}
@@ -272,7 +272,7 @@ const MarksTableView = () => {
               { label:'Graded',      value: students.reduce((n,s) => n + assignments.filter(a => s.marks[String(a.id)]?.graded).length, 0) },
             ].map(stat => (
               <Box key={stat.label} sx={{ px:2, py:1, borderRadius:'8px', background:C.headerBg, border:`1px solid ${C.border}` }}>
-                <Typography sx={{ fontSize:'1.1rem', fontWeight:800, color:C.brand, lineHeight:1, fontFamily:"'IBM Plex Sans', sans-serif" }}>{stat.value}</Typography>
+                <Typography sx={{ fontSize:'1.1rem', fontWeight:800, color:C.text, lineHeight:1, fontFamily:"'IBM Plex Sans', sans-serif" }}>{stat.value}</Typography>
                 <Typography sx={{ fontSize:'0.7rem', color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>{stat.label}</Typography>
               </Box>
             ))}
@@ -319,7 +319,7 @@ const MarksTableView = () => {
                       {/* Truncated title */}
                       <Tooltip title={a.title} placement="top">
                         <Typography sx={{
-                          fontWeight:700, fontSize:'0.72rem', color:C.brand,
+                          fontWeight:700, fontSize:'0.72rem', color:C.text,
                           fontFamily:"'IBM Plex Sans', sans-serif",
                           maxWidth:100, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                           mx:'auto',
@@ -352,7 +352,7 @@ const MarksTableView = () => {
 
                       {/* Student name — sticky */}
                       <TableCell sx={{ ...bodyCell, ...stickyCol, fontWeight:600, background: idx%2===0 ? C.white : C.rowAlt }}>
-                        <Typography sx={{ fontWeight:700, fontSize:'0.82rem', color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif", lineHeight:1.3 }}>
+                        <Typography sx={{ fontWeight:700, fontSize:'0.82rem', color:C.text, fontFamily:"'IBM Plex Sans', sans-serif", lineHeight:1.3 }}>
                           {student.firstName} {student.lastName}
                         </Typography>
                         <Typography sx={{ fontSize:'0.68rem', color:C.muted, fontFamily:'monospace' }}>
@@ -414,7 +414,7 @@ const MarksTableView = () => {
                 {/* Class average row */}
                 {students.length > 0 && (
                   <TableRow sx={{ background:'#F0F4F8', borderTop:`2px solid ${C.brand}` }}>
-                    <TableCell sx={{ ...bodyCell, ...stickyCol, fontWeight:800, color:C.brand, background:'#F0F4F8', fontSize:'0.78rem' }}>
+                    <TableCell sx={{ ...bodyCell, ...stickyCol, fontWeight:800, color:C.text, background:'#F0F4F8', fontSize:'0.78rem' }}>
                       Class Average
                     </TableCell>
                     {assignments.map(a => {
@@ -496,7 +496,7 @@ const DashboardTab = ({ onNavigate }) => {
                 <Box sx={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(180px, 1fr))', gap:1.5 }}>
                   {data.todaySlots.map(s => (
                     <Box key={s.id} sx={{ p:1.75, borderRadius:'8px', border:`1.5px solid ${C.border}`, borderLeft:`3px solid ${C.brand}`, background:C.headerBg }}>
-                      <Typography sx={{ fontWeight:700, fontSize:'0.875rem', color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif" }}>{s.subjectName}</Typography>
+                      <Typography sx={{ fontWeight:700, fontSize:'0.875rem', color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>{s.subjectName}</Typography>
                       <Typography sx={{ fontSize:'0.78rem', color:C.muted, mt:0.25, fontFamily:"'IBM Plex Sans', sans-serif" }}>{s.className}</Typography>
                       <Box sx={{ display:'flex', alignItems:'center', gap:0.5, mt:0.75 }}>
                         <AccessTimeIcon sx={{ fontSize:12, color:C.muted }} />
@@ -664,7 +664,7 @@ const TimetableTab = () => {
             {data.periods.map(p => (
               <TableRow key={p.id}>
                 <TableCell sx={{ ...bodyCell, background:p.isBreak?'#F5F5F5':C.headerBg, fontWeight:600 }}>
-                  <Typography sx={{ fontWeight:700, fontSize:'0.8rem', color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif" }}>{p.name}</Typography>
+                  <Typography sx={{ fontWeight:700, fontSize:'0.8rem', color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>{p.name}</Typography>
                   <Typography sx={{ fontSize:'0.7rem', color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>{p.timeStart?.slice(0,5)}–{p.timeEnd?.slice(0,5)}</Typography>
                 </TableCell>
                 {DAYS.map((day,i) => {
@@ -674,7 +674,7 @@ const TimetableTab = () => {
                       {p.isBreak ? <Typography sx={{ fontSize:'0.7rem', color:C.muted, fontStyle:'italic', fontFamily:"'IBM Plex Sans', sans-serif" }}>—</Typography>
                       : slot ? (
                         <Box>
-                          <Typography sx={{ fontWeight:700, fontSize:'0.78rem', color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif" }}>{slot.subjectName}</Typography>
+                          <Typography sx={{ fontWeight:700, fontSize:'0.78rem', color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>{slot.subjectName}</Typography>
                           <Typography sx={{ fontSize:'0.7rem', color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>{slot.className}</Typography>
                         </Box>
                       ) : <Typography sx={{ fontSize:'0.7rem', color:'#CBD5E1', fontFamily:"'IBM Plex Sans', sans-serif" }}>—</Typography>}
@@ -866,7 +866,7 @@ const TermWeightsDialog = ({ open, onClose, toast }) => {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx:{ borderRadius:'12px' } }}>
-      <DialogTitle sx={{ fontWeight:700, color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif" }}>Term Weights</DialogTitle>
+      <DialogTitle sx={{ fontWeight:700, color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>Term Weights</DialogTitle>
       <Divider />
       <DialogContent sx={{ pt:2.5, display:'flex', flexDirection:'column', gap:2 }}>
         <Typography sx={{ fontSize:'0.82rem', color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>
@@ -1114,7 +1114,7 @@ const AssignmentsTab = () => {
 
       {/* ── Create Assignment Dialog ── */}
       <Dialog open={dialog} onClose={()=>setDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx:{ borderRadius:'12px' } }}>
-        <DialogTitle sx={{ fontWeight:700, color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif" }}>New Assignment</DialogTitle>
+        <DialogTitle sx={{ fontWeight:700, color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>New Assignment</DialogTitle>
         <Divider />
         <DialogContent sx={{ pt:2.5, display:'flex', flexDirection:'column', gap:2 }}>
           <Box sx={{ display:'flex', gap:2 }}>
@@ -1156,7 +1156,7 @@ const AssignmentsTab = () => {
 
       {/* ── Files Dialog ── */}
       <Dialog open={!!filesDialog} onClose={()=>setFilesDialog(null)} maxWidth="sm" fullWidth PaperProps={{ sx:{ borderRadius:'12px' } }}>
-        <DialogTitle sx={{ fontWeight:700, color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif" }}>Attached Files — {filesDialog?.title}</DialogTitle>
+        <DialogTitle sx={{ fontWeight:700, color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>Attached Files — {filesDialog?.title}</DialogTitle>
         <Divider />
         <DialogContent sx={{ pt:2 }}>
           {assignFiles.length===0 ? <Typography sx={{ color:C.muted, py:2, fontFamily:"'IBM Plex Sans', sans-serif" }}>No files attached.</Typography>
@@ -1179,7 +1179,7 @@ const AssignmentsTab = () => {
 
       {/* ── Submissions Dialog ── */}
       <Dialog open={!!submissionsDialog} onClose={()=>setSubmissionsDialog(null)} maxWidth="md" fullWidth PaperProps={{ sx:{ borderRadius:'12px' } }}>
-        <DialogTitle sx={{ fontWeight:700, color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif" }}>Submissions — {submissionsDialog?.title}</DialogTitle>
+        <DialogTitle sx={{ fontWeight:700, color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>Submissions — {submissionsDialog?.title}</DialogTitle>
         <Divider />
         <DialogContent>
           {loadingSubs ? <Box sx={{ display:'flex', justifyContent:'center', py:4 }}><CircularProgress /></Box>
@@ -1295,7 +1295,7 @@ const ExamMarksTableView = () => {
               { label:'Captured',  value: students.reduce((n,s) => n + exams.filter(e => s.marks[String(e.id)]?.graded).length, 0) },
             ].map(stat => (
               <Box key={stat.label} sx={{ px:2, py:1, borderRadius:'8px', background:C.white, border:`1px solid ${C.border}` }}>
-                <Typography sx={{ fontSize:'1.1rem', fontWeight:800, color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif", lineHeight:1 }}>{stat.value}</Typography>
+                <Typography sx={{ fontSize:'1.1rem', fontWeight:800, color:C.text, fontFamily:"'IBM Plex Sans', sans-serif", lineHeight:1 }}>{stat.value}</Typography>
                 <Typography sx={{ fontSize:'0.72rem', color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>{stat.label}</Typography>
               </Box>
             ))}
@@ -1307,7 +1307,7 @@ const ExamMarksTableView = () => {
                   <TableCell sx={{ ...headCell, minWidth:140 }}>Student</TableCell>
                   {exams.map(e=>(
                     <TableCell key={e.id} sx={{ ...headCell, textAlign:'center', minWidth:110, verticalAlign:'bottom', pb:1 }}>
-                      <Typography sx={{ fontSize:'0.72rem', fontWeight:700, color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif", lineHeight:1.3 }}>{e.title}</Typography>
+                      <Typography sx={{ fontSize:'0.72rem', fontWeight:700, color:C.text, fontFamily:"'IBM Plex Sans', sans-serif", lineHeight:1.3 }}>{e.title}</Typography>
                       <Typography sx={{ fontSize:'0.65rem', color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>/{e.totalMarks}</Typography>
                     </TableCell>
                   ))}
@@ -1523,7 +1523,7 @@ const ExamsTab = () => {
       </Card>
 
       <Dialog open={dialog} onClose={()=>setDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx:{ borderRadius:'12px' } }}>
-        <DialogTitle sx={{ fontWeight:700, color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif" }}>New Exam</DialogTitle>
+        <DialogTitle sx={{ fontWeight:700, color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>New Exam</DialogTitle>
         <Divider />
         <DialogContent sx={{ pt:2.5, display:'flex', flexDirection:'column', gap:2 }}>
           <Box sx={{ display:'flex', gap:2 }}>
@@ -1559,7 +1559,7 @@ const ExamsTab = () => {
       </Dialog>
 
       <Dialog open={!!resultsDialog} onClose={()=>{ setResultsDialog(null); setResultsData(null); }} maxWidth="sm" fullWidth PaperProps={{ sx:{ borderRadius:'12px' } }}>
-        <DialogTitle sx={{ fontWeight:700, color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif", pb:1 }}>
+        <DialogTitle sx={{ fontWeight:700, color:C.text, fontFamily:"'IBM Plex Sans', sans-serif", pb:1 }}>
           Enter Results — {resultsDialog?.title}
           <Typography sx={{ fontSize:'0.8rem', color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>{resultsDialog?.className} · {resultsDialog?.subjectName} · Out of {resultsDialog?.totalMarks}</Typography>
         </DialogTitle>
@@ -1656,7 +1656,7 @@ const StudentsTab = ({ initClassId }) => {
         </Box>
         {classInfo && (
           <Box sx={{ display:'flex', alignItems:'center', gap:1.5, mb:2.5, p:1.5, borderRadius:'8px', background:'#EEF2FF', border:'1px solid #C7D2FE' }}>
-            <Typography sx={{ fontWeight:800, fontSize:'1.2rem', color:C.brand, fontFamily:"'IBM Plex Sans', sans-serif" }}>{classInfo.name}</Typography>
+            <Typography sx={{ fontWeight:800, fontSize:'1.2rem', color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>{classInfo.name}</Typography>
             {classInfo.stream && <Chip label={classInfo.stream} size="small" sx={{ fontWeight:700, fontSize:'0.72rem', bgcolor:'#EEF2FF', color:'#3730A3' }} />}
             <Typography sx={{ fontSize:'0.82rem', color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>Grade {classInfo.grade} · {students.length} student{students.length!==1?'s':''}</Typography>
           </Box>
@@ -1676,7 +1676,7 @@ const StudentsTab = ({ initClassId }) => {
                 {students.map((s, idx) => (
                   <TableRow key={s.id} sx={{ backgroundColor:idx%2===0?C.white:C.rowAlt, '&:hover':{ background:'#F0F7FF' } }}>
                     <TableCell sx={{ ...bodyCell, color:C.muted, textAlign:'center', width:40 }}>{idx+1}</TableCell>
-                    <TableCell sx={{ ...bodyCell, fontFamily:'monospace', fontSize:'0.8rem', color:C.brand, fontWeight:700 }}>{s.studentNumber}</TableCell>
+                    <TableCell sx={{ ...bodyCell, fontFamily:'monospace', fontSize:'0.8rem', color:C.text, fontWeight:700 }}>{s.studentNumber}</TableCell>
                     <TableCell sx={{ ...bodyCell, fontWeight:600 }}>{s.firstName} {s.lastName}</TableCell>
                     <TableCell sx={bodyCell}>{s.gender||'—'}</TableCell>
                     <TableCell sx={{ ...bodyCell, color:'#1565C0' }}>{s.email||'—'}</TableCell>

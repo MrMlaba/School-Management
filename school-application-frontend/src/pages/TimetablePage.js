@@ -23,7 +23,7 @@ const C = {
   headerBg:    '#F0F4F8',
   rowHover:    '#F7FAFC',
   rowAlt:      '#FAFBFC',
-  text:        '#1A2332',
+  text:        '#000000',
   muted:       '#6B7C93',
   white:       '#FFFFFF',
   danger:      '#C62828',
@@ -40,7 +40,7 @@ const DAYS  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 
 /* ─── Table styles ───────────────────────────────────────────── */
 const headCell = {
-  backgroundColor: C.headerBg, color: C.brand, fontWeight: 700,
+  backgroundColor: C.headerBg, color: C.text, fontWeight: 700,
   fontSize: '0.75rem', letterSpacing: '0.06em', textTransform: 'uppercase',
   borderBottom: `2px solid ${C.brand}`, borderRight: `1px solid ${C.border}`,
   padding: '9px 14px', whiteSpace: 'nowrap', fontFamily: "'IBM Plex Sans', sans-serif",
@@ -56,7 +56,7 @@ const Section = ({ title, subtitle, children, action }) => (
   <Box sx={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: '8px', p: 3, mb: 3 }}>
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
       <Box>
-        <Typography sx={{ fontWeight: 700, fontSize: '1rem', color: C.brand, fontFamily: "'IBM Plex Sans', sans-serif" }}>{title}</Typography>
+        <Typography sx={{ fontWeight: 700, fontSize: '1rem', color: C.text, fontFamily: "'IBM Plex Sans', sans-serif" }}>{title}</Typography>
         {subtitle && <Typography sx={{ fontSize: '0.82rem', color: C.muted, mt: 0.5, fontFamily: "'IBM Plex Sans', sans-serif" }}>{subtitle}</Typography>}
       </Box>
       {action}
@@ -260,7 +260,7 @@ const TeachersTab = () => {
 
       {/* ── Add / Edit dialog ──────────────────────────────── */}
       <Dialog open={dialog} onClose={() => setDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: '8px' } }}>
-        <DialogTitle sx={{ fontWeight: 700, color: C.brand, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+        <DialogTitle sx={{ fontWeight: 700, color: C.text, fontFamily: "'IBM Plex Sans', sans-serif" }}>
           {editing ? 'Edit Teacher' : 'Add Teacher'}
         </DialogTitle>
         <Divider />
@@ -526,7 +526,7 @@ const TimetableGrid = ({ classId, onBack }) => {
           <TableBody>
             {DAYS.map(day => (
               <TableRow key={day}>
-                <TableCell sx={{ ...bodyCell, background: C.headerBg, fontWeight:700, fontSize:'0.85rem', color: C.brand, whiteSpace:'nowrap' }}>
+                <TableCell sx={{ ...bodyCell, background: C.headerBg, fontWeight:700, fontSize:'0.85rem', color: C.text, whiteSpace:'nowrap' }}>
                   {day.slice(0,3)}
                 </TableCell>
                 {data.periods.map((period, i) => {
@@ -540,7 +540,7 @@ const TimetableGrid = ({ classId, onBack }) => {
                     <TableCell key={period.id} onClick={() => openSlot(period.id, day)} sx={{ ...bodyCell, p:'4px', cursor:'pointer', background: slot?C.filled:C.white, border:`1px solid ${slot?C.filledBorder:C.border}`, '&:hover':{ background: slot?'#D4EDDA':'#EFF6FF' }, minWidth:120, ...(i===data.periods.length-1?{borderRight:'none'}:{}) }}>
                       {slot ? (
                         <Box sx={{ p:'4px 6px', position:'relative' }}>
-                          <Typography sx={{ fontWeight:700, fontSize:'0.75rem', color: C.brand, fontFamily:"'IBM Plex Sans', sans-serif", lineHeight:1.3 }}>{slot.subjectName}</Typography>
+                          <Typography sx={{ fontWeight:700, fontSize:'0.75rem', color: C.text, fontFamily:"'IBM Plex Sans', sans-serif", lineHeight:1.3 }}>{slot.subjectName}</Typography>
                           <Typography sx={{ fontSize:'0.68rem', color: C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>{slot.teacherFirstName} {slot.teacherLastName}</Typography>
                           <IconButton size="small" onClick={e=>{ e.stopPropagation(); handleRemoveSlot(slot); }} sx={{ position:'absolute', top:0, right:0, width:16, height:16, p:0, color: C.muted, opacity:0, '.MuiTableCell-root:hover &':{opacity:1}, '&:hover':{color:C.danger} }}>
                             <CloseIcon sx={{ fontSize:11 }} />
@@ -562,7 +562,7 @@ const TimetableGrid = ({ classId, onBack }) => {
 
       {/* Slot dialog */}
       <Dialog open={!!slotDialog} onClose={() => setSlotDialog(null)} maxWidth="xs" fullWidth PaperProps={{ sx:{ borderRadius:'8px' } }}>
-        <DialogTitle sx={{ fontWeight:700, color: C.brand, fontFamily:"'IBM Plex Sans', sans-serif", pb:1 }}>
+        <DialogTitle sx={{ fontWeight:700, color: C.text, fontFamily:"'IBM Plex Sans', sans-serif", pb:1 }}>
           {slotDialog?.existing ? 'Edit Slot' : 'Assign Slot'}
           {slotDialog && <Typography sx={{ fontSize:'0.8rem', color: C.muted, fontFamily:"'IBM Plex Sans', sans-serif", mt:0.25 }}>{slotDialog.dayOfWeek} · {data.periods.find(p=>p.id===slotDialog.periodId)?.name}</Typography>}
         </DialogTitle>
@@ -672,7 +672,7 @@ const TimetableTab = () => {
         <Box sx={{ display:'flex', flexWrap:'wrap', gap:2 }}>
           {filtered.map(cls => (
             <Box key={cls.id} onClick={() => setSelectedClass(cls)} sx={{ width:160, p:2.5, borderRadius:'8px', cursor:'pointer', border:`1.5px solid ${C.border}`, background: C.white, textAlign:'center', '&:hover':{ borderColor: C.brand, background:'#EFF6FF' }, transition:'all 0.15s' }}>
-              <Typography sx={{ fontWeight:800, fontSize:'1.8rem', color: C.brand, lineHeight:1, fontFamily:"'IBM Plex Sans', sans-serif" }}>{cls.name}</Typography>
+              <Typography sx={{ fontWeight:800, fontSize:'1.8rem', color: C.text, lineHeight:1, fontFamily:"'IBM Plex Sans', sans-serif" }}>{cls.name}</Typography>
               <Typography sx={{ fontSize:'0.75rem', color: C.muted, mt:0.5, fontFamily:"'IBM Plex Sans', sans-serif" }}>Grade {cls.grade}</Typography>
               {cls.stream && <Chip label={cls.stream} size="small" sx={{ mt:1, fontWeight:700, fontSize:'0.7rem', bgcolor:'#EEF2FF', color:'#3730A3' }} />}
             </Box>

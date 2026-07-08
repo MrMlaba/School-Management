@@ -21,7 +21,7 @@ export const core = {
   border:     '#E2E8F0',
   headerBg:   '#F8FAFC',
   bg:         '#F0F4F8',
-  text:       '#1A2332',
+  text:       '#000000',
   muted:      '#6B7C93',
   white:      '#FFFFFF',
 };
