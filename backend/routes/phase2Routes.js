@@ -58,15 +58,47 @@ router.get('/terms', async (req, res) => {
   const schoolId = req.admin.schoolId;
   const { academicYearId } = req.query;
   try {
-    let query = `SELECT * FROM terms WHERE school_id = $1`;
+    // total_students / graded_students give the admin a rough "is grading
+    // actually done" signal before they release reports — not a hard gate,
+    // just enough to decide with eyes open.
+    let query = `
+      SELECT t.*,
+        (SELECT COUNT(*) FROM enrolled_students es WHERE es.school_id = t.school_id AND es.is_active = true) AS total_students,
+        (SELECT COUNT(DISTINCT r.student_id) FROM results r JOIN exams e ON e.id = r.exam_id WHERE e.term_id = t.id) AS graded_students
+      FROM terms t
+      WHERE t.school_id = $1`;
     const params = [schoolId];
-    if (academicYearId) { params.push(academicYearId); query += ` AND academic_year_id = $${params.length}`; }
-    query += ' ORDER BY term_number ASC';
+    if (academicYearId) { params.push(academicYearId); query += ` AND t.academic_year_id = $${params.length}`; }
+    query += ' ORDER BY t.term_number ASC';
     const { rows } = await pool.query(query, params);
     res.json(rows);
   } catch (err) {
     console.error('[terms GET]', err);
     res.status(500).json({ message: 'Failed to fetch terms' });
+  }
+});
+
+// PATCH /api/setup/terms/:id/release-reports — school admin releases (or
+// un-releases) report cards for a term. Only released terms are downloadable
+// from the student portal.
+router.patch('/terms/:id/release-reports', async (req, res) => {
+  const schoolId = req.admin.schoolId;
+  const released = !!req.body.released;
+  try {
+    const { rows } = await pool.query(
+      `UPDATE terms
+       SET reports_released = $1,
+           released_at = CASE WHEN $1 THEN NOW() ELSE NULL END,
+           released_by = CASE WHEN $1 THEN $2 ELSE NULL END
+       WHERE id = $3 AND school_id = $4
+       RETURNING *`,
+      [released, req.admin.username, req.params.id, schoolId]
+    );
+    if (!rows.length) return res.status(404).json({ message: 'Term not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('[release-reports]', err);
+    res.status(500).json({ message: 'Failed to update release status' });
   }
 });
 

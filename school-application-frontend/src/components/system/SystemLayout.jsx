@@ -64,10 +64,34 @@ const HealthPill = () => {
   );
 };
 
+// ── Live count of tickets awaiting a first response — polled more often than
+// health, since an unacknowledged ticket is something to act on right now.
+const useOpenTicketCount = () => {
+  const [count, setCount] = useState(0);
+
+  const check = useCallback(() => {
+    fetch(`${API_BASE}/api/system/support-tickets?status=open`, {
+      headers: { Authorization: `Bearer ${sessionStorage.getItem('systemToken')}` },
+    })
+      .then(r => r.json())
+      .then(d => setCount(Array.isArray(d) ? d.length : 0))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    check();
+    const id = setInterval(check, 30000);
+    return () => clearInterval(id);
+  }, [check]);
+
+  return count;
+};
+
 // ── Main layout component ─────────────────────────────────────
 const SystemLayout = ({ title, subtitle, children }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const openTicketCount = useOpenTicketCount();
 
   const handleLogout = () => {
     sessionStorage.removeItem('systemToken');
@@ -120,12 +144,14 @@ const SystemLayout = ({ title, subtitle, children }) => {
         }}>
           {CHAPTERS.map(c => {
             const active = location.pathname === c.path;
+            const badge  = c.path === '/system/tickets' ? openTicketCount : 0;
             return (
               <Box
                 key={c.path}
                 onClick={() => navigate(c.path)}
                 sx={{
                   py: 1.1, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', gap: 0.6,
                   borderBottom: active ? `2px solid ${BRAND}` : '2px solid transparent',
                   mb: '-1px',
                 }}
@@ -138,6 +164,16 @@ const SystemLayout = ({ title, subtitle, children }) => {
                   <Box component="span" sx={{ fontFamily: 'monospace', color: active ? BRAND : INK_FAINT, mr: 0.75 }}>{c.n}</Box>
                   {c.label}
                 </Typography>
+                {badge > 0 && (
+                  <Box sx={{
+                    minWidth: 17, height: 17, px: 0.5, borderRadius: '999px',
+                    bgcolor: core.danger, color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: FONT, fontSize: '0.66rem', fontWeight: 700, lineHeight: 1,
+                  }}>
+                    {badge > 99 ? '99+' : badge}
+                  </Box>
+                )}
               </Box>
             );
           })}

@@ -24,7 +24,13 @@ import DashboardIcon          from '@mui/icons-material/Dashboard';
 import BarChartIcon           from '@mui/icons-material/BarChart';
 import ScheduleIcon           from '@mui/icons-material/Schedule';
 import SchoolIcon from '@mui/icons-material/School';
+import EventAvailableIcon     from '@mui/icons-material/EventAvailable';
+import PersonOutlineIcon      from '@mui/icons-material/PersonOutline';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
+import DownloadIcon           from '@mui/icons-material/Download';
+import ErrorOutlineIcon       from '@mui/icons-material/ErrorOutline';
 import SchoolLogoHeader from '../components/SchoolLogoHeader';
+import API_BASE from '../config';
 
 /* ─── Google Fonts ─────────────────────────────────────────────────────── */
 const _fl = document.createElement('link');
@@ -195,7 +201,13 @@ const T = {
 };
 
 const SIDEBAR_W = 240;
-const BASE = 'https://school-management-production-6167.up.railway.app';
+const BASE = API_BASE;
+
+const TAB_TITLES = {
+  overview: 'Overview', assignments: 'Assignments', quizzes: 'Quizzes',
+  results: 'Results', deadlines: 'Deadlines', exams: 'Exams',
+  attendance: 'Attendance', profile: 'My Profile',
+};
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 const getInitials = s => s ? `${s.firstName?.[0]??''}${s.lastName?.[0]??''}`.toUpperCase() : '?';
@@ -315,6 +327,8 @@ function Sidebar({student,desktopTab,setDesktopTab,overdueCount,pendingQuizzesCo
     {key:'results',    label:'Results',     icon:<BarChartIcon   sx={{fontSize:17}}/>},
     {key:'deadlines',  label:'Deadlines',   icon:<ScheduleIcon   sx={{fontSize:17}}/>},
     {key:'exams', label:'Exams', icon:<SchoolIcon sx={{fontSize:17}}/>},
+    {key:'attendance', label:'Attendance', icon:<EventAvailableIcon sx={{fontSize:17}}/>},
+    {key:'profile', label:'My Profile', icon:<PersonOutlineIcon sx={{fontSize:17}}/>},
   ];
   const LINKS = [
     {label:'Class Chat', icon:<ChatBubbleOutlineIcon sx={{fontSize:15}}/>, href:`/classroom-chat/${gradeId}`},
@@ -404,6 +418,10 @@ export default function StudentDashboard() {
   const [quizzes,        setQuizzes]        = useState([]);
   const [loading,        setLoading]        = useState(true);
   const [exams, setExams] = useState([]);
+  const [performance,    setPerformance]    = useState(null); // { subjectResults, average }
+  const [attendance,     setAttendance]     = useState(null); // { records, summary }
+  const [reportTerms,    setReportTerms]    = useState([]);
+  const [loadErrors,     setLoadErrors]     = useState([]); // plain-language messages for sections that failed to load
   const [mobileTab,      setMobileTab]      = useState('home');
   const [desktopTab,     setDesktopTab]     = useState('overview');
   const navigate = useNavigate();
@@ -415,28 +433,37 @@ export default function StudentDashboard() {
     if (!token){navigate('/student-login');return;}
     const headers = {Authorization:`Bearer ${token}`};
     (async()=>{
+      const errors = [];
       try {
-        const [pRes,aRes,sRes,qRes,eRes] = await Promise.all([
-          fetch(`${BASE}/api/student/me`,          {headers}),
-          fetch(`${BASE}/api/student/assignments`, {headers}),
-          fetch(`${BASE}/api/student/submissions`, {headers}),
-          fetch(`${BASE}/api/student/quizzes`,     {headers}),
-          fetch(`${BASE}/api/student/exams`,       {headers}),
+        const [pRes,aRes,sRes,qRes,eRes,perfRes,attRes,rtRes] = await Promise.all([
+          fetch(`${BASE}/api/student/me`,             {headers}),
+          fetch(`${BASE}/api/student/assignments`,    {headers}),
+          fetch(`${BASE}/api/student/submissions`,    {headers}),
+          fetch(`${BASE}/api/student/quizzes`,        {headers}),
+          fetch(`${BASE}/api/student/exams`,          {headers}),
+          fetch(`${BASE}/api/student/performance`,    {headers}),
+          fetch(`${BASE}/api/student/attendance`,     {headers}),
+          fetch(`${BASE}/api/student/report-terms`,   {headers}),
         ]);
         if (pRes.status===401){sessionStorage.removeItem('studentToken');navigate('/student-login');return;}
         if (pRes.ok) setStudent(await pRes.json());
-        if (aRes.ok) setAssignments(await aRes.json());
+        if (aRes.ok) setAssignments(await aRes.json()); else errors.push('Assignments could not be loaded.');
         if (sRes.ok){
           const subs=await sRes.json(),map={};
           subs.forEach(s=>{map[String(s.assignmentId)]=s;});
           setSubmissionsMap(map);
         }
-        if (qRes?.ok) setQuizzes(await qRes.json());
-        if (eRes?.ok) setExams(await eRes.json());
-      } catch(e){console.error(e);}
-      
-      finally{setLoading(false);}
-      
+        if (qRes?.ok) setQuizzes(await qRes.json()); else errors.push('Quizzes could not be loaded.');
+        if (eRes?.ok) setExams(await eRes.json()); else errors.push('Exams could not be loaded.');
+        if (perfRes?.ok) setPerformance(await perfRes.json()); else errors.push('Your average mark could not be loaded.');
+        if (attRes?.ok) setAttendance(await attRes.json()); else errors.push('Attendance could not be loaded.');
+        if (rtRes?.ok) setReportTerms(await rtRes.json());
+      } catch(e){
+        console.error(e);
+        errors.push('Some information could not be loaded — check your connection.');
+      }
+      setLoadErrors(errors);
+      setLoading(false);
     })();
   },[navigate]);
 
@@ -446,7 +473,9 @@ export default function StudentDashboard() {
   const overdueCount      = assignments.filter(a=>{const d=daysUntil(a.dueDate);return d!==null&&d<0&&!submissionsMap[String(a.id)];}).length;
   const dueSoonCount      = assignments.filter(a=>{const d=daysUntil(a.dueDate);return d!==null&&d>=0&&d<=3;}).length;
   const gradedSubs        = Object.values(submissionsMap).filter(s=>s.gradedAt&&s.percentage!=null);
-  const avgMark           = gradedSubs.length>0 ? Math.round(gradedSubs.reduce((s,x)=>s+parseFloat(x.percentage),0)/gradedSubs.length) : null;
+  // Average now comes from the same combined assignments+exams calculation the
+  // official report card uses — no longer a frontend-only assignments-only number.
+  const avgMark           = performance?.average ?? null;
   const sortedAssignments = [...assignments].sort((a,b)=>new Date(a.dueDate??0)-new Date(b.dueDate??0));
   const pendingDeadlines  = assignments.filter(a=>{const d=daysUntil(a.dueDate);return d!==null&&d>=0&&!submissionsMap[String(a.id)];}).sort((a,b)=>new Date(a.dueDate)-new Date(b.dueDate));
   const pendingQuizzes    = quizzes.filter(q=>!q.submittedAt);
@@ -479,6 +508,18 @@ export default function StudentDashboard() {
         <StatTile icon={<TrendingUpIcon/>} label="Avg Mark"        value={avgMark!=null?`${avgMark}%`:'—'}       accent={T.green} delay={100} sub={avgMark!=null?gradeLabel(avgMark).text:null}/>
         <StatTile icon={<QuizIcon/>}       label="Quizzes Pending" value={pendingQuizzes.length}                accent="#7C3AED" delay={150}/>
       </Box>
+
+      {/* Report card ready */}
+      {reportTerms.length>0&&(
+        <Box onClick={()=>setMobileTab('profile')} sx={{p:2,borderRadius:'var(--r)',background:T.greenL,border:'1px solid #A7F3D0',display:'flex',alignItems:'center',gap:1.5,cursor:'pointer'}}>
+          <DescriptionOutlinedIcon sx={{color:T.green,fontSize:22,flexShrink:0}}/>
+          <Box sx={{flex:1,minWidth:0}}>
+            <Typography sx={{fontWeight:700,fontSize:'0.9rem',color:T.green,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Your report card is ready</Typography>
+            <Typography sx={{fontSize:'0.78rem',color:T.green,opacity:.8,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Tap to download · {reportTerms.length} term{reportTerms.length!==1?'s':''} available</Typography>
+          </Box>
+          <ArrowForwardIcon sx={{color:T.green,fontSize:18,flexShrink:0}}/>
+        </Box>
+      )}
 
       {/* Overdue alert */}
       {overdueCount>0&&(
@@ -626,11 +667,12 @@ export default function StudentDashboard() {
           {[
             {label:'Timetable', icon:<CalendarMonthIcon    sx={{fontSize:22,color:T.blue}}/>, href:'/student/timetable', disabled:false},
             {label:'Class Chat', icon:<ChatBubbleOutlineIcon sx={{fontSize:22,color:T.blue}}/>, href:`/classroom-chat/${gradeId}`, disabled:false},
-            {label:'My Profile', icon:<GradeIcon             sx={{fontSize:22,color:T.ink4}}/>, href:'#', disabled:true},
+            {label:'My Profile', icon:<PersonOutlineIcon    sx={{fontSize:22,color:T.blue}}/>, onClick:()=>setMobileTab('profile'), disabled:false},
+            {label:'Attendance', icon:<EventAvailableIcon   sx={{fontSize:22,color:T.blue}}/>, onClick:()=>setMobileTab('attendance'), disabled:false},
             {label:'Messages',   icon:<MenuBookIcon          sx={{fontSize:22,color:T.ink4}}/>, href:'#', disabled:true},
           ].map(link=>(
             <Box key={link.label}
-              component={link.disabled?'div':'a'} href={link.href}
+              component={link.disabled?'div':(link.href?'a':'div')} href={link.href} onClick={link.onClick}
               className={link.disabled?'':' sd-link-card'}
               sx={link.disabled?{display:'flex',flexDirection:'column',alignItems:'center',gap:1,p:'18px 12px',borderRadius:'var(--r)',border:`1px solid ${T.border}`,background:T.paper2,opacity:.4,cursor:'not-allowed'}:{}}>
               {link.icon}
@@ -653,6 +695,16 @@ export default function StudentDashboard() {
   const DesktopOverview = ()=>(
     <Box sx={{display:'grid',gridTemplateColumns:'1fr 320px',gap:2.5,alignItems:'start'}}>
       <Box sx={{display:'flex',flexDirection:'column',gap:2.5}}>
+        {reportTerms.length>0&&(
+          <Box onClick={()=>setDesktopTab('profile')} sx={{p:2.5,borderRadius:'var(--r)',background:T.greenL,border:'1px solid #A7F3D0',display:'flex',alignItems:'center',gap:2,cursor:'pointer',transition:'transform .15s','&:hover':{transform:'translateY(-1px)'}}}>
+            <DescriptionOutlinedIcon sx={{color:T.green,fontSize:26,flexShrink:0}}/>
+            <Box sx={{flex:1,minWidth:0}}>
+              <Typography sx={{fontWeight:700,fontSize:'0.95rem',color:T.green,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Your report card is ready</Typography>
+              <Typography sx={{fontSize:'0.8rem',color:T.green,opacity:.8,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{reportTerms.length} term{reportTerms.length!==1?'s':''} available — click to view and download</Typography>
+            </Box>
+            <ArrowForwardIcon sx={{color:T.green,fontSize:20,flexShrink:0}}/>
+          </Box>
+        )}
         <AssignmentsSection sortedAssignments={sortedAssignments} submissionsMap={submissionsMap} assignments={assignments}/>
         {avgMark!=null&&(
           <Card title="Performance" delay={200}>
@@ -691,11 +743,21 @@ export default function StudentDashboard() {
       {/* Main content */}
       <Box sx={{flex:1,ml:{xs:0,md:`${SIDEBAR_W}px`},minHeight:'100dvh',display:'flex',flexDirection:'column'}}>
 
+        {/* Load errors — distinguishes "something broke" from "you just have none" */}
+        {loadErrors.length>0 && (
+          <Box sx={{display:'flex',alignItems:'center',gap:1,px:{xs:2,md:4},py:1.25,background:T.redL,borderBottom:'1px solid #FECACA'}}>
+            <ErrorOutlineIcon sx={{fontSize:17,color:T.red,flexShrink:0}}/>
+            <Typography sx={{fontSize:'0.78rem',color:T.red,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>
+              {loadErrors.join(' ')}
+            </Typography>
+          </Box>
+        )}
+
         {/* Desktop topbar */}
         <Box sx={{display:{xs:'none',md:'flex'},alignItems:'center',justifyContent:'space-between',px:4,py:2.25,borderBottom:`1px solid ${T.border}`,background:T.paper,position:'sticky',top:0,zIndex:100,boxShadow:'0 1px 4px rgba(17,24,39,0.05)'}}>
           <Box>
             <Typography sx={{fontWeight:700,fontSize:'1.05rem',color:T.ink,fontFamily:"'Fraunces',serif",lineHeight:1.2}}>
-              {desktopTab==='overview'?'Overview':desktopTab==='assignments'?'Assignments':desktopTab==='quizzes'?'Quizzes':desktopTab==='results'?'Results':'Deadlines'}
+              {TAB_TITLES[desktopTab] || 'Overview'}
             </Typography>
             {student&&<Typography sx={{fontSize:'0.7rem',color:T.ink4,fontFamily:"'Plus Jakarta Sans',sans-serif",mt:'2px'}}>Welcome back, {student.firstName}</Typography>}
           </Box>
@@ -758,6 +820,8 @@ export default function StudentDashboard() {
           {desktopTab==='results'     && <RecentResultsSection gradedSubs={gradedSubs} assignments={assignments} fullWidth/>}
           {desktopTab==='deadlines'   && <DeadlinesSection pendingDeadlines={pendingDeadlines} fullWidth/>}
           {desktopTab==='exams' && <ExamsSection exams={exams} fullWidth/>}
+          {desktopTab==='attendance' && <AttendanceSection attendance={attendance}/>}
+          {desktopTab==='profile' && <ProfileSection student={student} reportTerms={reportTerms}/>}
         </Box>
 
         {/* ── FIX: Mobile content — sd-scroll for iOS smooth scroll, mob-content for safe bottom padding ── */}
@@ -767,6 +831,8 @@ export default function StudentDashboard() {
           {mobileTab==='quizzes' && <MobileQuizzes/>}
           {mobileTab==='grades'  && <MobileGrades/>}
           {mobileTab==='exams' && <ExamsSection exams={exams} fullWidth/>}
+          {mobileTab==='attendance' && <AttendanceSection attendance={attendance}/>}
+          {mobileTab==='profile' && <ProfileSection student={student} reportTerms={reportTerms}/>}
           {mobileTab==='more'    && <MobileMore/>}
         </Box>
       </Box>
@@ -1080,6 +1146,128 @@ function ExamsSection({ exams, fullWidth }) {
   );
 }
 
+function AttendanceSection({ attendance }) {
+  const summary = attendance?.summary;
+  const records = attendance?.records || [];
+  const pct = summary?.percentage;
+  const ringColor = pct==null ? T.ink4 : pct>=80 ? T.green : pct>=60 ? T.amber : T.red;
+  const statusColor = status => status==='present' ? T.green : status==='late' ? T.amber : status==='excused' ? T.blue : T.red;
 
+  return (
+    <Box sx={{display:'flex',flexDirection:'column',gap:2}}>
+      <Box className="sd-card sd-up" sx={{p:2.5,display:'flex',alignItems:'center',gap:2.5}}>
+        <Box sx={{width:64,height:64,borderRadius:'50%',border:`4px solid ${ringColor}`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+          <Typography sx={{fontWeight:800,fontSize:'1.15rem',color:ringColor,fontFamily:"'Fraunces',serif",lineHeight:1}}>{pct!=null?`${pct}%`:'—'}</Typography>
+        </Box>
+        <Box>
+          <Typography sx={{fontWeight:700,fontSize:'0.95rem',color:T.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Attendance rate</Typography>
+          <Typography sx={{fontSize:'0.78rem',color:T.ink3,fontFamily:"'Plus Jakarta Sans',sans-serif",mt:'2px'}}>
+            {summary?.total ? `Present ${summary.present} of ${summary.total} recorded days` : 'No attendance recorded yet.'}
+          </Typography>
+        </Box>
+      </Box>
+
+      <Card title="Recent Attendance">
+        <Box sx={{p:1.75,display:'flex',flexDirection:'column',gap:0.75}}>
+          {records.length===0
+            ? <Typography sx={{color:T.ink4,fontSize:'0.82rem',textAlign:'center',py:3,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>No attendance recorded yet.</Typography>
+            : records.slice(0,30).map((r,i)=>(
+              <Box key={i} sx={{display:'flex',alignItems:'center',justifyContent:'space-between',px:1.75,py:1,borderRadius:'var(--r-sm)',background:T.paper3,border:`1px solid ${T.border}`}}>
+                <Typography sx={{fontSize:'0.82rem',color:T.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{fmtDate(r.date)}</Typography>
+                <Box sx={{display:'flex',alignItems:'center',gap:1}}>
+                  {r.note && <Typography sx={{fontSize:'0.72rem',color:T.ink4,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{r.note}</Typography>}
+                  <Box sx={{px:1.25,py:'3px',borderRadius:'6px',background:`${statusColor(r.status)}18`}}>
+                    <Typography sx={{fontSize:'0.72rem',fontWeight:700,color:statusColor(r.status),fontFamily:"'Plus Jakarta Sans',sans-serif",textTransform:'capitalize'}}>{r.status}</Typography>
+                  </Box>
+                </Box>
+              </Box>
+            ))}
+        </Box>
+      </Card>
+    </Box>
+  );
+}
+
+function ProfileSection({ student, reportTerms }) {
+  const [downloadingId, setDownloadingId] = useState(null);
+  const [downloadError, setDownloadError] = useState('');
+
+  const downloadReportCard = async (termId) => {
+    setDownloadingId(termId);
+    setDownloadError('');
+    try {
+      const token = sessionStorage.getItem('studentToken');
+      const res = await fetch(`${BASE}/api/student/report-card/${termId}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) { setDownloadError('Could not download this report card. Please try again.'); return; }
+      const blob = await res.blob();
+      window.open(URL.createObjectURL(blob), '_blank');
+    } catch {
+      setDownloadError('Network error while downloading. Please try again.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  if (!student) return null;
+
+  return (
+    <Box sx={{display:'flex',flexDirection:'column',gap:2}}>
+      <Box className="sd-card sd-up" sx={{p:2.5}}>
+        <Box sx={{display:'flex',alignItems:'center',gap:2,mb:2.5}}>
+          <Avatar sx={{width:56,height:56,fontSize:'1.1rem',fontWeight:800,background:T.ink,color:T.amber,fontFamily:"'Fraunces',serif"}}>{getInitials(student)}</Avatar>
+          <Box>
+            <Typography sx={{fontWeight:700,fontSize:'1.05rem',color:T.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{student.firstName} {student.lastName}</Typography>
+            <Typography sx={{fontSize:'0.8rem',color:T.ink3,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{student.grade}{student.stream?` · ${student.stream}`:''}</Typography>
+          </Box>
+        </Box>
+        <Box sx={{display:'grid',gridTemplateColumns:{xs:'1fr',sm:'1fr 1fr'},gap:1.5}}>
+          {[
+            {label:'Student Number', value:student.studentNumber||'—'},
+            {label:'Email',          value:student.email||'—'},
+            {label:'Phone',          value:student.phone||'—'},
+            {label:'Enrolled',       value:fmtDate(student.enrollmentDate)},
+          ].map(f=>(
+            <Box key={f.label} sx={{p:1.5,borderRadius:'var(--r-sm)',background:T.paper3,border:`1px solid ${T.border}`}}>
+              <Typography sx={{fontSize:'0.68rem',color:T.ink4,fontFamily:"'Plus Jakarta Sans',sans-serif",textTransform:'uppercase',letterSpacing:'0.06em',mb:'3px'}}>{f.label}</Typography>
+              <Typography sx={{fontSize:'0.88rem',fontWeight:600,color:T.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",wordBreak:'break-word'}}>{f.value}</Typography>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+
+      <Card title="Report Cards" aside={reportTerms.length>0&&(
+        <Box sx={{px:1.25,py:'3px',borderRadius:'6px',background:T.greenL}}>
+          <Typography sx={{fontSize:'0.65rem',fontWeight:700,color:T.green,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{reportTerms.length} available</Typography>
+        </Box>
+      )}>
+        <Box sx={{p:1.75,display:'flex',flexDirection:'column',gap:1}}>
+          {downloadError && (
+            <Typography sx={{color:T.red,fontSize:'0.78rem',fontFamily:"'Plus Jakarta Sans',sans-serif",mb:0.5}}>{downloadError}</Typography>
+          )}
+          {reportTerms.length===0
+            ? <Typography sx={{color:T.ink4,fontSize:'0.82rem',textAlign:'center',py:3,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Your school hasn't released a report card yet. Check back once your teachers have finished grading for the term.</Typography>
+            : reportTerms.map(t=>(
+              <Box key={t.id} sx={{display:'flex',alignItems:'center',justifyContent:'space-between',px:1.75,py:1.25,borderRadius:'var(--r-sm)',background:T.paper3,border:`1px solid ${T.border}`,flexWrap:'wrap',gap:1}}>
+                <Box sx={{display:'flex',alignItems:'center',gap:1.25}}>
+                  <DescriptionOutlinedIcon sx={{fontSize:20,color:T.blue,flexShrink:0}}/>
+                  <Box>
+                    <Typography sx={{fontSize:'0.88rem',fontWeight:700,color:T.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Term {t.termNumber} Report</Typography>
+                    <Typography sx={{fontSize:'0.7rem',color:T.ink4,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Released {fmtDate(t.releasedAt)}</Typography>
+                  </Box>
+                </Box>
+                <Button size="small" variant="contained" disabled={downloadingId===t.id} onClick={()=>downloadReportCard(t.id)}
+                  startIcon={downloadingId===t.id?<CircularProgress size={14} sx={{color:'#fff'}}/>:<DownloadIcon sx={{fontSize:16}}/>}
+                  sx={{background:T.blue,textTransform:'none',fontWeight:700,fontSize:'0.78rem',boxShadow:'none',fontFamily:"'Plus Jakarta Sans',sans-serif",borderRadius:'8px','&:hover':{background:'#1D4ED8'}}}>
+                  {downloadingId===t.id?'Preparing…':'Download'}
+                </Button>
+              </Box>
+            ))}
+        </Box>
+      </Card>
+    </Box>
+  );
+}
 
 

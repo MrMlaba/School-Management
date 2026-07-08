@@ -10,7 +10,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Typography, Button, CircularProgress, LinearProgress, Tooltip } from '@mui/material';
+import { Box, Typography, Button, CircularProgress, LinearProgress, Tooltip, Alert } from '@mui/material';
 import CheckCircleIcon   from '@mui/icons-material/CheckCircle';
 import CancelIcon        from '@mui/icons-material/Cancel';
 import AccessTimeIcon    from '@mui/icons-material/AccessTime';
@@ -18,28 +18,29 @@ import MenuBookIcon      from '@mui/icons-material/MenuBook';
 import ArrowBackIcon     from '@mui/icons-material/ArrowBack';
 import EmojiEventsIcon   from '@mui/icons-material/EmojiEvents';
 import LightbulbIcon     from '@mui/icons-material/Lightbulb';
+import API_BASE from '../config';
 
 const T = {
-  navy:      '#0B1F3A',
-  navyLight: '#1E3D6B',
-  gold:      '#D4A843',
-  goldLight: '#F0C96A',
-  bg:        '#F0F3FB',
+  navy:      '#0F1F1A',
+  navyLight: '#1F3329',
+  gold:      '#D97706',
+  goldLight: '#FDE68A',
+  bg:        '#F4FAF7',
   white:     '#FFFFFF',
-  border:    '#E1E8F4',
-  muted:     '#7A8BA0',
-  text:      '#1A2B3C',
-  success:   '#1A8A5A',
-  successBg: '#E6F7F0',
-  warn:      '#B45309',
+  border:    '#D1E8E0',
+  muted:     '#4B6860',
+  text:      '#0F1F1A',
+  success:   '#059669',
+  successBg: '#D1FAE5',
+  warn:      '#D97706',
   warnBg:    '#FEF3C7',
-  danger:    '#B91C1C',
+  danger:    '#DC2626',
   dangerBg:  '#FEE2E2',
-  purple:    '#6D28D9',
+  purple:    '#7C3AED',
   purpleBg:  '#EDE9FE',
 };
 
-const BASE    = 'https://school-management-production-6167.up.railway.app';
+const BASE    = API_BASE;
 const authHdr = () => ({ Authorization: `Bearer ${sessionStorage.getItem('studentToken')}` });
 const jsonHdr = () => ({ 'Content-Type': 'application/json', ...authHdr() });
 
@@ -73,19 +74,17 @@ export default function StudentQuizAttempt() {
   const [current, setCurrent] = useState(0);          // current question index
   const [timeLeft, setTimeLeft] = useState(0);
   const [startedAt, setStartedAt] = useState(null);
+  const [submitError, setSubmitError] = useState('');
   const timerRef = useRef(null);
 
-  /* ── Load quiz ── */
-  useEffect(() => {
-    const token = sessionStorage.getItem('studentToken');
-    if (!token) { navigate('/student-login'); return; }
-
-    (async () => {
+  /* ── Load quiz (also used by the "Try Again" button on the error screen) ── */
+  const loadQuiz = useCallback(async () => {
+    setPhase('loading');
+    try {
       const res = await fetch(`${BASE}/api/student/quizzes/${id}`, { headers: authHdr() });
 
       if (res.status === 409) {
         // Already submitted — load result
-        setPhase('loading');
         const rRes = await fetch(`${BASE}/api/student/quizzes/${id}/result`, { headers: authHdr() });
         if (rRes.ok) { setResult(await rRes.json()); setPhase('result'); }
         else setPhase('already_done');
@@ -98,45 +97,64 @@ export default function StudentQuizAttempt() {
       setQuiz(data);
       setTimeLeft((data.timeLimitMinutes || data.time_limit_minutes || 30) * 60);
       setPhase('intro');
-    })();
-  }, [id, navigate]);
+    } catch {
+      setPhase('error');
+    }
+  }, [id]);
+
+  useEffect(() => {
+    const token = sessionStorage.getItem('studentToken');
+    if (!token) { navigate('/student-login'); return; }
+    loadQuiz();
+  }, [navigate, loadQuiz]);
 
   /* ── Countdown timer (starts when attempt begins) ── */
-  const handleSubmit = useCallback(async (auto = false) => {
+  const handleSubmit = useCallback(async () => {
     if (phase !== 'attempt') return;
     clearInterval(timerRef.current);
     setPhase('submitting');
+    setSubmitError('');
 
     const timeTaken = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : null;
 
-    const res = await fetch(`${BASE}/api/student/quizzes/${id}/attempt`, {
-      method: 'POST', headers: jsonHdr(),
-      body:   JSON.stringify({ answers, timeTakenSeconds: timeTaken }),
-    });
+    try {
+      const res = await fetch(`${BASE}/api/student/quizzes/${id}/attempt`, {
+        method: 'POST', headers: jsonHdr(),
+        body:   JSON.stringify({ answers, timeTakenSeconds: timeTaken }),
+      });
 
-    if (!res.ok) {
-      const e = await res.json();
-      if (e.message?.includes('Already')) {
-        // Race condition — load result
-        const rRes = await fetch(`${BASE}/api/student/quizzes/${id}/result`, { headers: authHdr() });
-        if (rRes.ok) { setResult(await rRes.json()); setPhase('result'); }
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        if (e.message?.includes('Already')) {
+          // Race condition — load result
+          const rRes = await fetch(`${BASE}/api/student/quizzes/${id}/result`, { headers: authHdr() });
+          if (rRes.ok) { setResult(await rRes.json()); setPhase('result'); return; }
+        }
+        // Don't strand the student on a permanent "Submitting…" screen or
+        // throw their answers away — let them retry from where they left off.
+        setSubmitError('Could not submit your quiz. Check your connection and try again.');
+        setPhase('attempt');
         return;
       }
-      setPhase('error');
-      return;
-    }
 
-    // Fetch full result with explanations
-    const rRes = await fetch(`${BASE}/api/student/quizzes/${id}/result`, { headers: authHdr() });
-    if (rRes.ok) { setResult(await rRes.json()); setPhase('result'); }
-    else setPhase('error');
+      // Fetch full result with explanations
+      const rRes = await fetch(`${BASE}/api/student/quizzes/${id}/result`, { headers: authHdr() });
+      if (rRes.ok) { setResult(await rRes.json()); setPhase('result'); }
+      else {
+        setSubmitError('Your quiz was submitted, but the result could not be loaded. Try refreshing the page.');
+        setPhase('attempt');
+      }
+    } catch {
+      setSubmitError('Network error while submitting. Check your connection and try again.');
+      setPhase('attempt');
+    }
   }, [phase, id, answers, startedAt]);
 
   useEffect(() => {
     if (phase === 'attempt') {
       timerRef.current = setInterval(() => {
         setTimeLeft(t => {
-          if (t <= 1) { clearInterval(timerRef.current); handleSubmit(true); return 0; }
+          if (t <= 1) { clearInterval(timerRef.current); handleSubmit(); return 0; }
           return t - 1;
         });
       }, 1000);
@@ -176,8 +194,12 @@ export default function StudentQuizAttempt() {
   ══════════════════════════════════ */
   if (phase === 'error') return (
     <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: T.bg, gap: 2 }}>
-      <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: T.danger, fontFamily: "'DM Sans', sans-serif" }}>Quiz not available</Typography>
-      <Button onClick={() => navigate(-1)} sx={{ textTransform: 'none', color: T.navyLight }}>← Go back</Button>
+      <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: T.danger, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Quiz not available</Typography>
+      <Typography sx={{ fontSize: '0.85rem', color: T.muted, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>This may just be a connection issue — try again.</Typography>
+      <Box sx={{ display: 'flex', gap: 1.5 }}>
+        <Button variant="contained" onClick={loadQuiz} sx={{ background: T.navy, textTransform: 'none', fontWeight: 700, boxShadow: 'none' }}>Try Again</Button>
+        <Button onClick={() => navigate(-1)} sx={{ textTransform: 'none', color: T.navyLight }}>← Go back</Button>
+      </Box>
     </Box>
   );
 
@@ -186,7 +208,7 @@ export default function StudentQuizAttempt() {
   ══════════════════════════════════ */
   if (phase === 'already_done') return (
     <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: T.bg, gap: 2 }}>
-      <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: T.muted, fontFamily: "'DM Sans', sans-serif" }}>You've already submitted this quiz.</Typography>
+      <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: T.muted, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>You've already submitted this quiz.</Typography>
       <Button onClick={() => navigate(-1)} sx={{ textTransform: 'none', color: T.navyLight }}>← Go back</Button>
     </Box>
   );
@@ -195,8 +217,8 @@ export default function StudentQuizAttempt() {
      PHASE: INTRO
   ══════════════════════════════════ */
   if (phase === 'intro' && quiz) return (
-    <Box sx={{ minHeight: '100vh', background: T.bg, display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700;9..40,800&family=Lora:wght@600;700&display=swap');`}</style>
+    <Box sx={{ minHeight: '100vh', background: T.bg, display: 'flex', flexDirection: 'column', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');`}</style>
 
       {/* Nav */}
       <Box sx={{ background: T.navy, px: { xs: 2, md: 4 }, height: 56, display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -212,7 +234,7 @@ export default function StudentQuizAttempt() {
           <Box sx={{ width: 60, height: 60, borderRadius: '16px', background: T.purpleBg, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2.5 }}>
             <MenuBookIcon sx={{ color: T.purple, fontSize: 28 }} />
           </Box>
-          <Typography sx={{ fontWeight: 700, fontSize: '1.5rem', color: T.text, fontFamily: "'Lora', serif", lineHeight: 1.2, mb: 0.75 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '1.5rem', color: T.text, fontFamily: "'Fraunces', serif", lineHeight: 1.2, mb: 0.75 }}>
             {quiz.title}
           </Typography>
           <Typography sx={{ fontSize: '0.85rem', color: T.muted, mb: 3 }}>
@@ -268,8 +290,8 @@ export default function StudentQuizAttempt() {
     if (!q) return null;
 
     return (
-      <Box sx={{ minHeight: '100vh', background: T.bg, display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif" }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,700;9..40,800&display=swap');`}</style>
+      <Box sx={{ minHeight: '100vh', background: T.bg, display: 'flex', flexDirection: 'column', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');`}</style>
 
         {/* Top bar */}
         <Box sx={{ background: T.navy, px: { xs: 2, md: 4 }, py: 1.25, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 12px rgba(11,31,58,0.2)' }}>
@@ -297,7 +319,7 @@ export default function StudentQuizAttempt() {
                 const answered = !!answers[String(quiz.questions[i].id)];
                 const isCur    = i === current;
                 return (
-                  <Box key={i} onClick={() => setCurrent(i)} sx={{ width: 32, height: 32, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', fontFamily: "'DM Sans', sans-serif", background: isCur ? T.navy : answered ? T.navyLight + '28' : T.border, color: isCur ? T.white : answered ? T.navyLight : T.muted, border: `1.5px solid ${isCur ? T.navy : answered ? T.navyLight + '60' : T.border}`, transition: 'all 0.12s' }}>
+                  <Box key={i} onClick={() => setCurrent(i)} sx={{ width: 32, height: 32, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', fontFamily: "'Plus Jakarta Sans', sans-serif", background: isCur ? T.navy : answered ? T.navyLight + '28' : T.border, color: isCur ? T.white : answered ? T.navyLight : T.muted, border: `1.5px solid ${isCur ? T.navy : answered ? T.navyLight + '60' : T.border}`, transition: 'all 0.12s' }}>
                     {i + 1}
                   </Box>
                 );
@@ -313,7 +335,7 @@ export default function StudentQuizAttempt() {
                 {q.topic && <Typography sx={{ fontSize: '0.7rem', color: T.muted }}>{q.topic}</Typography>}
               </Box>
 
-              <Typography sx={{ fontWeight: 700, fontSize: { xs: '1rem', md: '1.1rem' }, color: T.text, lineHeight: 1.5, mb: 3, fontFamily: "'DM Sans', sans-serif" }}>
+              <Typography sx={{ fontWeight: 700, fontSize: { xs: '1rem', md: '1.1rem' }, color: T.text, lineHeight: 1.5, mb: 3, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 {q.question}
               </Typography>
 
@@ -328,7 +350,7 @@ export default function StudentQuizAttempt() {
                       <Box sx={{ width: 36, height: 36, borderRadius: '10px', background: selected ? T.navy : T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
                         <Typography sx={{ fontWeight: 800, fontSize: '0.85rem', color: selected ? T.white : T.muted }}>{letter}</Typography>
                       </Box>
-                      <Typography sx={{ fontWeight: selected ? 700 : 400, fontSize: '0.9rem', color: selected ? T.navy : T.text, flex: 1, lineHeight: 1.4, fontFamily: "'DM Sans', sans-serif" }}>
+                      <Typography sx={{ fontWeight: selected ? 700 : 400, fontSize: '0.9rem', color: selected ? T.navy : T.text, flex: 1, lineHeight: 1.4, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                         {opt.replace(/^[A-D]\.\s*/i, '')}
                       </Typography>
                       {selected && <CheckCircleIcon sx={{ color: T.navy, fontSize: 18, flexShrink: 0 }} />}
@@ -338,22 +360,26 @@ export default function StudentQuizAttempt() {
               </Box>
             </Box>
 
+            {submitError && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setSubmitError('')}>{submitError}</Alert>
+            )}
+
             {/* Navigation */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
               <Button disabled={current === 0} onClick={() => setCurrent(c => c - 1)}
-                sx={{ textTransform: 'none', color: T.muted, fontFamily: "'DM Sans', sans-serif", '&:disabled': { opacity: 0.3 } }}>
+                sx={{ textTransform: 'none', color: T.muted, fontFamily: "'Plus Jakarta Sans', sans-serif", '&:disabled': { opacity: 0.3 } }}>
                 ← Previous
               </Button>
 
               {current < quiz.questions.length - 1 ? (
                 <Button variant="contained" onClick={() => setCurrent(c => c + 1)}
-                  sx={{ background: T.navy, textTransform: 'none', fontWeight: 700, borderRadius: '10px', px: 3, boxShadow: 'none', fontFamily: "'DM Sans', sans-serif" }}>
+                  sx={{ background: T.navy, textTransform: 'none', fontWeight: 700, borderRadius: '10px', px: 3, boxShadow: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                   Next →
                 </Button>
               ) : (
-                <Button variant="contained" onClick={() => handleSubmit(false)} disabled={phase === 'submitting'}
+                <Button variant="contained" onClick={() => handleSubmit()} disabled={phase === 'submitting'}
                   startIcon={phase === 'submitting' ? <CircularProgress size={16} sx={{ color: 'white' }} /> : null}
-                  sx={{ background: `linear-gradient(135deg, ${T.success}, #16A34A)`, textTransform: 'none', fontWeight: 700, borderRadius: '10px', px: 3, boxShadow: 'none', fontFamily: "'DM Sans', sans-serif", fontSize: '0.9rem' }}>
+                  sx={{ background: `linear-gradient(135deg, ${T.success}, #16A34A)`, textTransform: 'none', fontWeight: 700, borderRadius: '10px', px: 3, boxShadow: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: '0.9rem' }}>
                   {phase === 'submitting' ? 'Submitting…' : `Submit Quiz (${answeredCount}/${quiz.questions.length} answered)`}
                 </Button>
               )}
@@ -374,8 +400,8 @@ export default function StudentQuizAttempt() {
     const bg      = pct >= 75 ? T.successBg : pct >= 50 ? T.warnBg : T.dangerBg;
 
     return (
-      <Box sx={{ minHeight: '100vh', background: T.bg, fontFamily: "'DM Sans', sans-serif" }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,700;9..40,800&family=Lora:wght@600;700&display=swap');`}</style>
+      <Box sx={{ minHeight: '100vh', background: T.bg, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');`}</style>
 
         {/* Nav */}
         <Box sx={{ background: T.navy, px: { xs: 2, md: 4 }, height: 56, display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -389,10 +415,10 @@ export default function StudentQuizAttempt() {
           {/* Score banner */}
           <Box sx={{ background: T.white, borderRadius: '20px', border: `1px solid ${T.border}`, p: 3.5, mb: 3, textAlign: 'center', boxShadow: '0 4px 24px rgba(11,31,58,0.08)' }}>
             <Typography sx={{ fontSize: '2.5rem', mb: 0.5 }}>{gi.emoji}</Typography>
-            <Typography sx={{ fontWeight: 700, fontFamily: "'Lora', serif", fontSize: '1.8rem', color: T.text, mb: 0.5 }}>{gi.label}</Typography>
+            <Typography sx={{ fontWeight: 700, fontFamily: "'Fraunces', serif", fontSize: '1.8rem', color: T.text, mb: 0.5 }}>{gi.label}</Typography>
 
             <Box sx={{ display: 'inline-block', px: 3, py: 1.5, borderRadius: '16px', background: bg, mb: 2 }}>
-              <Typography sx={{ fontWeight: 800, fontSize: '2.5rem', color, lineHeight: 1, fontFamily: "'DM Sans', sans-serif" }}>{pct.toFixed(1)}%</Typography>
+              <Typography sx={{ fontWeight: 800, fontSize: '2.5rem', color, lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{pct.toFixed(1)}%</Typography>
               <Typography sx={{ color, fontSize: '0.85rem', fontWeight: 600 }}>{result.attempt?.score} / {result.attempt?.total} correct</Typography>
             </Box>
 
@@ -410,7 +436,7 @@ export default function StudentQuizAttempt() {
             </Box>
 
             <Button onClick={() => navigate(-1)} variant="contained"
-              sx={{ background: T.navy, textTransform: 'none', fontWeight: 700, borderRadius: '12px', px: 3, boxShadow: 'none', fontFamily: "'DM Sans', sans-serif" }}>
+              sx={{ background: T.navy, textTransform: 'none', fontWeight: 700, borderRadius: '12px', px: 3, boxShadow: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               Back to Dashboard
             </Button>
           </Box>
@@ -440,7 +466,7 @@ export default function StudentQuizAttempt() {
                       </Box>
                     </Box>
 
-                    <Typography sx={{ fontWeight: 600, fontSize: '0.88rem', color: T.text, lineHeight: 1.5, mb: 1.5, fontFamily: "'DM Sans', sans-serif" }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: '0.88rem', color: T.text, lineHeight: 1.5, mb: 1.5, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                       {q.question}
                     </Typography>
 
@@ -458,7 +484,7 @@ export default function StudentQuizAttempt() {
                             <Box sx={{ width: 24, height: 24, borderRadius: '7px', background: showGreen ? T.success : showRed ? T.danger : T.border, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                               <Typography sx={{ fontWeight: 800, fontSize: '0.7rem', color: showGreen || showRed ? T.white : T.muted }}>{letter}</Typography>
                             </Box>
-                            <Typography sx={{ fontSize: '0.82rem', fontWeight: showGreen ? 700 : 400, color: showGreen ? T.success : showRed ? T.danger : T.muted, flex: 1, fontFamily: "'DM Sans', sans-serif" }}>
+                            <Typography sx={{ fontSize: '0.82rem', fontWeight: showGreen ? 700 : 400, color: showGreen ? T.success : showRed ? T.danger : T.muted, flex: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                               {opt.replace(/^[A-D]\.\s*/i, '')}
                             </Typography>
                             {showGreen && <CheckCircleIcon sx={{ color: T.success, fontSize: 16 }} />}
@@ -472,7 +498,7 @@ export default function StudentQuizAttempt() {
                     {q.explanation && (
                       <Box sx={{ mt: 1.5, p: 1.25, borderRadius: '8px', background: '#FFFBEB', border: '1px solid #FDE68A', display: 'flex', gap: 0.75 }}>
                         <LightbulbIcon sx={{ fontSize: 16, color: T.warn, flexShrink: 0, mt: 0.1 }} />
-                        <Typography sx={{ fontSize: '0.78rem', color: T.warn, lineHeight: 1.5, fontFamily: "'DM Sans', sans-serif" }}>{q.explanation}</Typography>
+                        <Typography sx={{ fontSize: '0.78rem', color: T.warn, lineHeight: 1.5, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{q.explanation}</Typography>
                       </Box>
                     )}
                   </Box>
@@ -482,7 +508,7 @@ export default function StudentQuizAttempt() {
           </Box>
 
           <Box sx={{ mt: 3, textAlign: 'center' }}>
-            <Button onClick={() => navigate(-1)} sx={{ textTransform: 'none', color: T.muted, fontFamily: "'DM Sans', sans-serif" }}>
+            <Button onClick={() => navigate(-1)} sx={{ textTransform: 'none', color: T.muted, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               ← Back to Dashboard
             </Button>
           </Box>

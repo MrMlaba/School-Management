@@ -17,7 +17,7 @@ const { setStudentCredentials, resetStudentPassword, bulkGenerate, studentLogin,
 const { requireParent, resetParentCredentials, parentLogin, parentChangePassword } = require('./routes/parentAuth');
 const { schoolAdminTicketsRouter, systemAdminTicketsRouter } = require('./routes/supportRoutes');
 const { router: systemRouter, requireSystemAdmin: requireSystemAdminFromSystem } = require('./routes/systemRoutes');
-const managementRoutes = require('./routes/managementRoutes');
+const { router: managementRoutes, getStudentReportData, buildReportCardHTML, htmlToPdfBuffer, getSchoolLogoUrl } = require('./routes/managementRoutes');
 const phase2Routes     = require('./routes/phase2Routes');
 const phase3Routes     = require('./routes/phase3Routes');
 const eventsRoutes     = require('./routes/eventsRoutes');
@@ -602,6 +602,92 @@ app.post('/api/assignments/:id/submit', requireStudent, upload.single('file'), a
   } catch (err) {
     console.error('[submit assignment]', err);
     res.status(500).json({ success: false, message: 'Failed to submit' });
+  }
+});
+
+// ─── Student: attendance, performance, and released report cards ────────────
+app.get('/api/student/attendance', requireStudent, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT date, status, note
+       FROM attendance
+       WHERE student_id = $1 AND school_id = $2
+       ORDER BY date DESC LIMIT 90`,
+      [req.student.id, req.student.schoolId]
+    );
+    const total   = rows.length;
+    const present = rows.filter(r => ['present', 'late'].includes(r.status)).length;
+    res.json({
+      records: rows,
+      summary: { total, present, percentage: total ? Math.round((present / total) * 100) : null },
+    });
+  } catch (err) {
+    console.error('[student attendance]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/student/performance — subject-by-subject results plus a properly
+// combined average (assignments + exams, weighted the same way the official
+// report card is) for the student's current term. Replaces the old
+// frontend-only average, which only ever counted graded assignments.
+app.get('/api/student/performance', requireStudent, async (req, res) => {
+  try {
+    const { rows: termRows } = await pool.query(
+      `SELECT id FROM terms WHERE school_id = $1 AND is_current = true LIMIT 1`,
+      [req.student.schoolId]
+    );
+    const termId = termRows[0]?.id || null;
+    const data = await getStudentReportData(req.student.schoolId, req.student.id, termId);
+    if (!data) return res.status(404).json({ message: 'Student not found' });
+    res.json({ termId, subjectResults: data.subjectResults, average: data.average });
+  } catch (err) {
+    console.error('[student performance]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/student/report-terms — terms whose report cards the school has released
+app.get('/api/student/report-terms', requireStudent, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, term_number AS "termNumber", start_date AS "startDate",
+              end_date AS "endDate", released_at AS "releasedAt"
+       FROM terms
+       WHERE school_id = $1 AND reports_released = true
+       ORDER BY term_number DESC`,
+      [req.student.schoolId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[student report-terms]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/student/report-card/:termId/pdf — the student's own official report
+// card, reusing the exact same generator the school office uses. Only ever
+// reachable once the school has released that term's reports.
+app.get('/api/student/report-card/:termId/pdf', requireStudent, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id FROM terms WHERE id = $1 AND school_id = $2 AND reports_released = true`,
+      [req.params.termId, req.student.schoolId]
+    );
+    if (!rows.length) return res.status(403).json({ message: 'This report has not been released yet' });
+
+    const data = await getStudentReportData(req.student.schoolId, req.student.id, req.params.termId);
+    if (!data) return res.status(404).json({ message: 'Student not found' });
+
+    const logo = await getSchoolLogoUrl(req, req.student.schoolId);
+    const html = buildReportCardHTML(data, logo);
+    const pdf  = await htmlToPdfBuffer(html);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="report_${data.student.studentNumber}.pdf"`);
+    res.send(pdf);
+  } catch (err) {
+    console.error('[student report-card pdf]', err);
+    res.status(500).json({ message: 'Failed to generate report card' });
   }
 });
 
@@ -1407,6 +1493,18 @@ async function ensureTables() {
     }
   } catch (err) {
     console.warn('Migration note (reference_code):', err.message);
+  }
+
+  // Term report release — school admin flips this once teachers have finished
+  // grading, and only then can students download their report card for that term.
+  for (const col of [
+    `ALTER TABLE terms ADD COLUMN IF NOT EXISTS reports_released BOOLEAN DEFAULT false`,
+    `ALTER TABLE terms ADD COLUMN IF NOT EXISTS released_at TIMESTAMPTZ`,
+    `ALTER TABLE terms ADD COLUMN IF NOT EXISTS released_by VARCHAR(100)`,
+  ]) {
+    try { await pool.query(col); } catch (err) {
+      console.warn('Migration note (term report release):', err.message);
+    }
   }
 
   // support_tickets / support_ticket_replies — the school-admin ↔ system-admin

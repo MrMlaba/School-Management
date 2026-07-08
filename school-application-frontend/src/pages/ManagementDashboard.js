@@ -4,7 +4,7 @@ import {
   Box, Typography, Button, Chip, Divider, Avatar, CircularProgress,
   TextField, MenuItem, IconButton, Tooltip, Paper, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle,
-  DialogContent, DialogActions, Snackbar, Alert, Switch,
+  DialogContent, DialogActions, Snackbar, Alert, Switch, Stack,
 } from '@mui/material';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -2043,17 +2043,30 @@ const ReportsSection = () => {
   const [snack,      setSnack]     = useState({open:false,msg:'',sev:'success'});
   const toast = toast_(setSnack);
  
+  const loadTerms = useCallback(async () => {
+    const t = await fetch(`${BASE}/api/setup/terms`, {headers:authH()});
+    if (t.ok) setTerms(await t.json());
+  }, []);
+
   useEffect(()=>{
     (async()=>{
-      const [c,t] = await Promise.all([
-        fetch(`${BASE}/api/management/reports/classes`, {headers:authH()}),
-        fetch(`${BASE}/api/setup/terms`,               {headers:authH()}),
-      ]);
+      const c = await fetch(`${BASE}/api/management/reports/classes`, {headers:authH()});
       if(c.ok) setClasses(await c.json());
-      if(t.ok) setTerms(await t.json());
+      await loadTerms();
     })();
-  },[]);
- 
+  },[loadTerms]);
+
+  const toggleTermRelease = async (term) => {
+    const released = !(term.reports_released || term.reportsReleased);
+    try {
+      const res = await fetch(`${BASE}/api/setup/terms/${term.id}/release-reports`, {
+        method: 'PATCH', headers: jsonH(), body: JSON.stringify({ released }),
+      });
+      if (res.ok) { toast(released ? 'Reports released to students' : 'Reports un-released'); loadTerms(); }
+      else { const d = await res.json(); toast(d.message || 'Failed to update', 'error'); }
+    } catch { toast('Network error', 'error'); }
+  };
+
   const generate = async () => {
     if (!selClass) return toast('Select a class first','error');
     setLoading(true); setReport(null);
@@ -2166,6 +2179,50 @@ const ReportsSection = () => {
         ))}
       </Box>
  
+      {/* Term report release control */}
+      <Box sx={{background:C.white,border:`1px solid ${C.border}`,borderRadius:'8px',p:2,mb:3}}>
+        <Typography sx={{fontWeight:700,fontSize:'0.78rem',color:C.brand,fontFamily:"'IBM Plex Sans', sans-serif",mb:0.5}}>
+          Term Report Release
+        </Typography>
+        <Typography sx={{fontSize:'0.68rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif",mb:1.5}}>
+          Students can only download their report card for a term once you release it here — do this after teachers have finished capturing marks.
+        </Typography>
+        <Stack spacing={1}>
+          {terms.map(t=>{
+            const total    = Number(t.total_students ?? t.totalStudents ?? 0);
+            const graded   = Number(t.graded_students ?? t.gradedStudents ?? 0);
+            const released = !!(t.reports_released || t.reportsReleased);
+            return (
+              <Box key={t.id} sx={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:1,p:1.25,border:`1px solid ${C.border}`,borderRadius:'6px'}}>
+                <Box>
+                  <Typography sx={{fontWeight:600,fontSize:'0.78rem',fontFamily:"'IBM Plex Sans', sans-serif"}}>
+                    Term {t.term_number || t.termNumber}
+                  </Typography>
+                  <Typography sx={{fontSize:'0.68rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+                    {graded} of {total} students have results captured
+                  </Typography>
+                </Box>
+                <Button
+                  size="small"
+                  variant={released?'outlined':'contained'}
+                  onClick={()=>toggleTermRelease(t)}
+                  sx={released
+                    ? {borderColor:C.accent,color:C.accent,textTransform:'none',fontWeight:700,fontFamily:"'IBM Plex Sans', sans-serif",'&:hover':{background:'#f0f7f1'}}
+                    : {background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}
+                >
+                  {released?'Released — Unrelease':'Release Reports'}
+                </Button>
+              </Box>
+            );
+          })}
+          {terms.length===0 && (
+            <Typography sx={{fontSize:'0.75rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+              No terms set up yet — add one under School Setup.
+            </Typography>
+          )}
+        </Stack>
+      </Box>
+
       {/* Filters */}
       <Box sx={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:'8px',p:2,mb:3}}>
         <Box sx={{display:'flex',gap:2,flexWrap:'wrap',alignItems:'flex-end'}}>

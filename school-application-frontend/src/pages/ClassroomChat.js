@@ -1,14 +1,15 @@
 ﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import API_BASE from '../config';
 
 /* ── Design tokens ── */
 const T = {
-  navy:'#0B1F3A', navyLight:'#1E3D6B',
-  gold:'#D4A843', goldLight:'#F0C96A',
-  bg:'#EEF1F8', white:'#FFFFFF',
-  border:'#DDE3EE', muted:'#7A8BA0', text:'#1A2B3C',
+  navy:'#0F1F1A', navyLight:'#1F3329',
+  gold:'#D97706', goldLight:'#FDE68A',
+  bg:'#F4FAF7', white:'#FFFFFF',
+  border:'#D1E8E0', muted:'#4B6860', text:'#0F1F1A',
 };
-const BASE = 'https://school-management-production-6167.up.railway.app';
+const BASE = API_BASE;
 
 const PALETTE = ['#6C63FF','#E0457B','#0097B2','#FF6B35','#00B89F','#9B5DE5','#F97316','#0EA5E9'];
 const senderColor = (name='') => {
@@ -135,9 +136,9 @@ export default function ClassroomChat() {
   }));
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', height:'100vh', background:T.bg, fontFamily:"'DM Sans','Segoe UI',sans-serif", overflow:'hidden' }}>
+    <div style={{ display:'flex', flexDirection:'column', height:'100vh', background:T.bg, fontFamily:"'Plus Jakarta Sans','Segoe UI',sans-serif", overflow:'hidden' }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         *{box-sizing:border-box}
         @keyframes pop  {0%{transform:scale(.85);opacity:0}70%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
         @keyframes fade {from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
@@ -210,7 +211,7 @@ export default function ClassroomChat() {
           const yourRad = `${r}px ${m.isFirst?r:s}px ${r}px ${m.isLast?r:s}px`;
 
           return (
-            <div key={m.id} className="fade-in"
+            <div key={m.id} id={`msg-${m.id}`} className="fade-in"
               style={{ display:'flex', flexDirection:isMe?'row-reverse':'row', alignItems:'flex-end', gap:8, marginBottom:m.isLast?16:3 }}>
 
               {/* Avatar */}

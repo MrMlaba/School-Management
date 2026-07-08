@@ -14,26 +14,27 @@ import EmojiEventsIcon       from '@mui/icons-material/EmojiEvents';
 import RefreshIcon           from '@mui/icons-material/Refresh';
 import InsertDriveFileIcon   from '@mui/icons-material/InsertDriveFile';
 import WarningAmberIcon      from '@mui/icons-material/WarningAmber';
+import API_BASE from '../config';
 
 /* ─── Tokens ─────────────────────────────────────────────────────────────── */
 const C = {
-  navy:     '#0B1F3A',
-  brand:    '#1A3557',
-  muted:    '#6B7C93',
-  border:   '#E3E8F0',
+  navy:     '#0F1F1A',
+  brand:    '#1F3329',
+  muted:    '#4B6860',
+  border:   '#D1E8E0',
   white:    '#FFFFFF',
-  bg:       '#F4F6FB',
-  success:  '#1A8A5A',
-  successBg:'#E6F7F0',
-  warn:     '#B45309',
+  bg:       '#F4FAF7',
+  success:  '#059669',
+  successBg:'#D1FAE5',
+  warn:     '#D97706',
   warnBg:   '#FEF3C7',
-  danger:   '#B91C1C',
+  danger:   '#DC2626',
   dangerBg: '#FEE2E2',
-  gold:     '#D4A843',
-  goldBg:   '#FFFBEB',
+  gold:     '#D97706',
+  goldBg:   '#FEF3C7',
 };
 
-const BASE = 'https://school-management-production-6167.up.railway.app';
+const BASE = API_BASE;
 
 /* ─── JWT helper ─────────────────────────────────────────────────────────── */
 const getStudentIdFromToken = () => {
@@ -105,21 +106,21 @@ const ScoreRing = ({ percentage, marksObtained, totalMarks }) => {
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
         }}>
-          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: gc.text, lineHeight: 1, fontFamily: "'DM Sans', sans-serif" }}>
+          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: gc.text, lineHeight: 1, fontFamily: "'Fraunces', serif" }}>
             {Math.round(pct)}%
           </Typography>
         </Box>
       </Box>
 
       {/* Score fraction */}
-      <Typography sx={{ mt: 1, fontSize: '0.9rem', color: C.muted, fontFamily: "'DM Sans', sans-serif" }}>
+      <Typography sx={{ mt: 1, fontSize: '0.9rem', color: C.muted, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
         <strong style={{ color: gc.text, fontSize: '1.05rem' }}>{marksObtained}</strong>
         {' / '}{totalMarks ?? '—'} marks
       </Typography>
 
       {/* Grade label badge */}
       <Box sx={{ mt: 1, px: 2, py: 0.4, borderRadius: '20px', background: gc.bg, border: `1px solid ${gc.border}` }}>
-        <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: gc.text, fontFamily: "'DM Sans', sans-serif" }}>
+        <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: gc.text, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
           {label}
         </Typography>
       </Box>
@@ -188,6 +189,22 @@ export default function AssignmentDetail() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  /* ── Open a submitted file — needs the auth header, so a plain link can't do this ── */
+  const [openingFile, setOpeningFile] = useState(false);
+  const openDocument = async (filename) => {
+    setOpeningFile(true);
+    try {
+      const res = await fetch(`${BASE}/api/documents/${filename}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) { setError('Could not open this file.'); return; }
+      const blob = await res.blob();
+      window.open(URL.createObjectURL(blob), '_blank');
+    } catch {
+      setError('Network error while opening the file.');
+    } finally {
+      setOpeningFile(false);
+    }
+  };
+
   /* ── File select ── */
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -211,8 +228,7 @@ export default function AssignmentDetail() {
         setResubmitMode(false);
         setSelectedFile(null);
       } else {
-        const d = await res.json();
-        setError(d.message || 'Could not clear submission.');
+        setError('This assignment has already been graded and can no longer be resubmitted — ask your teacher if you need changes made.');
       }
     } catch {
       setError('Network error.');
@@ -298,17 +314,17 @@ export default function AssignmentDetail() {
         <UploadFileIcon sx={{ fontSize: 44, color: selectedFile ? C.brand : C.border, mb: 1 }} />
         {selectedFile ? (
           <>
-            <Typography sx={{ fontWeight: 700, color: C.brand, fontFamily: "'DM Sans', sans-serif" }}>{selectedFile.name}</Typography>
-            <Typography sx={{ fontSize: '0.78rem', color: C.muted, mt: 0.5, fontFamily: "'DM Sans', sans-serif" }}>
+            <Typography sx={{ fontWeight: 700, color: C.brand, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{selectedFile.name}</Typography>
+            <Typography sx={{ fontSize: '0.78rem', color: C.muted, mt: 0.5, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               {(selectedFile.size / 1024 / 1024).toFixed(2)} MB · Click to change
             </Typography>
           </>
         ) : (
           <>
-            <Typography sx={{ fontWeight: 600, color: C.muted, fontFamily: "'DM Sans', sans-serif" }}>
+            <Typography sx={{ fontWeight: 600, color: C.muted, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               Click or drag your file here
             </Typography>
-            <Typography sx={{ fontSize: '0.78rem', color: C.muted, mt: 0.5, fontFamily: "'DM Sans', sans-serif" }}>
+            <Typography sx={{ fontSize: '0.78rem', color: C.muted, mt: 0.5, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               PDF, Word, images — max 10 MB
             </Typography>
           </>
@@ -322,7 +338,7 @@ export default function AssignmentDetail() {
         <Box sx={{ mb: 2 }}>
           <LinearProgress variant="determinate" value={uploadProgress}
             sx={{ height: 6, borderRadius: 3, mb: 0.5, '& .MuiLinearProgress-bar': { background: C.brand } }} />
-          <Typography sx={{ fontSize: '0.75rem', color: C.muted, textAlign: 'right', fontFamily: "'DM Sans', sans-serif" }}>
+          <Typography sx={{ fontSize: '0.75rem', color: C.muted, textAlign: 'right', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             Uploading… {uploadProgress}%
           </Typography>
         </Box>
@@ -331,14 +347,14 @@ export default function AssignmentDetail() {
       <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'flex-end' }}>
         {resubmitMode && (
           <Button onClick={() => { setResubmitMode(false); setSelectedFile(null); setError(''); }}
-            disabled={uploading} sx={{ textTransform: 'none', color: C.muted, fontFamily: "'DM Sans', sans-serif" }}>
+            disabled={uploading} sx={{ textTransform: 'none', color: C.muted, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             Cancel
           </Button>
         )}
         <Button variant="contained" onClick={handleSubmit}
           disabled={!selectedFile || uploading}
           sx={{ background: C.brand, textTransform: 'none', fontWeight: 700, boxShadow: 'none',
-            borderRadius: '10px', px: 3, fontFamily: "'DM Sans', sans-serif",
+            borderRadius: '10px', px: 3, fontFamily: "'Plus Jakarta Sans', sans-serif",
             '&:disabled': { background: C.border } }}>
           {uploading ? 'Submitting…' : resubmitMode ? 'Submit New Version' : 'Submit Assignment'}
         </Button>
@@ -350,21 +366,21 @@ export default function AssignmentDetail() {
      RENDER
   ════════════════════════════════════════════════════════ */
   return (
-    <Box sx={{ minHeight: '100vh', background: C.bg, fontFamily: "'DM Sans', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap');`}</style>
+    <Box sx={{ minHeight: '100vh', background: C.bg, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');`}</style>
 
       <Box sx={{ maxWidth: 780, mx: 'auto', px: { xs: 2, md: 4 }, py: 4 }}>
 
         {/* Back */}
         <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/student-dashboard')}
-          sx={{ textTransform: 'none', color: C.muted, mb: 3, pl: 0, fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>
+          sx={{ textTransform: 'none', color: C.muted, mb: 3, pl: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600 }}>
           Back to Dashboard
         </Button>
 
         {/* ── Assignment info card ── */}
         <Paper elevation={0} sx={{ border: `1px solid ${C.border}`, borderRadius: '16px', p: 3, mb: 3, background: C.white }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
-            <Typography sx={{ fontWeight: 800, fontSize: '1.35rem', color: C.brand, fontFamily: "'DM Sans', sans-serif", letterSpacing: '-0.01em' }}>
+            <Typography sx={{ fontWeight: 800, fontSize: '1.35rem', color: C.brand, fontFamily: "'Fraunces', serif", letterSpacing: '-0.01em' }}>
               {assignment.title}
             </Typography>
             {isOverdue && !submission && (
@@ -376,20 +392,20 @@ export default function AssignmentDetail() {
           <Box sx={{ display: 'flex', gap: 2.5, flexWrap: 'wrap', mb: assignment.description ? 2 : 0 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
               <SchoolIcon sx={{ fontSize: 15, color: C.muted }} />
-              <Typography sx={{ fontSize: '0.83rem', color: C.muted, fontFamily: "'DM Sans', sans-serif" }}>
+              <Typography sx={{ fontSize: '0.83rem', color: C.muted, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 {assignment.className} · {assignment.subjectName}
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
               <CalendarMonthIcon sx={{ fontSize: 15, color: isOverdue && !isGraded ? C.danger : C.muted }} />
-              <Typography sx={{ fontSize: '0.83rem', fontFamily: "'DM Sans', sans-serif",
+              <Typography sx={{ fontSize: '0.83rem', fontFamily: "'Plus Jakarta Sans', sans-serif",
                 color: isOverdue && !isGraded ? C.danger : C.muted,
                 fontWeight: isOverdue && !isGraded ? 700 : 400 }}>
                 Due: {fmtDate(assignment.dueDate, { weekday: 'long' })}
               </Typography>
             </Box>
             {assignment.totalMarks && (
-              <Typography sx={{ fontSize: '0.83rem', color: C.muted, fontFamily: "'DM Sans', sans-serif" }}>
+              <Typography sx={{ fontSize: '0.83rem', color: C.muted, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 Out of <strong style={{ color: C.brand }}>{assignment.totalMarks}</strong> marks
               </Typography>
             )}
@@ -398,7 +414,7 @@ export default function AssignmentDetail() {
           {assignment.description && (
             <>
               <Divider sx={{ my: 2, borderColor: C.border }} />
-              <Typography sx={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.75, whiteSpace: 'pre-wrap', fontFamily: "'DM Sans', sans-serif" }}>
+              <Typography sx={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.75, whiteSpace: 'pre-wrap', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 {assignment.description}
               </Typography>
             </>
@@ -413,7 +429,7 @@ export default function AssignmentDetail() {
           {/* Panel header */}
           <Box sx={{ px: 3, py: 2, borderBottom: `1px solid ${C.border}`, background: '#FAFBFF',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography sx={{ fontWeight: 700, fontSize: '0.92rem', color: C.brand, fontFamily: "'DM Sans', sans-serif" }}>
+            <Typography sx={{ fontWeight: 700, fontSize: '0.92rem', color: C.brand, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               Your Submission
             </Typography>
             {isPending && (
@@ -449,10 +465,10 @@ export default function AssignmentDetail() {
                     <HourglassEmptyIcon sx={{ color: C.warn, fontSize: 22 }} />
                   </Box>
                   <Box sx={{ flex: 1 }}>
-                    <Typography sx={{ fontWeight: 700, fontSize: '0.92rem', color: C.warn, fontFamily: "'DM Sans', sans-serif" }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '0.92rem', color: C.warn, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                       Submitted — awaiting teacher review
                     </Typography>
-                    <Typography sx={{ fontSize: '0.8rem', color: C.warn, mt: 0.35, fontFamily: "'DM Sans', sans-serif", opacity: 0.85 }}>
+                    <Typography sx={{ fontSize: '0.8rem', color: C.warn, mt: 0.35, fontFamily: "'Plus Jakarta Sans', sans-serif", opacity: 0.85 }}>
                       Submitted on {fmtDateTime(submission.submittedAt)}
                     </Typography>
                   </Box>
@@ -463,18 +479,18 @@ export default function AssignmentDetail() {
                   border: `1px solid ${C.border}`, background: C.bg, mb: 3 }}>
                   <InsertDriveFileIcon sx={{ color: C.brand, fontSize: 22, flexShrink: 0 }} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: C.brand, fontFamily: "'DM Sans', sans-serif",
+                    <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: C.brand, fontFamily: "'Plus Jakarta Sans', sans-serif",
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {submission.originalname || submission.filename}
                     </Typography>
-                    <Typography sx={{ fontSize: '0.72rem', color: C.muted, fontFamily: "'DM Sans', sans-serif" }}>
+                    <Typography sx={{ fontSize: '0.72rem', color: C.muted, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                       {submission.mimetype}
                     </Typography>
                   </Box>
-                  <Button size="small" variant="outlined"
-                    href={`${BASE}/api/documents/${submission.filename}`} target="_blank" rel="noreferrer"
+                  <Button size="small" variant="outlined" disabled={openingFile}
+                    onClick={() => openDocument(submission.filename)}
                     sx={{ textTransform: 'none', fontSize: '0.75rem', fontWeight: 600, borderColor: C.border, color: C.brand,
-                      borderRadius: '8px', fontFamily: "'DM Sans', sans-serif", whiteSpace: 'nowrap' }}>
+                      borderRadius: '8px', fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: 'nowrap' }}>
                     View File
                   </Button>
                 </Box>
@@ -482,13 +498,13 @@ export default function AssignmentDetail() {
                 {/* Resubmit option */}
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   p: 2, borderRadius: '10px', border: `1px dashed ${C.border}`, background: '#FAFBFF' }}>
-                  <Typography sx={{ fontSize: '0.82rem', color: C.muted, fontFamily: "'DM Sans', sans-serif" }}>
+                  <Typography sx={{ fontSize: '0.82rem', color: C.muted, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                     Need to make changes?
                   </Typography>
                   <Button size="small" startIcon={<RefreshIcon sx={{ fontSize: 15 }} />}
                     onClick={() => { setResubmitMode(true); setSelectedFile(null); setError(''); }}
                     sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.78rem', color: C.brand,
-                      fontFamily: "'DM Sans', sans-serif", background: '#EEF3FF', borderRadius: '8px', px: 1.75,
+                      fontFamily: "'Plus Jakarta Sans', sans-serif", background: '#EEF3FF', borderRadius: '8px', px: 1.75,
                       '&:hover': { background: '#DBEAFE' } }}>
                     Resubmit
                   </Button>
@@ -517,11 +533,11 @@ export default function AssignmentDetail() {
                     }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                         <EmojiEventsIcon sx={{ color: C.success, fontSize: 18 }} />
-                        <Typography sx={{ fontWeight: 700, fontSize: '0.92rem', color: C.success, fontFamily: "'DM Sans', sans-serif" }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: '0.92rem', color: C.success, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                           Assignment graded
                         </Typography>
                       </Box>
-                      <Typography sx={{ fontSize: '0.8rem', color: C.success, fontFamily: "'DM Sans', sans-serif", opacity: 0.85 }}>
+                      <Typography sx={{ fontSize: '0.8rem', color: C.success, fontFamily: "'Plus Jakarta Sans', sans-serif", opacity: 0.85 }}>
                         Graded on {fmtDateTime(submission.gradedAt)}
                       </Typography>
                     </Box>
@@ -529,10 +545,10 @@ export default function AssignmentDetail() {
                     {/* Progress bar */}
                     <Box sx={{ mb: 1.5 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                        <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: C.muted, fontFamily: "'DM Sans', sans-serif", textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: C.muted, fontFamily: "'Plus Jakarta Sans', sans-serif", textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                           Score
                         </Typography>
-                        <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: gradeColor(submission.percentage).text, fontFamily: "'DM Sans', sans-serif" }}>
+                        <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: gradeColor(submission.percentage).text, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                           {parseFloat(submission.percentage).toFixed(1)}%
                         </Typography>
                       </Box>
@@ -551,36 +567,16 @@ export default function AssignmentDetail() {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1.5, borderRadius: '8px',
                       border: `1px solid ${C.border}`, background: C.bg }}>
                       <InsertDriveFileIcon sx={{ color: C.muted, fontSize: 16 }} />
-                      <Typography sx={{ flex: 1, fontSize: '0.78rem', color: C.muted, fontFamily: "'DM Sans', sans-serif",
+                      <Typography sx={{ flex: 1, fontSize: '0.78rem', color: C.muted, fontFamily: "'Plus Jakarta Sans', sans-serif",
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {submission.originalname || submission.filename}
                       </Typography>
-                      <Button size="small" href={`${BASE}/api/documents/${submission.filename}`} target="_blank" rel="noreferrer"
-                        sx={{ textTransform: 'none', fontSize: '0.72rem', fontWeight: 600, color: C.brand, fontFamily: "'DM Sans', sans-serif", minWidth: 0, px: 1 }}>
+                      <Button size="small" disabled={openingFile} onClick={() => openDocument(submission.filename)}
+                        sx={{ textTransform: 'none', fontSize: '0.72rem', fontWeight: 600, color: C.brand, fontFamily: "'Plus Jakarta Sans', sans-serif", minWidth: 0, px: 1 }}>
                         View
                       </Button>
                     </Box>
                   </Box>
-                </Box>
-
-                {/* Resubmit (even after grading — teacher will re-grade) */}
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  p: 2, borderRadius: '10px', border: `1px dashed ${C.border}`, background: '#FAFBFF' }}>
-                  <Box>
-                    <Typography sx={{ fontSize: '0.82rem', color: C.muted, fontFamily: "'DM Sans', sans-serif" }}>
-                      Want to improve your work?
-                    </Typography>
-                    <Typography sx={{ fontSize: '0.72rem', color: C.border, fontFamily: "'DM Sans', sans-serif", mt: 0.25 }}>
-                      Resubmitting will require your teacher to re-grade.
-                    </Typography>
-                  </Box>
-                  <Button size="small" startIcon={<RefreshIcon sx={{ fontSize: 15 }} />}
-                    onClick={() => { setResubmitMode(true); setSelectedFile(null); setError(''); }}
-                    sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.78rem', color: C.brand,
-                      fontFamily: "'DM Sans', sans-serif", background: '#EEF3FF', borderRadius: '8px', px: 1.75, whiteSpace: 'nowrap',
-                      '&:hover': { background: '#DBEAFE' } }}>
-                    Resubmit
-                  </Button>
                 </Box>
               </Box>
             )}
@@ -593,13 +589,11 @@ export default function AssignmentDetail() {
                   background: C.warnBg, border: `1px solid #FCD34D`, mb: 3 }}>
                   <WarningAmberIcon sx={{ color: C.warn, fontSize: 18, mt: 0.1, flexShrink: 0 }} />
                   <Box>
-                    <Typography sx={{ fontWeight: 700, fontSize: '0.82rem', color: C.warn, fontFamily: "'DM Sans', sans-serif" }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '0.82rem', color: C.warn, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                       Resubmitting your work
                     </Typography>
-                    <Typography sx={{ fontSize: '0.78rem', color: C.warn, mt: 0.25, fontFamily: "'DM Sans', sans-serif", opacity: 0.9 }}>
-                      {isGraded
-                        ? 'Your current grade will be cleared and your teacher will need to re-grade your new submission.'
-                        : 'Your previous submission will be replaced with this new file.'}
+                    <Typography sx={{ fontSize: '0.78rem', color: C.warn, mt: 0.25, fontFamily: "'Plus Jakarta Sans', sans-serif", opacity: 0.9 }}>
+                      Your previous submission will be replaced with this new file.
                     </Typography>
                   </Box>
                 </Box>
@@ -611,7 +605,7 @@ export default function AssignmentDetail() {
                       disabled={deleteLoading}
                       startIcon={deleteLoading ? <CircularProgress size={14} /> : <RefreshIcon sx={{ fontSize: 16 }} />}
                       sx={{ textTransform: 'none', fontWeight: 700, borderColor: C.warn, color: C.warn,
-                        borderRadius: '10px', px: 3, fontFamily: "'DM Sans', sans-serif",
+                        borderRadius: '10px', px: 3, fontFamily: "'Plus Jakarta Sans', sans-serif",
                         '&:hover': { background: C.warnBg } }}>
                       {deleteLoading ? 'Clearing…' : 'Confirm — Clear Old Submission & Upload New'}
                     </Button>
@@ -624,7 +618,7 @@ export default function AssignmentDetail() {
 
                 {!submission && (
                   <Button onClick={() => { setResubmitMode(false); setSelectedFile(null); setError(''); }}
-                    sx={{ mt: 1, textTransform: 'none', color: C.muted, fontFamily: "'DM Sans', sans-serif" }}>
+                    sx={{ mt: 1, textTransform: 'none', color: C.muted, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                     ← Cancel
                   </Button>
                 )}

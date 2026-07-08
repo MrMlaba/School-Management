@@ -1078,4 +1078,8 @@ ${pages.join('\n')}
   }
 });
 
-module.exports = router;
+// getStudentReportData/buildReportCardHTML/htmlToPdfBuffer/getSchoolLogoUrl are
+// reused by the student-facing report-card routes in server.js — same data,
+// same rendering, so a student's self-service download always matches what
+// the school office generates for them.
+module.exports = { router, getStudentReportData, buildReportCardHTML, htmlToPdfBuffer, getSchoolLogoUrl };
