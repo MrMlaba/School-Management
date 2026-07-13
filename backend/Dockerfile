@@ -1,18 +1,20 @@
 FROM node:20-bookworm-slim
 
-# Shared libraries required for Puppeteer's bundled Chrome to launch headless
+# Install Chromium from Debian's own repo instead of listing individual
+# libX* shared-library packages by hand — apt resolves every correct
+# transitive dependency automatically, avoiding version-name drift across
+# Debian releases (e.g. libxfixes1 vs libxfixes3 between releases).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates fonts-liberation libasound2 libatk-bridge2.0-0 libatk1.0-0 \
-    libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 libgbm1 \
-    libglib2.0-0 libgtk-3-0 libnspr4 libnss3 libpango-1.0-0 libpangocairo-1.0-0 \
-    libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 libxdamage1 \
-    libxext6 libxfixes1 libxi6 libxrandr1 libxrender1 libxss1 libxtst1 \
-    lsb-release wget xdg-utils \
+    chromium ca-certificates fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY package*.json ./
+# Use the system Chromium installed above instead of downloading Puppeteer's
+# own copy — faster build, and sidesteps the same dependency fragility.
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 RUN npm ci --omit=dev
 
 COPY . .

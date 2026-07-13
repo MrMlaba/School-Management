@@ -423,7 +423,8 @@ function getBrowser() {
   if (!browserPromise) {
     browserPromise = puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'], // required in most container hosts, incl. Railway
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined, // system Chromium in Docker; Puppeteer's own bundled Chrome locally
+      args: ['--no-sandbox', '--disable-setuid-sandbox'], // required in most container hosts
     });
   }
   return browserPromise;
