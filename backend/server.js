@@ -1297,6 +1297,518 @@ app.get('/api/students', requireSchoolAdmin, async (req, res) => {
 // ─── FIX 2: Create all required tables at startup ────────────────────────────
 // audit_logs was missing — every login was failing with "relation does not exist"
 async function ensureTables() {
+  // ───────────────────────────────────────────────────────────────────────────
+  // RECOVERY NOTE (2026-07): the tables below (schools through quiz_answers)
+  // had no CREATE TABLE anywhere in this codebase — they were created by hand
+  // directly on the old Railway database at some point early in the project
+  // and never committed as code. When that database was lost, this whole
+  // block had to be reverse-engineered from how every route in this backend
+  // reads/writes these tables (column names, types, foreign keys, unique
+  // constraints inferred from ON CONFLICT clauses and 23505 error handling).
+  // They must run FIRST, before anything below this block, since almost every
+  // other table in ensureTables() references them via foreign key.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS schools (
+      id          SERIAL PRIMARY KEY,
+      name        TEXT NOT NULL,
+      location    TEXT,
+      phone       TEXT,
+      email       TEXT,
+      principal   TEXT,
+      grades      JSONB DEFAULT '["Grade 8","Grade 9","Grade 10","Grade 11","Grade 12"]',
+      streams     JSONB DEFAULT '["Physics","Commerce","Humanities"]',
+      is_active   BOOLEAN DEFAULT true,
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  // national_subjects — shared curriculum reference list (no school_id; global
+  // across every school). Nothing in the app can create these, so they must
+  // be seeded once below.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS national_subjects (
+      id         SERIAL PRIMARY KEY,
+      name       TEXT NOT NULL,
+      code       TEXT,
+      grade_min  INTEGER NOT NULL,
+      grade_max  INTEGER NOT NULL,
+      stream     TEXT
+    )
+  `);
+  await pool.query(`
+    INSERT INTO national_subjects (name, code, grade_min, grade_max, stream)
+    SELECT * FROM (VALUES
+      ('English Home Language',              'ENG', 8, 12, NULL),
+      ('Mathematics',                        'MATH',8, 12, NULL),
+      ('Mathematical Literacy',              'MATL',10,12, NULL),
+      ('Life Orientation',                   'LO',  8, 12, NULL),
+      ('Afrikaans First Additional Language','AFR', 8, 12, NULL),
+      ('Natural Sciences',                   'NSCI',8, 9,  NULL),
+      ('Social Sciences',                    'SSCI',8, 9,  NULL),
+      ('Technology',                         'TECH',8, 9,  NULL),
+      ('Economic and Management Sciences',   'EMS', 8, 9,  NULL),
+      ('Creative Arts',                      'ART', 8, 9,  NULL),
+      ('Physical Sciences',                  'PSCI',10,12, 'Physics'),
+      ('Life Sciences',                      'LSCI',10,12, 'Physics'),
+      ('Information Technology',             'IT',  10,12, 'Physics'),
+      ('Accounting',                         'ACC', 10,12, 'Commerce'),
+      ('Business Studies',                   'BUS', 10,12, 'Commerce'),
+      ('Economics',                          'ECON',10,12, 'Commerce'),
+      ('History',                            'HIST',10,12, 'Humanities'),
+      ('Geography',                          'GEOG',10,12, 'Humanities'),
+      ('Tourism',                            'TOUR',10,12, 'Humanities')
+    ) AS seed(name, code, grade_min, grade_max, stream)
+    WHERE NOT EXISTS (SELECT 1 FROM national_subjects)
+  `);
+
+  // applications — linked to schools by NAME (not id) throughout the app,
+  // one row per school a candidate applied to.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS applications (
+      id                  SERIAL PRIMARY KEY,
+      national_id         TEXT,
+      first_name          TEXT,
+      last_name           TEXT,
+      date_of_birth       DATE,
+      gender              TEXT,
+      email               TEXT,
+      phone               TEXT,
+      address             TEXT,
+      city                TEXT,
+      parent_name         TEXT,
+      parent_phone        TEXT,
+      parent_email        TEXT,
+      parent_occupation   TEXT,
+      relationship        TEXT,
+      school              TEXT,
+      grade               TEXT,
+      subject             TEXT,
+      previous_school     TEXT,
+      achievements        TEXT,
+      why_attend          TEXT,
+      emergency_contact   TEXT,
+      emergency_phone     TEXT,
+      documents           JSONB,
+      document_count      INTEGER DEFAULT 0,
+      required_documents  JSONB,
+      status              VARCHAR(20) NOT NULL DEFAULT 'pending'
+                             CHECK (status IN ('pending','approved','accepted','rejected')),
+      comment             TEXT DEFAULT '',
+      submitted_at        TIMESTAMPTZ DEFAULT NOW(),
+      updated_at          TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS school_admins (
+      id                  SERIAL PRIMARY KEY,
+      school_id           INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      name                TEXT,
+      username            VARCHAR(100) NOT NULL UNIQUE,
+      password_hash       TEXT NOT NULL,
+      is_active           BOOLEAN DEFAULT true,
+      temp_password_flag  BOOLEAN DEFAULT true,
+      last_login          TIMESTAMPTZ,
+      created_at          TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS teachers (
+      id                  SERIAL PRIMARY KEY,
+      school_id           INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      first_name          TEXT NOT NULL,
+      last_name           TEXT NOT NULL,
+      email               TEXT,
+      phone               TEXT,
+      employee_number     VARCHAR(50) UNIQUE,
+      gender              TEXT,
+      is_active           BOOLEAN DEFAULT true,
+      username            VARCHAR(100) UNIQUE,
+      password_hash       TEXT,
+      temp_password_flag  BOOLEAN DEFAULT true,
+      last_login          TIMESTAMPTZ,
+      created_at          TIMESTAMPTZ DEFAULT NOW(),
+      updated_at          TIMESTAMPTZ
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS academic_years (
+      id          SERIAL PRIMARY KEY,
+      school_id   INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      year        INTEGER NOT NULL,
+      is_current  BOOLEAN DEFAULT false,
+      created_at  TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(school_id, year)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS parents (
+      id                    SERIAL PRIMARY KEY,
+      school_id             INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      first_name            TEXT,
+      last_name             TEXT,
+      phone                 TEXT,
+      email                 TEXT,
+      relationship          TEXT DEFAULT 'Guardian',
+      is_emergency_contact  BOOLEAN DEFAULT false,
+      created_at            TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS school_periods (
+      id             SERIAL PRIMARY KEY,
+      school_id      INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      period_number  INTEGER NOT NULL,
+      name           TEXT,
+      time_start     TIME,
+      time_end       TIME,
+      is_break       BOOLEAN DEFAULT false,
+      UNIQUE(school_id, period_number)
+    )
+  `);
+
+  // school_logos mirrors school_images (below) — same replace-then-insert
+  // pattern, same schools.logo_id back-reference.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS school_logos (
+      id          SERIAL PRIMARY KEY,
+      school_id   INTEGER NOT NULL UNIQUE REFERENCES schools(id) ON DELETE CASCADE,
+      image_data  BYTEA NOT NULL,
+      mime_type   VARCHAR(50) DEFAULT 'image/png',
+      file_size   INTEGER,
+      uploaded_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS classes (
+      id                SERIAL PRIMARY KEY,
+      school_id         INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      academic_year_id  INTEGER NOT NULL REFERENCES academic_years(id) ON DELETE CASCADE,
+      name              TEXT NOT NULL,
+      grade             INTEGER NOT NULL,
+      stream            TEXT,
+      letter            TEXT NOT NULL,
+      capacity          INTEGER DEFAULT 40,
+      is_active         BOOLEAN DEFAULT true,
+      UNIQUE(school_id, academic_year_id, grade, letter)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS school_subjects (
+      id                    SERIAL PRIMARY KEY,
+      school_id             INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      academic_year_id      INTEGER NOT NULL REFERENCES academic_years(id) ON DELETE CASCADE,
+      national_subject_id   INTEGER NOT NULL REFERENCES national_subjects(id),
+      name                  TEXT NOT NULL,
+      code                  TEXT,
+      grade                 INTEGER NOT NULL,
+      stream                TEXT,
+      is_active             BOOLEAN DEFAULT true
+    )
+  `);
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS school_subjects_unique_idx
+      ON school_subjects (school_id, academic_year_id, national_subject_id, grade, COALESCE(stream, 'ALL'))
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS terms (
+      id                SERIAL PRIMARY KEY,
+      school_id         INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      academic_year_id  INTEGER NOT NULL REFERENCES academic_years(id) ON DELETE CASCADE,
+      term_number       INTEGER NOT NULL,
+      start_date        DATE NOT NULL,
+      end_date          DATE NOT NULL,
+      is_current        BOOLEAN DEFAULT false,
+      UNIQUE(school_id, academic_year_id, term_number)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS teacher_subjects (
+      id                    SERIAL PRIMARY KEY,
+      teacher_id            INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+      school_id             INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      national_subject_id   INTEGER NOT NULL REFERENCES national_subjects(id) ON DELETE CASCADE,
+      UNIQUE(teacher_id, national_subject_id)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS enrolled_students (
+      id                  SERIAL PRIMARY KEY,
+      school_id           INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      application_id      INTEGER REFERENCES applications(id) ON DELETE SET NULL,
+      student_number      VARCHAR(50) UNIQUE,
+      first_name          TEXT NOT NULL,
+      last_name           TEXT NOT NULL,
+      national_id         TEXT,
+      email               TEXT,
+      phone               TEXT,
+      date_of_birth       DATE,
+      gender              TEXT,
+      grade               TEXT,
+      stream              TEXT,
+      enrolled_by         INTEGER REFERENCES school_admins(id),
+      notes               TEXT,
+      is_active           BOOLEAN DEFAULT true,
+      enrollment_date     TIMESTAMPTZ DEFAULT NOW(),
+      created_at          TIMESTAMPTZ DEFAULT NOW(),
+      password_hash       TEXT,
+      temp_password_flag  BOOLEAN DEFAULT true,
+      last_login          TIMESTAMPTZ,
+      updated_at          TIMESTAMPTZ
+    )
+  `);
+
+  // generate_student_number() — the original function is lost along with the
+  // old database. This reconstruction guarantees global uniqueness (student
+  // login looks students up by number alone, with no school scoping) via a
+  // dedicated sequence; the exact format of existing numbers can't be
+  // recovered, but new ones will look like STU00100001.
+  await pool.query(`CREATE SEQUENCE IF NOT EXISTS student_number_seq`);
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION generate_student_number(p_school_id INTEGER)
+    RETURNS TEXT AS $$
+    DECLARE
+      v_num BIGINT;
+    BEGIN
+      v_num := nextval('student_number_seq');
+      RETURN 'STU' || LPAD(p_school_id::TEXT, 3, '0') || LPAD(v_num::TEXT, 6, '0');
+    END;
+    $$ LANGUAGE plpgsql
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS announcements (
+      id          SERIAL PRIMARY KEY,
+      school_id   INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      title       TEXT NOT NULL,
+      body        TEXT NOT NULL,
+      audience    VARCHAR(20) DEFAULT 'all',
+      is_pinned   BOOLEAN DEFAULT false,
+      is_active   BOOLEAN DEFAULT true,
+      created_by  INTEGER REFERENCES school_admins(id),
+      created_at  TIMESTAMPTZ DEFAULT NOW(),
+      updated_at  TIMESTAMPTZ
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS events (
+      id           SERIAL PRIMARY KEY,
+      school_id    INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      title        TEXT NOT NULL,
+      description  TEXT,
+      event_date   DATE NOT NULL,
+      event_time   TIME,
+      location     TEXT,
+      type         VARCHAR(30) DEFAULT 'general',
+      created_by   INTEGER REFERENCES school_admins(id),
+      created_at   TIMESTAMPTZ DEFAULT NOW(),
+      updated_at   TIMESTAMPTZ
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS student_parents (
+      id          SERIAL PRIMARY KEY,
+      student_id  INTEGER NOT NULL REFERENCES enrolled_students(id) ON DELETE CASCADE,
+      parent_id   INTEGER NOT NULL REFERENCES parents(id) ON DELETE CASCADE,
+      UNIQUE(student_id, parent_id)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS assignments (
+      id                SERIAL PRIMARY KEY,
+      school_id         INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      class_id          INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+      subject_id        INTEGER NOT NULL REFERENCES school_subjects(id) ON DELETE CASCADE,
+      teacher_id        INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+      title             TEXT NOT NULL,
+      description       TEXT,
+      due_date          DATE NOT NULL,
+      total_marks       NUMERIC,
+      academic_year_id  INTEGER REFERENCES academic_years(id),
+      term_id           INTEGER REFERENCES terms(id) ON DELETE SET NULL,
+      created_at        TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS exams (
+      id                SERIAL PRIMARY KEY,
+      school_id         INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      class_id          INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+      subject_id        INTEGER NOT NULL REFERENCES school_subjects(id) ON DELETE CASCADE,
+      teacher_id        INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+      title             TEXT NOT NULL,
+      exam_date         DATE NOT NULL,
+      total_marks       NUMERIC DEFAULT 100,
+      type              VARCHAR(30) DEFAULT 'test',
+      academic_year_id  INTEGER REFERENCES academic_years(id),
+      term_id           INTEGER REFERENCES terms(id) ON DELETE SET NULL,
+      created_at        TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS timetable_slots (
+      id                SERIAL PRIMARY KEY,
+      school_id         INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      academic_year_id  INTEGER REFERENCES academic_years(id),
+      class_id          INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+      subject_id        INTEGER NOT NULL REFERENCES school_subjects(id) ON DELETE CASCADE,
+      teacher_id        INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+      period_id         INTEGER NOT NULL REFERENCES school_periods(id) ON DELETE CASCADE,
+      day_of_week       VARCHAR(20) NOT NULL,
+      CONSTRAINT uq_slot_teacher UNIQUE (teacher_id, period_id, day_of_week),
+      CONSTRAINT uq_slot_class   UNIQUE (class_id, period_id, day_of_week)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS quizzes (
+      id                  SERIAL PRIMARY KEY,
+      school_id           INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      teacher_id          INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+      subject_id          INTEGER REFERENCES school_subjects(id),
+      class_id            INTEGER REFERENCES classes(id),
+      title               TEXT NOT NULL,
+      description         TEXT,
+      total_questions     INTEGER,
+      time_limit_minutes  INTEGER DEFAULT 30,
+      difficulty          VARCHAR(20) DEFAULT 'medium',
+      status              VARCHAR(20) NOT NULL DEFAULT 'draft',
+      published_at        TIMESTAMPTZ,
+      closes_at           TIMESTAMPTZ,
+      created_at          TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS quiz_questions (
+      id             SERIAL PRIMARY KEY,
+      quiz_id        INTEGER NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+      question_text  TEXT NOT NULL,
+      options        JSONB NOT NULL,
+      correct        VARCHAR(10) NOT NULL,
+      explanation    TEXT,
+      topic          TEXT,
+      order_num      INTEGER DEFAULT 0
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id                SERIAL PRIMARY KEY,
+      school_id         INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      grade             INTEGER NOT NULL,
+      sender_id         INTEGER NOT NULL,
+      sender_name       TEXT NOT NULL,
+      sender_type       VARCHAR(20) NOT NULL,
+      message           TEXT NOT NULL,
+      reply_to_id       INTEGER REFERENCES chat_messages(id) ON DELETE SET NULL,
+      reply_to_sender   TEXT,
+      reply_to_preview  TEXT,
+      created_at        TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS teacher_materials (
+      id              SERIAL PRIMARY KEY,
+      teacher_id      INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+      subject_id      INTEGER REFERENCES school_subjects(id),
+      class_id        INTEGER REFERENCES classes(id),
+      school_id       INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      title           TEXT NOT NULL,
+      material_type   VARCHAR(30),
+      filename        TEXT,
+      originalname    TEXT,
+      extracted_text  TEXT NOT NULL,
+      char_count      INTEGER GENERATED ALWAYS AS (char_length(extracted_text)) STORED,
+      created_at      TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS attendance (
+      id                 SERIAL PRIMARY KEY,
+      school_id          INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      timetable_slot_id  INTEGER NOT NULL REFERENCES timetable_slots(id) ON DELETE CASCADE,
+      student_id         INTEGER NOT NULL REFERENCES enrolled_students(id) ON DELETE CASCADE,
+      date               DATE NOT NULL,
+      status             VARCHAR(20) NOT NULL DEFAULT 'present',
+      marked_by          INTEGER REFERENCES teachers(id),
+      note               TEXT,
+      marked_at          TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(timetable_slot_id, student_id, date)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS results (
+      id              SERIAL PRIMARY KEY,
+      school_id       INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      student_id      INTEGER NOT NULL REFERENCES enrolled_students(id) ON DELETE CASCADE,
+      exam_id         INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+      marks_obtained  NUMERIC NOT NULL,
+      percentage      NUMERIC,
+      captured_by     INTEGER REFERENCES teachers(id),
+      captured_at     TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(student_id, exam_id)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS quiz_attempts (
+      id                  SERIAL PRIMARY KEY,
+      quiz_id             INTEGER NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+      student_id          INTEGER NOT NULL REFERENCES enrolled_students(id) ON DELETE CASCADE,
+      school_id           INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      started_at          TIMESTAMPTZ DEFAULT NOW(),
+      submitted_at        TIMESTAMPTZ,
+      score               INTEGER,
+      total               INTEGER,
+      percentage          NUMERIC(5,2),
+      time_taken_seconds  INTEGER,
+      UNIQUE(quiz_id, student_id)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat_reactions (
+      id          SERIAL PRIMARY KEY,
+      message_id  INTEGER NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+      student_id  INTEGER NOT NULL REFERENCES enrolled_students(id) ON DELETE CASCADE,
+      emoji       VARCHAR(10) NOT NULL,
+      UNIQUE(message_id, student_id, emoji)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS quiz_answers (
+      id               SERIAL PRIMARY KEY,
+      attempt_id       INTEGER NOT NULL REFERENCES quiz_attempts(id) ON DELETE CASCADE,
+      question_id      INTEGER NOT NULL REFERENCES quiz_questions(id) ON DELETE CASCADE,
+      selected_answer  VARCHAR(10),
+      is_correct       BOOLEAN
+    )
+  `);
+
+  console.log('✅ Recovered core schema verified');
+  // ───────────────────────────────────────────────────────────────────────────
+
   // assignment_submissions
   await pool.query(`
     CREATE TABLE IF NOT EXISTS assignment_submissions (
