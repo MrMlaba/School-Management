@@ -1,3 +1,4 @@
+﻿import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { Grid, Typography, CircularProgress, Box } from '@mui/material';
 import SchoolCard from './SchoolCard';
@@ -14,7 +15,7 @@ const SchoolList = ({ bodyFont, displayFont }) => {
   const DISPLAY = displayFont || "'Cormorant Garamond', serif";
 
   useEffect(() => {
-    fetch('https://school-management-production-6167.up.railway.app/api/schools')
+    fetch(`${API_BASE}/api/schools`)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to load schools');
         return res.json();

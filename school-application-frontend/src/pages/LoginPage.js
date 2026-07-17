@@ -11,6 +11,7 @@ import VisibilityOutlinedIcon    from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import ArrowForwardIcon          from '@mui/icons-material/ArrowForward';
 import { LoginShell, MobileLogo, B, FF, inputSx } from '../components/LoginLayout';
+import API_BASE from '../config';
 
 const LEFT = {
   badge:    'Admin Portal',
@@ -35,7 +36,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true); setError('');
     try {
-      const res  = await fetch('https://school-management-production-6167.up.railway.app/api/admin-login', {
+      const res  = await fetch(`${API_BASE}/api/admin-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),

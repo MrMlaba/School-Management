@@ -1,4 +1,4 @@
-// src/pages/ParentLoginPage.js — Parent Portal Login
+﻿// src/pages/ParentLoginPage.js — Parent Portal Login
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -11,6 +11,7 @@ import VisibilityOutlinedIcon    from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import ArrowForwardIcon          from '@mui/icons-material/ArrowForward';
 import { LoginShell, MobileLogo, B, FF, inputSx } from '../components/LoginLayout';
+import API_BASE from '../config';
 
 const LEFT = {
   badge:    'Parent Portal',
@@ -35,7 +36,7 @@ export default function ParentLoginPage() {
     if (!form.username || !form.password) return setError('Username and password are required');
     setLoading(true); setError('');
     try {
-      const res  = await fetch('https://school-management-production-6167.up.railway.app/api/parent-login', {
+      const res  = await fetch(`${API_BASE}/api/parent-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),

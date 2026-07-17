@@ -1,4 +1,5 @@
-﻿// src/pages/StudentLogin.js — Student Login
+﻿import API_BASE from '../config';
+// src/pages/StudentLogin.js — Student Login
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -36,7 +37,7 @@ export default function StudentLogin() {
     if (!studentNumber || !password) return setError('Student number and password are required');
     setLoading(true); setError('');
     try {
-      const res  = await fetch('https://school-management-production-6167.up.railway.app/api/student-login', {
+      const res  = await fetch(`${API_BASE}/api/student-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studentNumber, password }),

@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+﻿import API_BASE from '../config';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Button, Container, Chip, Divider,
   TextField, MenuItem, CircularProgress, Snackbar, Alert,
@@ -33,7 +34,7 @@ const C = {
   dangerBg: '#FFEBEE',
 };
 
-const BASE = 'https://school-management-production-6167.up.railway.app';
+const BASE = `${API_BASE}`;
 
 const headCell = {
   backgroundColor: C.headerBg, color: C.text, fontWeight: 700,

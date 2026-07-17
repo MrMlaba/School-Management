@@ -1,4 +1,5 @@
-﻿import React, { useEffect, useState } from 'react';
+﻿import API_BASE from '../config';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Table, TableBody, TableCell,
@@ -128,7 +129,7 @@ function PctPill({ value, totalMarks }) {
 }
 
 /* ─── Main Component ─────────────────────────────────────────────────────── */
-const BASE = 'https://school-management-production-6167.up.railway.app';
+const BASE = `${API_BASE}`;
 
 export default function TeacherGradebook() {
   const { classId } = useParams();

@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import API_BASE from '../config';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -146,7 +147,7 @@ const ApplicantDashboard = () => {
       if (nationalId)    params.append('nationalId', nationalId);
       if (applicationId) params.append('applicationId', applicationId);
 
-      const response = await fetch(`https://school-management-production-6167.up.railway.app/api/applicant-applications?${params}`);
+      const response = await fetch(`${API_BASE}/api/applicant-applications?${params}`);
       const data = await response.json();
 
       if (response.ok) {
@@ -167,7 +168,7 @@ const ApplicantDashboard = () => {
     const storedNationalId = nationalId || sessionStorage.getItem('nationalId');
 
     try {
-      const response = await fetch(`https://school-management-production-6167.up.railway.app/api/applications/${appId}/accept`, {
+      const response = await fetch(`${API_BASE}/api/applications/${appId}/accept`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nationalId: storedNationalId }),

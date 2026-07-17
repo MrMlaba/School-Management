@@ -1,4 +1,5 @@
-﻿// QuizTab.js — AI Quiz Generator for TeacherDashboard
+﻿import API_BASE from '../config';
+// QuizTab.js — AI Quiz Generator for TeacherDashboard
 // Import and render this inside TeacherDashboard.js:
 //
 //   import QuizTab from './QuizTab';
@@ -47,7 +48,7 @@ const C = {
   purpleBg:  '#EDE9FE',
 };
 
-const BASE  = 'https://school-management-production-6167.up.railway.app';
+const BASE  = `${API_BASE}`;
 const authH = () => ({ Authorization: `Bearer ${sessionStorage.getItem('teacherToken')}` });
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 

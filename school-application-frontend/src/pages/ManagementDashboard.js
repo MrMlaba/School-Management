@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import API_BASE from '../config';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Chip, Divider, Avatar, CircularProgress,
@@ -61,7 +62,7 @@ const C = {
   dock:       '#f4f4f4',   // bottom icon dock
 };
 
-const BASE  = 'https://school-management-production-6167.up.railway.app';
+const BASE  = `${API_BASE}`;
 const authH = () => ({ Authorization: `Bearer ${sessionStorage.getItem('adminToken')}` });
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 

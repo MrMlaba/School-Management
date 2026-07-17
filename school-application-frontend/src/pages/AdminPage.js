@@ -1,4 +1,5 @@
-﻿import React, { useEffect, useState, useMemo } from 'react';
+﻿import API_BASE from '../config';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Paper, Typography, Button, Box, Dialog, DialogTitle, DialogContent,
@@ -197,7 +198,7 @@ const AdminPage = () => {
   const fetchApplications = () => {
     setLoading(true);
     const token = sessionStorage.getItem('adminToken');
-    fetch('https://school-management-production-6167.up.railway.app/api/applications', {
+    fetch(`${API_BASE}/api/applications`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(res => res.json())
@@ -211,7 +212,7 @@ const AdminPage = () => {
     // Load current school's form settings
     const token = sessionStorage.getItem('adminToken');
     if (!token) return;
-    fetch('https://school-management-production-6167.up.railway.app/api/schools')
+    fetch(`${API_BASE}/api/schools`)
       .then(r => r.json())
       .then(schools => {
         const adminSch = sessionStorage.getItem('adminSchool');
@@ -231,7 +232,7 @@ const AdminPage = () => {
     fd.append('enabled', String(formRequired));
     if (formTemplateFile) fd.append('formTemplate', formTemplateFile);
     try {
-      const res  = await fetch('https://school-management-production-6167.up.railway.app/api/admin/schools/application-form', {
+      const res  = await fetch(`${API_BASE}/api/admin/schools/application-form`, {
         method: 'PATCH', headers: { Authorization: `Bearer ${token}` }, body: fd,
       });
       const data = await res.json();
@@ -308,7 +309,7 @@ const AdminPage = () => {
     }
     try {
       const token = sessionStorage.getItem('adminToken');
-      const res = await fetch(`https://school-management-production-6167.up.railway.app/api/applications/${id}`, {
+      const res = await fetch(`${API_BASE}/api/applications/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status, comment }),
@@ -347,12 +348,12 @@ const AdminPage = () => {
       let res;
       if (deleteTarget.type === 'one') {
         res = await fetch(
-          `https://school-management-production-6167.up.railway.app/api/applications/${deleteTarget.ids[0]}`,
+          `${API_BASE}/api/applications/${deleteTarget.ids[0]}`,
           { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
         );
       } else {
         res = await fetch(
-          'https://school-management-production-6167.up.railway.app/api/applications',
+          `${API_BASE}/api/applications`,
           {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -392,7 +393,7 @@ const AdminPage = () => {
     const token = sessionStorage.getItem('adminToken');
     try {
       const res = await fetch(
-        `https://school-management-production-6167.up.railway.app/api/documents/${doc.filename}`,
+        `${API_BASE}/api/documents/${doc.filename}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!res.ok) throw new Error('Failed');
@@ -414,7 +415,7 @@ const AdminPage = () => {
     const token = sessionStorage.getItem('adminToken');
     try {
       const res = await fetch(
-        `https://school-management-production-6167.up.railway.app/api/documents/${filename}`,
+        `${API_BASE}/api/documents/${filename}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!res.ok) throw new Error('Failed');

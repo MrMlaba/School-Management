@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+﻿import API_BASE from '../config';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Table, Button, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, CircularProgress,
@@ -376,8 +377,8 @@ const StudentsPage = () => {
     setError('');
     try {
       const [pendingRes, enrolledRes] = await Promise.all([
-        fetch('https://school-management-production-6167.up.railway.app/api/management/pending-enrollment', { headers: authHeaders }),
-        fetch('https://school-management-production-6167.up.railway.app/api/management/enrolled-students',  { headers: authHeaders }),
+        fetch(`${API_BASE}/api/management/pending-enrollment`, { headers: authHeaders }),
+        fetch(`${API_BASE}/api/management/enrolled-students`,  { headers: authHeaders }),
       ]);
 
       if (pendingRes.ok && enrolledRes.ok) {
@@ -432,7 +433,7 @@ const StudentsPage = () => {
     if (!enrollTarget) return;
     setEnrolling(true);
     try {
-      const res = await fetch('https://school-management-production-6167.up.railway.app/api/management/enroll', {
+      const res = await fetch(`${API_BASE}/api/management/enroll`, {
         method: 'POST',
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({ applicationId: enrollTarget.id }),

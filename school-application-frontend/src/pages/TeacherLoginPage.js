@@ -1,4 +1,5 @@
-﻿// src/pages/TeacherLoginPage.js — Teacher Login
+﻿import API_BASE from '../config';
+// src/pages/TeacherLoginPage.js — Teacher Login
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -35,7 +36,7 @@ export default function TeacherLoginPage() {
     if (!form.username || !form.password) return setError('Username and password are required');
     setLoading(true); setError('');
     try {
-      const res  = await fetch('https://school-management-production-6167.up.railway.app/api/teacher-login', {
+      const res  = await fetch(`${API_BASE}/api/teacher-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),

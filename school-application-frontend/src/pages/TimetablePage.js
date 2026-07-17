@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+﻿import API_BASE from '../config';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Button, Container, Chip, Divider,
   TextField, MenuItem, CircularProgress, Snackbar, Alert,
@@ -33,7 +34,7 @@ const C = {
   filledBorder:'#A5D6A7',
 };
 
-const BASE  = 'https://school-management-production-6167.up.railway.app';
+const BASE  = `${API_BASE}`;
 const authH = () => ({ Authorization: `Bearer ${sessionStorage.getItem('adminToken')}` });
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 const DAYS  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];

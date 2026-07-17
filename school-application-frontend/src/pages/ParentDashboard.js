@@ -1,4 +1,4 @@
-// src/pages/ParentDashboard.js — Parent Portal: children, attendance, results
+﻿// src/pages/ParentDashboard.js — Parent Portal: children, attendance, results
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -10,8 +10,9 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { core } from '../theme/tokens';
+import API_BASE from '../config';
 
-const BASE  = 'https://school-management-production-6167.up.railway.app';
+const BASE  = `${API_BASE}`;
 const authH = () => ({ Authorization: `Bearer ${sessionStorage.getItem('parentToken')}` });
 
 const ParentDashboard = () => {

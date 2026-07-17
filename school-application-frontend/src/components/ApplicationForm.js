@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import API_BASE from '../config';
+import React, { useState, useEffect } from 'react';
 import {
   TextField, Button, MenuItem, FormControl, Select,
   Box, Typography, Grid, Chip, CircularProgress, Stack, LinearProgress,
@@ -274,7 +275,7 @@ const ApplicationForm = () => {
   const maxFileSize      = 5 * 1024 * 1024;
 
   useEffect(() => {
-    fetch('https://school-management-production-6167.up.railway.app/api/schools')
+    fetch(`${API_BASE}/api/schools`)
       .then(r => r.json()).then(d => setAvailableSchools(Array.isArray(d) ? d : []))
       .catch(e => console.error(e)).finally(() => setSchoolsLoading(false));
   }, []);
@@ -295,7 +296,7 @@ const ApplicationForm = () => {
       const p = new URLSearchParams();
       if (nationalId) p.append('nationalId', nationalId);
       if (appId)      p.append('applicationId', appId);
-      const res  = await fetch(`https://school-management-production-6167.up.railway.app/api/applicant-applications?${p}`);
+      const res  = await fetch(`${API_BASE}/api/applicant-applications?${p}`);
       const apps = await res.json();
       if (res.ok && apps.length > 0) {
         const app = apps.find(a => String(a.id) === String(appId));
@@ -424,7 +425,7 @@ const ApplicationForm = () => {
     form.documents.forEach(d => fd.append('documents', d.file));
     fd.append('documentTypes', JSON.stringify(form.documents.map(d=>d.type)));
     try {
-      const url = isEditMode ? `https://school-management-production-6167.up.railway.app/api/applications/${applicationId}` : 'https://school-management-production-6167.up.railway.app/api/applications';
+      const url = isEditMode ? `${API_BASE}/api/applications/${applicationId}` : `${API_BASE}/api/applications`;
       const res  = await fetch(url, { method: isEditMode?'PUT':'POST', body: fd });
       const data = await res.json();
       if (data.success) { sessionStorage.removeItem('applicationDraft'); navigate(`/applicant-dashboard?nationalId=${encodeURIComponent(form.nationalId)}`); }
