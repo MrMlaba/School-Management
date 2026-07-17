@@ -1938,6 +1938,15 @@ async function ensureTables() {
     console.warn('Note: image_id column ALTER failed:', err.message);
   }
 
+  // Add logo_id column to schools if it doesn't exist
+  try {
+    await pool.query(`
+      ALTER TABLE schools ADD COLUMN IF NOT EXISTS logo_id INTEGER REFERENCES school_logos(id) ON DELETE SET NULL
+    `);
+  } catch (err) {
+    console.warn('Note: logo_id column ALTER failed:', err.message);
+  }
+
   // document_files — persistent binary storage for uploaded documents (replaces ephemeral disk)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS document_files (
