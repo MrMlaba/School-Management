@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, createContext, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Box, Typography, Tooltip } from '@mui/material';
+import { Box, Typography, Tooltip, Menu, MenuItem, Divider } from '@mui/material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import DashboardRoundedIcon      from '@mui/icons-material/DashboardRounded';
 import SchoolRoundedIcon         from '@mui/icons-material/SchoolRounded';
@@ -10,9 +10,10 @@ import SupportAgentRoundedIcon   from '@mui/icons-material/SupportAgentRounded';
 import GroupsRoundedIcon         from '@mui/icons-material/GroupsRounded';
 import LogoutRoundedIcon         from '@mui/icons-material/LogoutRounded';
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
+import CheckRoundedIcon          from '@mui/icons-material/CheckRounded';
 import API_BASE from '../../config';
 
-// ── Dark design tokens ────────────────────────────────────────────────────────
+// ── Design tokens ─────────────────────────────────────────────────────────────
 const BG        = '#0A1628';
 const SIDEBAR   = '#0D1E33';
 const CARD      = '#122040';
@@ -24,7 +25,11 @@ const INK_FAINT = '#4A6080';
 const FONT      = "'IBM Plex Sans', sans-serif";
 const BLUE      = TEAL;
 
-// ── Nested dark MUI theme ─────────────────────────────────────────────────────
+// ── School-selection context shared with child pages ─────────────────────────
+export const SchoolCtx = createContext({ schoolId: null, schoolName: null, setSchool: () => {} });
+export const useSchoolCtx = () => useContext(SchoolCtx);
+
+// ── Dark MUI theme ────────────────────────────────────────────────────────────
 const useDarkTheme = () => useMemo(() => createTheme({
   palette: {
     mode: 'dark',
@@ -46,7 +51,8 @@ const useDarkTheme = () => useMemo(() => createTheme({
     MuiButton:        { styleOverrides: { root: { textTransform: 'none', fontFamily: FONT, fontWeight: 600 } } },
     MuiChip:          { styleOverrides: { root: { fontFamily: FONT } } },
     MuiDialog:        { styleOverrides: { paper: { bgcolor: CARD } } },
-    MuiMenu:          { styleOverrides: { paper: { bgcolor: CARD } } },
+    MuiMenu:          { styleOverrides: { paper: { background: CARD, border: `1px solid ${BORDER}`, boxShadow: '0 16px 40px rgba(0,0,0,0.5)' } } },
+    MuiMenuItem:      { styleOverrides: { root: { fontFamily: FONT, fontSize: '0.8rem' } } },
     MuiSelect:        { styleOverrides: { icon: { color: INK_SOFT } } },
     MuiInputLabel:    { styleOverrides: { root: { color: INK_SOFT, '&.Mui-focused': { color: TEAL } } } },
     MuiOutlinedInput: { styleOverrides: { root: { '& fieldset': { borderColor: BORDER } } } },
@@ -54,21 +60,19 @@ const useDarkTheme = () => useMemo(() => createTheme({
   },
 }), []);
 
-// ── Main nav items ────────────────────────────────────────────────────────────
+// ── Nav definitions ───────────────────────────────────────────────────────────
 const NAV_MAIN = [
   { label: 'Overview',  path: '/system/dashboard', Icon: DashboardRoundedIcon },
   { label: 'Schools',   path: '/system/schools',   Icon: SchoolRoundedIcon },
   { label: 'Admins',    path: '/system/admins',    Icon: ManageAccountsRoundedIcon },
   { label: 'Audit Log', path: '/system/logs',      Icon: HistoryRoundedIcon },
 ];
-
-// Always pinned at bottom of nav
 const NAV_PINNED = [
   { label: 'Tickets',  path: '/system/tickets', Icon: SupportAgentRoundedIcon, badge: true },
   { label: 'IT Team',  path: '/system/team',    Icon: GroupsRoundedIcon },
 ];
 
-// ── Live health status ────────────────────────────────────────────────────────
+// ── Health pill ───────────────────────────────────────────────────────────────
 const HealthPill = () => {
   const [health, setHealth] = useState(null);
   const check = useCallback(() => {
@@ -77,9 +81,9 @@ const HealthPill = () => {
     }).then(r => r.json()).then(setHealth).catch(() => setHealth({ status: 'unknown' }));
   }, []);
   useEffect(() => { check(); const id = setInterval(check, 60000); return () => clearInterval(id); }, [check]);
-  const ok = health?.status === 'operational';
+  const ok    = health?.status === 'operational';
   const known = health?.status && health.status !== 'unknown';
-  const dot = !known ? INK_FAINT : ok ? '#10B981' : '#EF4444';
+  const dot   = !known ? INK_FAINT : ok ? '#10B981' : '#EF4444';
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
       <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: dot, boxShadow: known ? `0 0 0 3px ${dot}30` : 'none', flexShrink: 0 }} />
@@ -101,7 +105,7 @@ const useOpenTicketCount = () => {
   return count;
 };
 
-// ── Navigation item ───────────────────────────────────────────────────────────
+// ── Nav item ──────────────────────────────────────────────────────────────────
 const NavItem = ({ item, active, badge }) => {
   const navigate = useNavigate();
   return (
@@ -133,12 +137,83 @@ const NavItem = ({ item, active, badge }) => {
   );
 };
 
+// ── School selector dropdown ──────────────────────────────────────────────────
+const SchoolSelector = () => {
+  const { schoolId, schoolName, setSchool } = useSchoolCtx();
+  const [schools, setSchools] = useState([]);
+  const [anchor,  setAnchor]  = useState(null);
+  const location = useLocation();
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/system/schools`, {
+      headers: { Authorization: `Bearer ${sessionStorage.getItem('systemToken')}` },
+    }).then(r => r.json()).then(d => setSchools(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
+
+  const onDashboard = location.pathname === '/system/dashboard';
+  const label = schoolName || 'All Schools';
+
+  const select = (s) => {
+    setSchool(s ? { schoolId: s.id, schoolName: s.name } : { schoolId: null, schoolName: null });
+    setAnchor(null);
+  };
+
+  return (
+    <>
+      <Box
+        onClick={onDashboard ? e => setAnchor(e.currentTarget) : undefined}
+        sx={{
+          display: 'flex', alignItems: 'center', gap: 0.75,
+          px: 1.25, py: 0.65, bgcolor: CARD, borderRadius: '7px',
+          border: `1px solid ${anchor ? TEAL : BORDER}`,
+          cursor: onDashboard ? 'pointer' : 'default',
+          transition: 'border-color 0.15s',
+          '&:hover': onDashboard ? { borderColor: `${TEAL}60` } : {},
+        }}
+      >
+        <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: schoolId ? '#10B981' : TEAL, flexShrink: 0 }} />
+        <Typography sx={{ fontFamily: FONT, fontSize: '0.74rem', fontWeight: 600, color: INK, flex: 1 }} noWrap>
+          {label}
+        </Typography>
+        {onDashboard && <KeyboardArrowDownRoundedIcon sx={{ fontSize: 14, color: INK_FAINT, flexShrink: 0, transform: anchor ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />}
+      </Box>
+
+      <Menu
+        anchorEl={anchor}
+        open={Boolean(anchor)}
+        onClose={() => setAnchor(null)}
+        PaperProps={{ sx: { mt: 0.5, minWidth: 200 } }}
+        transformOrigin={{ horizontal: 'left', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'left', vertical: 'bottom' }}
+      >
+        <MenuItem onClick={() => select(null)} sx={{ gap: 1 }}>
+          <SchoolRoundedIcon sx={{ fontSize: 14, color: INK_FAINT }} />
+          <Typography sx={{ fontFamily: FONT, fontSize: '0.78rem', flex: 1 }}>All Schools</Typography>
+          {!schoolId && <CheckRoundedIcon sx={{ fontSize: 13, color: TEAL }} />}
+        </MenuItem>
+        {schools.length > 0 && <Divider sx={{ borderColor: BORDER, my: 0.5 }} />}
+        {schools.map(s => (
+          <MenuItem key={s.id} onClick={() => select(s)} sx={{ gap: 1 }}>
+            <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: s.is_active ? '#10B981' : INK_FAINT, flexShrink: 0 }} />
+            <Typography sx={{ fontFamily: FONT, fontSize: '0.78rem', flex: 1 }} noWrap>{s.name}</Typography>
+            {schoolId === s.id && <CheckRoundedIcon sx={{ fontSize: 13, color: TEAL }} />}
+          </MenuItem>
+        ))}
+      </Menu>
+    </>
+  );
+};
+
 // ── Layout ────────────────────────────────────────────────────────────────────
 const SystemLayout = ({ title, subtitle, children }) => {
   const theme       = useDarkTheme();
   const navigate    = useNavigate();
   const location    = useLocation();
   const openTickets = useOpenTicketCount();
+
+  const [school, setSchoolState] = useState({ schoolId: null, schoolName: null });
+  const setSchool = useCallback((s) => setSchoolState(s), []);
+  const ctxValue = useMemo(() => ({ ...school, setSchool }), [school, setSchool]);
 
   const handleLogout = () => {
     sessionStorage.removeItem('systemToken');
@@ -148,118 +223,82 @@ const SystemLayout = ({ title, subtitle, children }) => {
 
   return (
     <ThemeProvider theme={theme}>
-      <Box sx={{ height: '100vh', display: 'flex', bgcolor: BG, overflow: 'hidden', fontFamily: FONT }}>
+      <SchoolCtx.Provider value={ctxValue}>
+        <Box sx={{ height: '100vh', display: 'flex', bgcolor: BG, overflow: 'hidden', fontFamily: FONT }}>
 
-        {/* ── Left navigation panel ─────────────────────────────── */}
-        <Box sx={{
-          width: 230, flexShrink: 0,
-          bgcolor: SIDEBAR, borderRight: `1px solid ${BORDER}`,
-          display: 'flex', flexDirection: 'column',
-          overflow: 'hidden',
-        }}>
+          {/* ── Left nav ──────────────────────────────────────── */}
+          <Box sx={{ width: 230, flexShrink: 0, bgcolor: SIDEBAR, borderRight: `1px solid ${BORDER}`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-          {/* Brand + context selector */}
-          <Box sx={{ px: 2, pt: 2, pb: 1.5, borderBottom: `1px solid ${BORDER}` }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-              <Box sx={{ width: 28, height: 28, borderRadius: '7px', bgcolor: TEAL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <SchoolRoundedIcon sx={{ color: '#fff', fontSize: 15 }} />
+            {/* Brand + selector */}
+            <Box sx={{ px: 2, pt: 2, pb: 1.5, borderBottom: `1px solid ${BORDER}` }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                <Box sx={{ width: 28, height: 28, borderRadius: '7px', bgcolor: TEAL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <SchoolRoundedIcon sx={{ color: '#fff', fontSize: 15 }} />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontFamily: FONT, fontWeight: 800, fontSize: '0.75rem', color: INK, letterSpacing: '0.04em', lineHeight: 1.1 }}>
+                    SYSTEM ADMIN
+                  </Typography>
+                  <Typography sx={{ fontFamily: FONT, fontSize: '0.6rem', color: INK_FAINT }}>Service Provider Console</Typography>
+                </Box>
               </Box>
+              <SchoolSelector />
+            </Box>
+
+            {/* Main nav */}
+            <Box sx={{ flex: 1, overflowY: 'auto', py: 1 }}>
+              <Typography sx={{ fontFamily: FONT, fontSize: '0.58rem', fontWeight: 700, color: INK_FAINT, textTransform: 'uppercase', letterSpacing: '0.1em', px: 2.5, mb: 0.5 }}>
+                Functions
+              </Typography>
+              {NAV_MAIN.map(item => (
+                <NavItem key={item.path} item={item} active={location.pathname === item.path} />
+              ))}
+            </Box>
+
+            {/* Pinned */}
+            <Box sx={{ borderTop: `1px solid ${BORDER}`, py: 1 }}>
+              <Typography sx={{ fontFamily: FONT, fontSize: '0.58rem', fontWeight: 700, color: INK_FAINT, textTransform: 'uppercase', letterSpacing: '0.1em', px: 2.5, mb: 0.5 }}>
+                Quick Access
+              </Typography>
+              {NAV_PINNED.map(item => (
+                <NavItem key={item.path} item={item} active={location.pathname === item.path} badge={item.badge ? openTickets : 0} />
+              ))}
+            </Box>
+
+            {/* User + health + logout */}
+            <Box sx={{ px: 2, py: 1.25, borderTop: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Box>
-                <Typography sx={{ fontFamily: FONT, fontWeight: 800, fontSize: '0.75rem', color: INK, letterSpacing: '0.04em', lineHeight: 1.1 }}>
-                  SYSTEM ADMIN
+                <Typography sx={{ fontFamily: FONT, fontSize: '0.72rem', fontWeight: 600, color: INK, lineHeight: 1.2 }}>
+                  {sessionStorage.getItem('systemUsername') || 'sysadmin'}
                 </Typography>
-                <Typography sx={{ fontFamily: FONT, fontSize: '0.6rem', color: INK_FAINT }}>Service Provider Console</Typography>
+                <HealthPill />
               </Box>
-            </Box>
-
-            {/* Context pill — "Turkey"-style selector */}
-            <Box sx={{
-              display: 'flex', alignItems: 'center', gap: 0.75,
-              px: 1.25, py: 0.65, bgcolor: CARD, borderRadius: '7px',
-              border: `1px solid ${BORDER}`, cursor: 'default',
-            }}>
-              <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: TEAL, flexShrink: 0 }} />
-              <Typography sx={{ fontFamily: FONT, fontSize: '0.74rem', fontWeight: 600, color: INK, flex: 1 }}>
-                All Schools
-              </Typography>
-              <KeyboardArrowDownRoundedIcon sx={{ fontSize: 14, color: INK_FAINT }} />
+              <Tooltip title="Logout" placement="right">
+                <Box onClick={handleLogout} sx={{ cursor: 'pointer', color: INK_FAINT, '&:hover': { color: '#EF4444' }, transition: 'color 0.15s' }}>
+                  <LogoutRoundedIcon sx={{ fontSize: 16 }} />
+                </Box>
+              </Tooltip>
             </Box>
           </Box>
 
-          {/* Main nav */}
-          <Box sx={{ flex: 1, overflowY: 'auto', py: 1 }}>
-            <Typography sx={{ fontFamily: FONT, fontSize: '0.58rem', fontWeight: 700, color: INK_FAINT, textTransform: 'uppercase', letterSpacing: '0.1em', px: 2.5, mb: 0.5 }}>
-              Functions
-            </Typography>
-            {NAV_MAIN.map(item => (
-              <NavItem key={item.path} item={item} active={location.pathname === item.path} />
-            ))}
-          </Box>
-
-          {/* Pinned — always accessible */}
-          <Box sx={{ borderTop: `1px solid ${BORDER}`, py: 1 }}>
-            <Typography sx={{ fontFamily: FONT, fontSize: '0.58rem', fontWeight: 700, color: INK_FAINT, textTransform: 'uppercase', letterSpacing: '0.1em', px: 2.5, mb: 0.5 }}>
-              Quick Access
-            </Typography>
-            {NAV_PINNED.map(item => (
-              <NavItem
-                key={item.path}
-                item={item}
-                active={location.pathname === item.path}
-                badge={item.badge ? openTickets : 0}
-              />
-            ))}
-          </Box>
-
-          {/* User + health + logout */}
-          <Box sx={{ px: 2, py: 1.25, borderTop: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Box>
-              <Typography sx={{ fontFamily: FONT, fontSize: '0.72rem', fontWeight: 600, color: INK, lineHeight: 1.2 }}>
-                {sessionStorage.getItem('systemUsername') || 'sysadmin'}
-              </Typography>
-              <HealthPill />
+          {/* ── Content ───────────────────────────────────────── */}
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+            <Box sx={{ height: 44, flexShrink: 0, bgcolor: SIDEBAR, borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', px: 2.5, gap: 1 }}>
+              <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '0.82rem', color: INK }}>{title}</Typography>
+              {subtitle && (
+                <>
+                  <Box sx={{ width: 1, height: 14, bgcolor: BORDER }} />
+                  <Typography sx={{ fontFamily: FONT, fontSize: '0.7rem', color: INK_FAINT }}>{subtitle}</Typography>
+                </>
+              )}
             </Box>
-            <Tooltip title="Logout" placement="right">
-              <Box onClick={handleLogout} sx={{ cursor: 'pointer', color: INK_FAINT, '&:hover': { color: '#EF4444' }, transition: 'color 0.15s' }}>
-                <LogoutRoundedIcon sx={{ fontSize: 16 }} />
-              </Box>
-            </Tooltip>
+            <Box key={location.pathname} sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'pageSlideIn 0.22s ease both' }}>
+              {children}
+            </Box>
           </Box>
+
         </Box>
-
-        {/* ── Main content area ─────────────────────────────────── */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-
-          {/* Slim top bar */}
-          <Box sx={{
-            height: 44, flexShrink: 0,
-            bgcolor: SIDEBAR, borderBottom: `1px solid ${BORDER}`,
-            display: 'flex', alignItems: 'center', px: 2.5, gap: 1,
-          }}>
-            <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '0.82rem', color: INK }}>
-              {title}
-            </Typography>
-            {subtitle && (
-              <>
-                <Box sx={{ width: 1, height: 14, bgcolor: BORDER }} />
-                <Typography sx={{ fontFamily: FONT, fontSize: '0.7rem', color: INK_FAINT }}>{subtitle}</Typography>
-              </>
-            )}
-          </Box>
-
-          {/* Animated page content */}
-          <Box
-            key={location.pathname}
-            sx={{
-              flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column',
-              animation: 'pageSlideIn 0.22s ease both',
-            }}
-          >
-            {children}
-          </Box>
-        </Box>
-
-      </Box>
+      </SchoolCtx.Provider>
 
       <style>{`
         @keyframes pageSlideIn {

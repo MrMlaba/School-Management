@@ -280,6 +280,158 @@ router.get('/stats', requireSystemAdmin, async (req, res) => {
   }
 });
 
+// GET /api/system/schools/:schoolId/report — per-school term report stats
+router.get('/schools/:schoolId/report', requireSystemAdmin, async (req, res) => {
+  const { schoolId } = req.params;
+  const sid = parseInt(schoolId, 10);
+  if (isNaN(sid)) return res.status(400).json({ error: 'Invalid school id' });
+
+  try {
+    const [
+      enrollR, attendR, passR, marksDistR,
+      adminR, teacherR, studentR, parentR,
+      appR, loginTrendR, subjectR,
+    ] = await Promise.all([
+      // Enrollment
+      pool.query(`
+        SELECT
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE is_active) AS active,
+          COUNT(*) FILTER (WHERE NOT is_active) AS inactive,
+          COUNT(DISTINCT grade) AS grade_count
+        FROM enrolled_students WHERE school_id = $1`, [sid]),
+
+      // Attendance rate (all time for this school)
+      pool.query(`
+        SELECT
+          COUNT(*) AS total_records,
+          COUNT(*) FILTER (WHERE status = 'present') AS present_count,
+          COUNT(*) FILTER (WHERE status = 'absent')  AS absent_count,
+          COUNT(*) FILTER (WHERE status = 'late')    AS late_count,
+          ROUND(COUNT(*) FILTER (WHERE status IN ('present','late')) * 100.0
+            / NULLIF(COUNT(*), 0), 1) AS attendance_rate
+        FROM attendance WHERE school_id = $1`, [sid]),
+
+      // Pass rate from results (pass = percentage >= 50)
+      pool.query(`
+        SELECT
+          COUNT(*) AS total_results,
+          COUNT(*) FILTER (WHERE percentage >= 50) AS passed,
+          COUNT(*) FILTER (WHERE percentage < 50)  AS failed,
+          ROUND(AVG(percentage), 1) AS avg_percentage,
+          ROUND(COUNT(*) FILTER (WHERE percentage >= 50) * 100.0
+            / NULLIF(COUNT(*), 0), 1) AS pass_rate
+        FROM results WHERE school_id = $1`, [sid]),
+
+      // Marks distribution buckets (0-49, 50-59, 60-69, 70-79, 80-100)
+      pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE m.score / NULLIF(m.max_score,0) * 100 < 50)                               AS below_50,
+          COUNT(*) FILTER (WHERE m.score / NULLIF(m.max_score,0) * 100 BETWEEN 50 AND 59.99)              AS s50_59,
+          COUNT(*) FILTER (WHERE m.score / NULLIF(m.max_score,0) * 100 BETWEEN 60 AND 69.99)              AS s60_69,
+          COUNT(*) FILTER (WHERE m.score / NULLIF(m.max_score,0) * 100 BETWEEN 70 AND 79.99)              AS s70_79,
+          COUNT(*) FILTER (WHERE m.score / NULLIF(m.max_score,0) * 100 >= 80)                             AS above_80
+        FROM marks m
+        JOIN assessments a ON a.id = m.assessment_id
+        WHERE a.school_id = $1 AND m.max_score > 0`, [sid]),
+
+      // Admins
+      pool.query(`
+        SELECT
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE is_active) AS active,
+          COUNT(*) FILTER (WHERE last_login >= NOW() - INTERVAL '30 days') AS logged_in_30d,
+          COUNT(*) FILTER (WHERE last_login >= NOW() - INTERVAL '7 days')  AS logged_in_7d
+        FROM school_admins WHERE school_id = $1`, [sid]),
+
+      // Teachers
+      pool.query(`
+        SELECT
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE is_active) AS active,
+          COUNT(*) FILTER (WHERE last_login >= NOW() - INTERVAL '30 days') AS logged_in_30d,
+          COUNT(*) FILTER (WHERE last_login >= NOW() - INTERVAL '7 days')  AS logged_in_7d
+        FROM teachers WHERE school_id = $1`, [sid]),
+
+      // Students
+      pool.query(`
+        SELECT
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE is_active) AS active,
+          COUNT(*) FILTER (WHERE last_login >= NOW() - INTERVAL '30 days') AS logged_in_30d,
+          COUNT(*) FILTER (WHERE last_login >= NOW() - INTERVAL '7 days')  AS logged_in_7d
+        FROM enrolled_students WHERE school_id = $1`, [sid]),
+
+      // Parents (no last_login, just counts)
+      pool.query(`
+        SELECT COUNT(*) AS total FROM parents WHERE school_id = $1`, [sid]),
+
+      // Applications for this school
+      pool.query(`
+        SELECT
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE status = 'pending')  AS pending,
+          COUNT(*) FILTER (WHERE status = 'approved') AS approved,
+          COUNT(*) FILTER (WHERE status = 'rejected') AS rejected
+        FROM applications a
+        JOIN schools s ON s.name = a.school
+        WHERE s.id = $1`, [sid]),
+
+      // Login trend — last 14 days from audit_logs, grouped by day + role
+      pool.query(`
+        SELECT
+          DATE(created_at) AS day,
+          actor_role,
+          COUNT(*) AS count
+        FROM audit_logs
+        WHERE school_id = $1
+          AND action = 'LOGIN'
+          AND created_at >= NOW() - INTERVAL '14 days'
+        GROUP BY DATE(created_at), actor_role
+        ORDER BY day`, [sid]),
+
+      // Subjects offered
+      pool.query(`
+        SELECT COUNT(*) AS total FROM school_subjects WHERE school_id = $1`, [sid]),
+    ]);
+
+    // Build 14-day login trend keyed by date
+    const trendMap = {};
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      trendMap[key] = { day: key, admin: 0, teacher: 0, student: 0, parent: 0 };
+    }
+    for (const row of loginTrendR.rows) {
+      const key = row.day instanceof Date ? row.day.toISOString().slice(0, 10) : String(row.day).slice(0, 10);
+      if (trendMap[key]) {
+        const role = row.actor_role === 'school_admin' ? 'admin' : row.actor_role || 'other';
+        if (role in trendMap[key]) trendMap[key][role] = Number(row.count);
+      }
+    }
+
+    res.json({
+      enrollment:   { ...enrollR.rows[0],   total: Number(enrollR.rows[0].total),   active: Number(enrollR.rows[0].active) },
+      attendance:   { ...attendR.rows[0],   attendance_rate: Number(attendR.rows[0].attendance_rate || 0) },
+      performance:  { ...passR.rows[0],     pass_rate: Number(passR.rows[0].pass_rate || 0), avg_percentage: Number(passR.rows[0].avg_percentage || 0) },
+      marksDist:    marksDistR.rows[0],
+      staff: {
+        admins:   { ...adminR.rows[0],   total: Number(adminR.rows[0].total),   active: Number(adminR.rows[0].active),   logged_in_30d: Number(adminR.rows[0].logged_in_30d),   logged_in_7d: Number(adminR.rows[0].logged_in_7d) },
+        teachers: { ...teacherR.rows[0], total: Number(teacherR.rows[0].total), active: Number(teacherR.rows[0].active), logged_in_30d: Number(teacherR.rows[0].logged_in_30d), logged_in_7d: Number(teacherR.rows[0].logged_in_7d) },
+        students: { ...studentR.rows[0], total: Number(studentR.rows[0].total), active: Number(studentR.rows[0].active), logged_in_30d: Number(studentR.rows[0].logged_in_30d), logged_in_7d: Number(studentR.rows[0].logged_in_7d) },
+        parents:  { total: Number(parentR.rows[0].total) },
+      },
+      applications: { ...appR.rows[0], total: Number(appR.rows[0].total), approved: Number(appR.rows[0].approved), pending: Number(appR.rows[0].pending), rejected: Number(appR.rows[0].rejected) },
+      loginTrend:   Object.values(trendMap),
+      subjects:     Number(subjectR.rows[0].total),
+    });
+  } catch (err) {
+    console.error('[school report]', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ─────────────────────────────────────────────────────────────
 //  SCHOOL MANAGEMENT
 // ─────────────────────────────────────────────────────────────
