@@ -251,6 +251,36 @@ router.delete('/schools/:schoolId/logo', requireSystemAdmin, async (req, res) =>
 });
 
 // ─────────────────────────────────────────────────────────────
+//  STATS
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/system/stats — aggregate platform counts for the dashboard
+router.get('/stats', requireSystemAdmin, async (req, res) => {
+  try {
+    const [schoolR, appR, adminR, dbR] = await Promise.all([
+      pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE is_active) AS active FROM schools`),
+      pool.query(`SELECT COUNT(*) AS total,
+                         COUNT(*) FILTER (WHERE status = 'pending')  AS pending,
+                         COUNT(*) FILTER (WHERE status = 'approved') AS approved,
+                         COUNT(*) FILTER (WHERE status = 'rejected') AS rejected
+                  FROM applications`),
+      pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE is_active) AS active FROM school_admins`),
+      pool.query('SELECT 1').then(() => ({ connected: true, latencyMs: null })).catch(() => ({ connected: false })),
+    ]);
+    res.json({
+      schools:      { total: Number(schoolR.rows[0].total), active: Number(schoolR.rows[0].active) },
+      applications: { total: Number(appR.rows[0].total), pending: Number(appR.rows[0].pending), approved: Number(appR.rows[0].approved), rejected: Number(appR.rows[0].rejected) },
+      admins:       { total: Number(adminR.rows[0].total), active: Number(adminR.rows[0].active) },
+      database:     dbR,
+      system:       { error_count_last_hour: 0, avg_response_ms: 0 },
+    });
+  } catch (err) {
+    console.error('[system stats]', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
 //  SCHOOL MANAGEMENT
 // ─────────────────────────────────────────────────────────────
 

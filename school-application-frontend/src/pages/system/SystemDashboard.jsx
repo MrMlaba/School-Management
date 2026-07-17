@@ -266,20 +266,14 @@ const SystemDashboard = () => {
 
   const load = useCallback(async () => {
     setLoading(true);
-    try {
-      const [sRes, schRes] = await Promise.all([
-        fetch(`${API_BASE}/api/system/stats`,   { headers: { Authorization: `Bearer ${token()}` } }),
-        fetch(`${API_BASE}/api/system/schools`, { headers: { Authorization: `Bearer ${token()}` } }),
-      ]);
-      const sData   = await sRes.json();
-      const schData = await schRes.json();
-      setStats(sData);
-      setSchools(Array.isArray(schData) ? schData : []);
-    } catch {
-      setStats(null);
-    } finally {
-      setLoading(false);
-    }
+    const headers = { Authorization: `Bearer ${token()}` };
+    const [sResult, schResult] = await Promise.allSettled([
+      fetch(`${API_BASE}/api/system/stats`,   { headers }).then(r => r.json()),
+      fetch(`${API_BASE}/api/system/schools`, { headers }).then(r => r.json()),
+    ]);
+    if (sResult.status === 'fulfilled')   setStats(sResult.value);
+    if (schResult.status === 'fulfilled') setSchools(Array.isArray(schResult.value) ? schResult.value : []);
+    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -293,7 +287,7 @@ const SystemDashboard = () => {
   const dec  = appr + rej;
   const appRate = dec > 0 ? Math.round((appr / dec) * 100) : 0;
 
-  const dbOk     = s.database?.status === 'connected';
+  const dbOk     = s.database?.connected === true;
   const errCount = s.system?.error_count_last_hour || 0;
   const latency  = s.system?.avg_response_ms || 0;
   const sysHealth = Math.max(0, Math.round(
