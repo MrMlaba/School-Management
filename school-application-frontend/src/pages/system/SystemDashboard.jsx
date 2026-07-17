@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Chip, Tabs, Tab, TextField, CircularProgress } from '@mui/material';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
-  ResponsiveContainer, Cell, LineChart, Line, Legend, PieChart, Pie,
-  RadialBarChart, RadialBar,
+  ResponsiveContainer, Cell, LineChart, Line, Legend,
 } from 'recharts';
 import SendRoundedIcon          from '@mui/icons-material/SendRounded';
 import SmartToyRoundedIcon      from '@mui/icons-material/SmartToyRounded';
@@ -17,7 +16,6 @@ import PersonRoundedIcon        from '@mui/icons-material/PersonRounded';
 import MenuBookRoundedIcon      from '@mui/icons-material/MenuBookRounded';
 import FamilyRestroomRoundedIcon from '@mui/icons-material/FamilyRestroomRounded';
 import SystemLayout, { FONT, TEAL, BORDER, BG, SIDEBAR, CARD, INK, INK_SOFT, INK_FAINT } from '../../components/system/SystemLayout';
-import { useSchoolCtx } from '../../components/system/SystemLayout';
 import API_BASE from '../../config';
 
 const token = () => sessionStorage.getItem('systemToken');
@@ -515,14 +513,23 @@ const AllSchoolsCenter = ({ stats, schools, loading, onSelectSchool }) => {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 const SystemDashboard = () => {
-  const { schoolId, schoolName, setSchool } = useSchoolCtx();
+  // School selection lives here — passed DOWN as props so there is no context
+  // timing issue (hooks run before SystemLayout's Provider mounts).
+  const [schoolId,   setSchoolId]   = useState(null);
+  const [schoolName, setSchoolName] = useState(null);
+
   const [stats,   setStats]   = useState(null);
   const [schools, setSchools] = useState([]);
   const [loading, setLoading] = useState(true);
   const [report,  setReport]  = useState(null);
   const [repLoad, setRepLoad] = useState(false);
 
-  // Load global stats + schools list
+  const handleSchoolChange = useCallback(({ schoolId: id, schoolName: name }) => {
+    setSchoolId(id ?? null);
+    setSchoolName(name ?? null);
+  }, []);
+
+  // Load global stats + schools list once
   const loadBase = useCallback(async () => {
     setLoading(true);
     const h = { Authorization: `Bearer ${token()}` };
@@ -535,31 +542,42 @@ const SystemDashboard = () => {
     setLoading(false);
   }, []);
 
-  // Load per-school report when a school is selected
+  // Load per-school report whenever selection changes
   useEffect(() => {
     if (!schoolId) { setReport(null); return; }
     setRepLoad(true);
     fetch(`${API_BASE}/api/system/schools/${schoolId}/report`, {
       headers: { Authorization: `Bearer ${token()}` },
-    }).then(r => r.json()).then(d => setReport(d)).catch(() => setReport(null)).finally(() => setRepLoad(false));
+    })
+      .then(r => r.json())
+      .then(d => setReport(d))
+      .catch(() => setReport(null))
+      .finally(() => setRepLoad(false));
   }, [schoolId]);
 
   useEffect(() => { loadBase(); }, [loadBase]);
 
   const handleCardClick = useCallback((s) => {
-    setSchool({ schoolId: s.id, schoolName: s.name });
-  }, [setSchool]);
+    setSchoolId(s.id);
+    setSchoolName(s.name);
+  }, []);
 
   const viewingSchool = Boolean(schoolId);
   const title    = viewingSchool ? schoolName : 'Overview';
   const subtitle = viewingSchool ? 'Term Report' : 'System Dashboard';
 
   return (
-    <SystemLayout title={title} subtitle={subtitle}>
+    <SystemLayout
+      title={title}
+      subtitle={subtitle}
+      selectedSchoolId={schoolId}
+      selectedSchoolName={schoolName}
+      onSchoolChange={handleSchoolChange}
+    >
       <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
 
-        {/* Center */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, animation: 'pageSlideIn 0.25s ease both' }} key={schoolId ?? 'all'}>
+        {/* Center — key forces remount + animation on school switch */}
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }} key={schoolId ?? 'all'}>
           {viewingSchool ? (
             <SchoolReport schoolName={schoolName} report={report} loading={repLoad} />
           ) : (
