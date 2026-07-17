@@ -1,11 +1,8 @@
 import React, { Fragment } from 'react';
 import { Box, Typography, TextField } from '@mui/material';
-import { FONT, BORDER, INK, INK_SOFT, INK_FAINT } from './SystemLayout';
+import { FONT, BORDER, CARD, SIDEBAR, INK, INK_SOFT, INK_FAINT, TEAL } from './SystemLayout';
 import { core } from '../../theme/tokens';
 
-// The list+detail record-editor pattern: a breadcrumb + toolbar row, then a
-// list panel on the left and a persistent detail form on the right — no
-// modals for the primary create/edit flow.
 const MasterDetailShell = ({
   breadcrumb = [],
   onAdd, addLabel = '+ Add',
@@ -13,8 +10,14 @@ const MasterDetailShell = ({
   search, onSearchChange,
   list, detail,
 }) => (
-  <Box>
-    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 1.5 }}>
+  <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+
+    {/* Toolbar */}
+    <Box sx={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      flexWrap: 'wrap', gap: 1.5, px: 2.5, py: 1.25, flexShrink: 0,
+      borderBottom: `1px solid ${BORDER}`,
+    }}>
       <Typography sx={{ fontFamily: FONT, fontSize: '0.78rem' }}>
         {breadcrumb.map((b, i) => (
           <Fragment key={i}>
@@ -30,30 +33,44 @@ const MasterDetailShell = ({
         {onSearchChange && (
           <TextField
             size="small" placeholder="Search…" value={search} onChange={e => onSearchChange(e.target.value)}
-            sx={{ width: 190, '& .MuiOutlinedInput-root': { fontFamily: FONT, fontSize: '0.8rem', borderRadius: '6px', bgcolor: '#fff' } }}
+            sx={{ width: 190, '& .MuiOutlinedInput-root': { fontFamily: FONT, fontSize: '0.8rem', borderRadius: '6px' } }}
           />
         )}
         {onRefresh && (
-          <Box component="span" onClick={onRefresh} sx={{ fontFamily: FONT, fontSize: '0.78rem', fontWeight: 600, color: INK_SOFT, cursor: 'pointer', '&:hover': { color: core.brand } }}>
+          <Box component="span" onClick={onRefresh}
+            sx={{ fontFamily: FONT, fontSize: '0.78rem', fontWeight: 600, color: INK_SOFT, cursor: 'pointer', '&:hover': { color: TEAL } }}>
             Refresh
           </Box>
         )}
         {onAdd && (
-          <Box component="span" onClick={onAdd} sx={{ fontFamily: FONT, fontSize: '0.78rem', fontWeight: 700, color: core.link, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
+          <Box component="span" onClick={onAdd}
+            sx={{ fontFamily: FONT, fontSize: '0.78rem', fontWeight: 700, color: TEAL, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
             {addLabel}
           </Box>
         )}
       </Box>
     </Box>
 
+    {/* List + Detail panels */}
     <Box sx={{
-      display: 'flex', flexDirection: { xs: 'column', md: 'row' },
-      border: `1px solid ${BORDER}`, borderRadius: '8px', bgcolor: '#fff', overflow: 'hidden', minHeight: 440,
+      flex: 1, display: 'flex', flexDirection: { xs: 'column', md: 'row' },
+      overflow: 'hidden', minHeight: 0,
     }}>
-      <Box sx={{ flex: '1 1 58%', minWidth: 0, borderRight: { md: `1px solid ${BORDER}` }, borderBottom: { xs: `1px solid ${BORDER}`, md: 'none' }, overflowX: 'auto' }}>
+      <Box sx={{
+        flex: '1 1 58%', minWidth: 0,
+        borderRight: { md: `1px solid ${BORDER}` },
+        borderBottom: { xs: `1px solid ${BORDER}`, md: 'none' },
+        overflowX: 'auto', overflowY: 'auto',
+        bgcolor: CARD,
+      }}>
         {list}
       </Box>
-      <Box sx={{ flex: '1 1 42%', minWidth: { md: 300 }, bgcolor: '#FAFBFC', display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{
+        flex: '1 1 42%', minWidth: { md: 300 },
+        bgcolor: SIDEBAR,
+        display: 'flex', flexDirection: 'column',
+        overflowY: 'auto',
+      }}>
         {detail}
       </Box>
     </Box>

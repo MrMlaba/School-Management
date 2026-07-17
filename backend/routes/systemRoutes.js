@@ -540,9 +540,67 @@ router.get('/schools/:schoolId/admins', requireSystemAdmin, async (req, res) => 
   }
 });
 
-// Creating, editing, deleting, and resetting passwords for school-admin
-// accounts all now live solely under /api/system/admins/* (backend/auth.js) —
-// see SystemAdminsPage.jsx. This file keeps only the read-only per-school
-// list above, used for the read-only summary on the Schools page.
+// ── AI chat — system admin asks questions about platform data ─────────────────
+// POST /api/system/ai-chat
+// Body: { message: string, history?: [{role, content}] }
+// Uses Groq (llama-3.3-70b) with live platform stats as system context.
+router.post('/ai-chat', requireSystemAdmin, async (req, res) => {
+  const { message, history = [] } = req.body;
+  if (!message?.trim()) return res.status(400).json({ error: 'Message required' });
+
+  const GROQ_KEY = process.env.GROQ_API_KEY;
+  if (!GROQ_KEY) return res.status(503).json({ error: 'AI not configured' });
+
+  try {
+    const [appR, schoolR, adminR] = await Promise.all([
+      pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE status='pending') AS pending,
+                         COUNT(*) FILTER (WHERE status='approved') AS approved,
+                         COUNT(*) FILTER (WHERE status='rejected') AS rejected
+                  FROM applications`),
+      pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE is_active) AS active FROM schools`),
+      pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE is_active) AS active FROM school_admins`),
+    ]);
+
+    const stats = {
+      applications: appR.rows[0],
+      schools:      schoolR.rows[0],
+      admins:       adminR.rows[0],
+    };
+
+    const systemPrompt = `You are an AI assistant for a School Management System (SMS) — a South African school enrollment and management platform. You are embedded in the Service Provider Console used by the system administrator.
+
+Current platform stats (live data):
+- Schools: ${stats.schools.active} active / ${stats.schools.total} total
+- School admins: ${stats.admins.active} active / ${stats.admins.total} total
+- Applications: ${stats.applications.total} total — ${stats.applications.pending} pending, ${stats.applications.approved} approved, ${stats.applications.rejected} rejected
+
+Answer concisely. If asked about specific schools or students, explain you only have aggregate stats here. If asked what you can do, mention you can explain platform data, suggest actions, and answer questions about the SMS system.`;
+
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...history.slice(-6),
+      { role: 'user', content: message },
+    ];
+
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages, max_tokens: 400, temperature: 0.5 }),
+    });
+
+    if (!groqRes.ok) {
+      const err = await groqRes.text();
+      console.error('[ai-chat] Groq error:', err);
+      return res.status(502).json({ error: 'AI service error' });
+    }
+
+    const groqData = await groqRes.json();
+    const reply = groqData.choices?.[0]?.message?.content || 'No response.';
+    return res.json({ reply });
+  } catch (err) {
+    console.error('[ai-chat]', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
 
 module.exports = { router, requireSystemAdmin };
