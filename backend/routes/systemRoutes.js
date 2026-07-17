@@ -263,7 +263,11 @@ router.get('/schools', requireSystemAdmin, async (req, res) => {
          s.grades, s.streams, s.is_active, s.created_at, s.image_id, s.logo_id,
          s.created_by, s.updated_by, s.updated_at,
          COUNT(DISTINCT sa.id) AS admin_count,
-         COUNT(DISTINCT a.id) AS application_count
+         COUNT(DISTINCT a.id)                                               AS application_count,
+         COUNT(DISTINCT a.id)                                               AS total_applications,
+         COUNT(DISTINCT CASE WHEN a.status = 'pending'  THEN a.id END)     AS pending_applications,
+         COUNT(DISTINCT CASE WHEN a.status = 'approved' THEN a.id END)     AS approved_count,
+         COUNT(DISTINCT CASE WHEN a.status = 'rejected' THEN a.id END)     AS rejected_count
        FROM schools s
        LEFT JOIN school_admins sa ON sa.school_id = s.id AND sa.is_active = true
        LEFT JOIN applications a ON a.school = s.name
