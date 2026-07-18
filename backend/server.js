@@ -1337,30 +1337,49 @@ async function ensureTables() {
       stream     TEXT
     )
   `);
+  // Fix legacy stream value 'Physics' → 'Science' so it matches the frontend dropdown
+  await pool.query(`UPDATE national_subjects SET stream = 'Science' WHERE stream = 'Physics'`);
+
+  // Seed national subjects — only inserts rows that don't already exist by code
   await pool.query(`
     INSERT INTO national_subjects (name, code, grade_min, grade_max, stream)
-    SELECT * FROM (VALUES
-      ('English Home Language',              'ENG', 8, 12, NULL),
-      ('Mathematics',                        'MATH',8, 12, NULL),
-      ('Mathematical Literacy',              'MATL',10,12, NULL),
-      ('Life Orientation',                   'LO',  8, 12, NULL),
-      ('Afrikaans First Additional Language','AFR', 8, 12, NULL),
-      ('Natural Sciences',                   'NSCI',8, 9,  NULL),
-      ('Social Sciences',                    'SSCI',8, 9,  NULL),
-      ('Technology',                         'TECH',8, 9,  NULL),
-      ('Economic and Management Sciences',   'EMS', 8, 9,  NULL),
-      ('Creative Arts',                      'ART', 8, 9,  NULL),
-      ('Physical Sciences',                  'PSCI',10,12, 'Physics'),
-      ('Life Sciences',                      'LSCI',10,12, 'Physics'),
-      ('Information Technology',             'IT',  10,12, 'Physics'),
-      ('Accounting',                         'ACC', 10,12, 'Commerce'),
-      ('Business Studies',                   'BUS', 10,12, 'Commerce'),
-      ('Economics',                          'ECON',10,12, 'Commerce'),
-      ('History',                            'HIST',10,12, 'Humanities'),
-      ('Geography',                          'GEOG',10,12, 'Humanities'),
-      ('Tourism',                            'TOUR',10,12, 'Humanities')
-    ) AS seed(name, code, grade_min, grade_max, stream)
-    WHERE NOT EXISTS (SELECT 1 FROM national_subjects)
+    SELECT v.name, v.code, v.grade_min, v.grade_max, v.stream
+    FROM (VALUES
+      -- Grades 8–9 (compulsory, all streams)
+      ('English Home Language',              'ENG',  8, 12, NULL),
+      ('English First Additional Language',  'ENFL', 8, 12, NULL),
+      ('IsiZulu Home Language',              'ZUL',  8, 12, NULL),
+      ('Afrikaans First Additional Language','AFR',  8, 12, NULL),
+      ('Mathematics',                        'MATH', 8, 12, NULL),
+      ('Life Orientation',                   'LO',   8, 12, NULL),
+      ('Natural Sciences',                   'NSCI', 8, 9,  NULL),
+      ('Social Sciences',                    'SSCI', 8, 9,  NULL),
+      ('Technology',                         'TECH', 8, 9,  NULL),
+      ('Economic and Management Sciences',   'EMS',  8, 9,  NULL),
+      ('Creative Arts',                      'ART',  8, 9,  NULL),
+      -- Grade 10–12 general
+      ('Mathematical Literacy',              'MATL', 10, 12, NULL),
+      -- Science stream
+      ('Physical Sciences',                  'PSCI', 10, 12, 'Science'),
+      ('Life Sciences',                      'LSCI', 10, 12, 'Science'),
+      ('Agricultural Sciences',              'AGRI', 10, 12, 'Science'),
+      ('Information Technology',             'IT',   10, 12, 'Science'),
+      ('Geography',                          'GEOG', 10, 12, 'Science'),
+      -- Commerce stream
+      ('Accounting',                         'ACC',  10, 12, 'Commerce'),
+      ('Business Studies',                   'BUS',  10, 12, 'Commerce'),
+      ('Economics',                          'ECON', 10, 12, 'Commerce'),
+      ('Consumer Studies',                   'CONS', 10, 12, 'Commerce'),
+      ('Tourism',                            'TOUR', 10, 12, 'Commerce'),
+      -- Humanities stream
+      ('History',                            'HIST', 10, 12, 'Humanities'),
+      ('Geography (Humanities)',             'GEOH', 10, 12, 'Humanities'),
+      ('Tourism (Humanities)',               'TOURH',10, 12, 'Humanities'),
+      ('Visual Arts',                        'VART', 10, 12, 'Humanities'),
+      ('Dramatic Arts',                      'DRAM', 10, 12, 'Humanities'),
+      ('Music',                              'MUS',  10, 12, 'Humanities')
+    ) AS v(name, code, grade_min, grade_max, stream)
+    WHERE NOT EXISTS (SELECT 1 FROM national_subjects WHERE code = v.code)
   `);
 
   // applications — linked to schools by NAME (not id) throughout the app,

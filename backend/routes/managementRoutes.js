@@ -76,6 +76,7 @@ router.get('/enrolled-students', async (req, res) => {
              es.last_name AS "lastName", es.national_id AS "nationalId", es.email, es.phone,
              es.date_of_birth AS "dateOfBirth", es.gender, es.grade, es.stream,
              es.enrollment_date AS "enrollmentDate", es.notes, es.created_at AS "createdAt",
+             (es.password_hash IS NOT NULL AND es.password_hash <> '') AS "hasCredentials",
              COALESCE(json_agg(json_build_object('id',p.id,'firstName',p.first_name,'lastName',p.last_name,'phone',p.phone,'email',p.email,'relationship',p.relationship,'isEmergency',p.is_emergency_contact)) FILTER (WHERE p.id IS NOT NULL),'[]') AS parents
       FROM enrolled_students es
       LEFT JOIN student_parents sp ON sp.student_id = es.id

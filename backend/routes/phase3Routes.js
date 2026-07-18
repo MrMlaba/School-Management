@@ -45,8 +45,12 @@ router.get('/teachers', async (req, res) => {
 router.post('/teachers', async (req, res) => {
   const schoolId = req.admin.schoolId;
   const { firstName, lastName, email, phone, employeeNumber, gender } = req.body;
-  if (!firstName || !lastName)
+  if (!firstName?.trim() || !lastName?.trim())
     return res.status(400).json({ message: 'First name and last name are required' });
+  if (email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+    return res.status(400).json({ message: 'Invalid email address format' });
+  if (employeeNumber?.trim() && !/^[A-Za-z0-9]{2,20}$/.test(employeeNumber.trim()))
+    return res.status(400).json({ message: 'Employee number must be 2–20 alphanumeric characters (letters and digits only)' });
   try {
     const { rows } = await pool.query(
       `INSERT INTO teachers (school_id, first_name, last_name, email, phone, employee_number, gender)

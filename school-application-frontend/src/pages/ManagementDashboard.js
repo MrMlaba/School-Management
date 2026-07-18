@@ -537,8 +537,8 @@ const StudentsSection = () => {
                                   <KeyIcon sx={{fontSize:15}}/>
                                 </IconButton>
                               </Tooltip>
-                              {/* NEW: Reset Password button — only show if student already has credentials */}
-                              {s.passwordHash !== null && s.passwordHash !== '' && (
+                              {/* Reset Password — only show if student already has login credentials */}
+                              {s.hasCredentials && (
                                 <Tooltip title="Reset Password">
                                   <IconButton size="small"
                                     onClick={(e)=>{e.stopPropagation();setResetStudentDialog(s);}}
@@ -577,7 +577,7 @@ const StudentsSection = () => {
               <FormRow label="Stream">{selectedStudent.stream?<Chip label={selectedStudent.stream} size="small" sx={{fontSize:'0.62rem',fontWeight:700,bgcolor:'#f2f2f2',color:'#3f3f3f'}}/>:<Typography sx={{fontSize:'0.75rem',color:C.muted}}>—</Typography>}</FormRow>
               <FormRow label="Enrolled"><Typography sx={{fontSize:'0.75rem',color:C.muted}}>{selectedStudent.enrollmentDate?fmt(selectedStudent.enrollmentDate):'—'}</Typography></FormRow>
               <FormRow label="Login">
-                <Chip label={selectedStudent.passwordHash?'Set':'Not set'} size="small" sx={{fontWeight:700,fontSize:'0.62rem',bgcolor:selectedStudent.passwordHash?'#f2f2f2':'#f7f7f7',color:selectedStudent.passwordHash?'#3f3f3f':C.danger}}/>
+                <Chip label={selectedStudent.hasCredentials?'Set':'Not set'} size="small" sx={{fontWeight:700,fontSize:'0.62rem',bgcolor:selectedStudent.hasCredentials?'#f2f2f2':'#f7f7f7',color:selectedStudent.hasCredentials?'#3f3f3f':C.danger}}/>
               </FormRow>
               <FormRow label="Parents">
                 {selectedStudent.parents?.length ? (
@@ -875,8 +875,10 @@ const TeachersSection = () => {
       e.phone = 'Phone number is required';
     else if (form.phone.replace(/\D/g,'').length !== 10)
       e.phone = 'Phone must be exactly 10 digits';
-    if (form.employeeNumber?.trim() && form.employeeNumber.trim().length < 2)
-      e.employeeNumber = 'Too short';
+    if (form.employeeNumber?.trim()) {
+      if (!/^[A-Za-z0-9]{2,20}$/.test(form.employeeNumber.trim()))
+        e.employeeNumber = 'Must be 2–20 letters/digits only (no spaces or symbols)';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };

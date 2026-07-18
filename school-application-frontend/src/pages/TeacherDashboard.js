@@ -59,8 +59,20 @@ const C = {
 };
 
 const BASE  = `${API_BASE}`;
-const authH = () => ({ Authorization: `Bearer ${sessionStorage.getItem('teacherToken')}` });
+const authH = () => {
+  const t = sessionStorage.getItem('teacherToken');
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
+
+const redirectOn401 = (responses, navigate) => {
+  if (responses.some(r => r.status === 401)) {
+    ['teacherToken', 'teacherName', 'teacherSchool'].forEach(k => sessionStorage.removeItem(k));
+    navigate('/teacher-login');
+    return true;
+  }
+  return false;
+};
 
 const openDoc = async (filename, onError) => {
   try {
@@ -460,12 +472,13 @@ const DashboardTab = ({ onNavigate }) => {
         fetch(`${BASE}/api/teacher/announcements`, { headers: authH() }),
         fetch(`${BASE}/api/teacher/events`,        { headers: authH() }),
       ]);
+      if (redirectOn401([dashRes, annRes, evRes], navigate)) return;
       if (dashRes.ok) setData(await dashRes.json());
       if (annRes.ok)  setAnnouncements(await annRes.json());
       if (evRes.ok)   setEvents(await evRes.json());
       setLoading(false);
     })();
-  }, []);
+  }, [navigate]);
 
   if (loading) return <Box sx={{ display:'flex', justifyContent:'center', py:8 }}><CircularProgress sx={{ color:C.brand }} /></Box>;
   if (!data)   return <Typography sx={{ color:C.muted }}>Failed to load dashboard.</Typography>;
@@ -633,22 +646,27 @@ const DashboardTab = ({ onNavigate }) => {
    TIMETABLE TAB
 ══════════════════════════════════════════════════════════════════════ */
 const TimetableTab = () => {
+  const navigate = useNavigate();
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState('');
 
   useEffect(() => {
     (async () => {
       const res = await fetch(`${BASE}/api/teacher/timetable`, { headers: authH() });
+      if (redirectOn401([res], navigate)) return;
       if (res.ok) setData(await res.json());
+      else setError('Failed to load timetable. Please try again.');
       setLoading(false);
     })();
-  }, []);
+  }, [navigate]);
 
   if (loading) return <Box sx={{ display:'flex', justifyContent:'center', py:6 }}><CircularProgress sx={{ color:C.brand }} /></Box>;
-  if (!data)   return null;
+  if (error || !data)
+    return <Typography sx={{ color:C.danger, px:2, py:4, fontFamily:"'IBM Plex Sans', sans-serif" }}>{error || 'Could not load timetable.'}</Typography>;
 
   const slotMap = {};
-  data.slots.forEach(s => { slotMap[`${s.dayOfWeek}-${s.periodNumber}`] = s; });
+  (data.slots || []).forEach(s => { slotMap[`${s.dayOfWeek}-${s.periodNumber}`] = s; });
 
   return (
     <Card>
@@ -662,7 +680,7 @@ const TimetableTab = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {data.periods.map(p => (
+            {(data.periods || []).map(p => (
               <TableRow key={p.id}>
                 <TableCell sx={{ ...bodyCell, background:p.isBreak?'#F5F5F5':C.headerBg, fontWeight:600 }}>
                   <Typography sx={{ fontWeight:700, fontSize:'0.8rem', color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>{p.name}</Typography>
@@ -711,7 +729,7 @@ const AttendanceTab = ({ initSlotId }) => {
       if (res.ok) {
         const d = await res.json();
         const seen = new Set();
-        setMySlots(d.slots.filter(s => { const k=`${s.subjectName}-${s.className}`; if(seen.has(k))return false; seen.add(k);return true; }));
+        setMySlots((d.slots || []).filter(s => { const k=`${s.subjectName}-${s.className}`; if(seen.has(k))return false; seen.add(k);return true; }));
       }
     })();
   }, []);
@@ -948,7 +966,7 @@ const AssignmentsTab = () => {
       fetch(`${BASE}/api/teacher/terms`,       { headers:authH() }),
     ]);
     if (aRes.ok)    setAssignments(await aRes.json());
-    if (tRes.ok)    { const d=await tRes.json(); setSlots(d.slots); }
+    if (tRes.ok)    { const d=await tRes.json(); setSlots(d.slots || []); }
     if (termsRes.ok) setTerms(await termsRes.json());
   }, []);
 
@@ -1393,7 +1411,7 @@ const ExamsTab = () => {
       fetch(`${BASE}/api/teacher/terms`,     { headers:authH() }),
     ]);
     if (eRes.ok)    setExams(await eRes.json());
-    if (tRes.ok)    { const d=await tRes.json(); setSlots(d.slots); }
+    if (tRes.ok)    { const d=await tRes.json(); setSlots(d.slots || []); }
     if (termsRes.ok) setTerms(await termsRes.json());
   }, []);
 
