@@ -817,33 +817,18 @@ const StudentsSection = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   TEACHERS
+   TEACHERS  (read-only view — management is done by System Admin)
 ═══════════════════════════════════════════════════════════════ */
 const TeachersSection = () => {
-  const [teachers,       setTeachers]       = useState([]);
-  const [loading,        setLoading]        = useState(true);
-  const [dialog,         setDialog]         = useState(false);
-  const [credDialog,     setCredDialog]     = useState(null);
-  const [editing,        setEditing]        = useState(null);
-  const [saving,         setSaving]         = useState(false);
-  const [snack,          setSnack]          = useState({open:false,msg:'',sev:'success'});
-  const [allNatSubjects, setAllNatSubjects] = useState([]);
-  const [selSubjects,    setSelSubjects]    = useState([]);
-  const [errors,         setErrors]         = useState({});
-  const toast = toast_(setSnack);
-
-  // ── EF must have 'phone', not 'subject' ──
-  const EF = { firstName:'', lastName:'', email:'', phone:'', employeeNumber:'', gender:'' };
-  const [form, setForm] = useState(EF);
-  const [cred, setCred] = useState({username:'',password:''});
+  const [teachers,           setTeachers]           = useState([]);
+  const [loading,            setLoading]            = useState(true);
+  const [credDialog,         setCredDialog]         = useState(null);
+  const [cred,               setCred]               = useState({username:'',password:''});
+  const [saving,             setSaving]             = useState(false);
   const [resetTeacherDialog, setResetTeacherDialog] = useState(null);
   const [resetTeacherResult, setResetTeacherResult] = useState(null);
-
-  // Load national subjects
-  useEffect(() => {
-    fetch(`${BASE}/api/setup/national-subjects`, {headers:authH()})
-      .then(r=>r.ok?r.json():[]).then(setAllNatSubjects).catch(()=>{});
-  }, []);
+  const [snack,              setSnack]              = useState({open:false,msg:'',sev:'success'});
+  const toast = toast_(setSnack);
 
   const fetch_ = useCallback(async () => {
     setLoading(true);
@@ -853,61 +838,6 @@ const TeachersSection = () => {
   }, []);
   useEffect(()=>{fetch_();},[fetch_]);
 
-  // Default-select the first teacher on landing (once), same as the Students tab.
-  const didDefaultSelect = useRef(false);
-  useEffect(()=>{
-    if (!didDefaultSelect.current && teachers.length>0) {
-      didDefaultSelect.current = true;
-      openEdit(teachers[0]);
-    }
-  }, [teachers]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Validation ──
-  const validate = () => {
-    const e = {};
-    if (!form.firstName?.trim())               e.firstName = 'First name is required';
-    else if (form.firstName.trim().length < 2) e.firstName = 'At least 2 characters';
-    if (!form.lastName?.trim())                e.lastName  = 'Last name is required';
-    else if (form.lastName.trim().length < 2)  e.lastName  = 'At least 2 characters';
-    if (form.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
-      e.email = 'Enter a valid email address';
-    if (!form.phone?.trim())
-      e.phone = 'Phone number is required';
-    else if (form.phone.replace(/\D/g,'').length !== 10)
-      e.phone = 'Phone must be exactly 10 digits';
-    if (form.employeeNumber?.trim()) {
-      if (!/^[A-Za-z0-9]{2,20}$/.test(form.employeeNumber.trim()))
-        e.employeeNumber = 'Must be 2–20 letters/digits only (no spaces or symbols)';
-    }
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const openAdd = () => { setEditing(null); setForm(EF); setSelSubjects([]); setErrors({}); setDialog(true); };
-  const openEdit = (t) => {
-    setEditing(t);
-    setForm({firstName:t.firstName,lastName:t.lastName,email:t.email||'',phone:t.phone||'',employeeNumber:t.employeeNumber||'',gender:t.gender||''});
-    setSelSubjects((t.subjects||[]).map(s=>s.id));
-    setErrors({});
-    setDialog(true);
-  };
-
-  const handleSave = async () => {
-    if (!validate()) return;
-    setSaving(true);
-    const url = editing ? `${BASE}/api/management/teachers/${editing.id}` : `${BASE}/api/management/teachers`;
-    const res = await fetch(url, {method:editing?'PATCH':'POST', headers:jsonH(), body:JSON.stringify(form)});
-    const d = await res.json();
-    if (res.ok) {
-      await fetch(`${BASE}/api/management/teachers/${d.id}/subjects`, {
-        method:'PUT', headers:jsonH(), body:JSON.stringify({subjectIds:selSubjects}),
-      });
-      toast(editing?'Teacher updated':'Teacher added');
-      setDialog(false); fetch_();
-    } else toast(d.message||'Failed','error');
-    setSaving(false);
-  };
-
   const handleSetCred = async () => {
     if (!cred.username||!cred.password) return toast('Username and password required','error');
     setSaving(true);
@@ -916,181 +846,91 @@ const TeachersSection = () => {
     });
     const d = await res.json();
     setSaving(false);
-    if (res.ok) { toast('Credentials set — teacher can now log in'); setCredDialog(null); }
+    if (res.ok) { toast('Credentials set — teacher can now log in'); setCredDialog(null); fetch_(); }
     else toast(d.message||'Failed','error');
-  };
-
-  const handleDeactivate = async (id) => {
-    const res = await fetch(`${BASE}/api/management/teachers/${id}`, {method:'DELETE',headers:authH()});
-    if (res.ok) { toast('Teacher deactivated'); fetch_(); } else toast('Failed','error');
   };
 
   if (loading) return <Box sx={{display:'flex',justifyContent:'center',py:8}}><CircularProgress sx={{color:C.brand}}/></Box>;
 
-  const fmtDate = d => new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
-
   return (
     <Card_ sx={{mb:0,p:0,overflow:'hidden'}}>
       <Box sx={{p:2.5,pb:0}}>
-        <SectionHead title="Teachers" subtitle="Manage teachers and their login access"
+        <SectionHead title="Teachers" subtitle="View teacher roster — set login credentials here"
           action={
-            <Box sx={{display:'flex',gap:0.5}}>
-              <Tooltip title="Refresh"><IconButton size="small" onClick={fetch_} sx={{color:C.muted,border:`1px solid ${C.border}`,borderRadius:'4px'}}><RestoreIcon sx={{fontSize:16}}/></IconButton></Tooltip>
-              <Tooltip title="Add Teacher"><IconButton size="small" onClick={openAdd} sx={{color:C.white,background:C.brand,borderRadius:'4px','&:hover':{background:C.brand}}}><AddIcon sx={{fontSize:18}}/></IconButton></Tooltip>
-            </Box>
+            <Tooltip title="Refresh">
+              <IconButton size="small" onClick={fetch_} sx={{color:C.muted,border:`1px solid ${C.border}`,borderRadius:'4px'}}>
+                <RestoreIcon sx={{fontSize:16}}/>
+              </IconButton>
+            </Tooltip>
           }
         />
+        <InfoBanner>
+          Teacher profiles, subjects and timetable are managed by the Service Provider. Your role here is to set or reset each teacher's login credentials.
+        </InfoBanner>
       </Box>
 
-      <Box sx={{display:'flex',minHeight:420}}>
-        <Box sx={{flex:'1 1 60%',minWidth:0,overflowX:'auto',p:2.5,pt:1.5}}>
-          {teachers.length===0 ? (
-            <Typography sx={{color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>No teachers added yet.</Typography>
-          ) : (
-            <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'4px'}}>
-              <Table size="small" sx={{borderCollapse:'collapse'}}>
-                <TableHead><TableRow>
-                  {['#','Name','Emp. No.','Email','Phone','Subjects','Status','Login',''].map(h=>(
-                    <TableCell key={h} sx={{...hc,...(h===''?{borderRight:'none'}:{})}}>{h}</TableCell>
-                  ))}
-                </TableRow></TableHead>
-                <TableBody>
-                  {teachers.map((t,idx)=>(
-                    <TableRow key={t.id} onClick={()=>openEdit(t)} sx={{cursor:'pointer',boxShadow:editing?.id===t.id&&dialog?`inset 3px 0 0 0 ${C.brand}`:'none',backgroundColor:editing?.id===t.id&&dialog?'#e3e3e3':idx%2===0?C.white:'#fbfbfb'}}>
-                      <TableCell sx={{...bc,color:C.muted,textAlign:'center',width:40}}>{idx+1}</TableCell>
-                      <TableCell sx={{...bc,fontWeight:600}}>{t.firstName} {t.lastName}</TableCell>
-                      <TableCell sx={{...bc,fontFamily:'monospace',fontSize:'0.7rem'}}>{t.employeeNumber||'—'}</TableCell>
-                      <TableCell sx={{...bc,color:'#575757'}}>{t.email||'—'}</TableCell>
-                      {/* ── Phone column ── */}
-                      <TableCell sx={bc}>{t.phone||'—'}</TableCell>
-                      {/* ── Subjects column ── */}
-                      <TableCell sx={bc}>
-                        {(t.subjects||[]).length>0 ? (
-                          <Box sx={{display:'flex',flexWrap:'wrap',gap:0.5}}>
-                            {(t.subjects||[]).slice(0,3).map(s=>(
-                              <Chip key={s.id} label={s.name} size="small" sx={{fontSize:'0.58rem',fontWeight:600,height:18,bgcolor:'#f2f2f2',color:'#3f3f3f'}}/>
-                            ))}
-                            {(t.subjects||[]).length>3 && <Chip label={`+${(t.subjects||[]).length-3}`} size="small" sx={{fontSize:'0.58rem',height:18,bgcolor:C.headerBg,color:C.muted}}/>}
-                          </Box>
-                        ) : (
-                          <Typography sx={{fontSize:'0.69rem',color:C.muted,fontStyle:'italic',fontFamily:"'IBM Plex Sans', sans-serif"}}>None assigned</Typography>
-                        )}
-                      </TableCell>
-                      <TableCell sx={bc}>
-                        <Chip label={t.isActive?'Active':'Inactive'} size="small" sx={{fontWeight:700,fontSize:'0.62rem',bgcolor:t.isActive?'#f0f0f0':'#f5f5f5',color:t.isActive?C.accent:C.muted}}/>
-                      </TableCell>
-                      <TableCell sx={bc}>
-                        <Chip label={t.username?'Set':'Not set'} size="small" sx={{fontWeight:700,fontSize:'0.62rem',bgcolor:t.username?'#f2f2f2':'#f7f7f7',color:t.username?'#3f3f3f':C.danger}}/>
-                      </TableCell>
-                      <TableCell sx={{...bc,borderRight:'none'}}>
-                        <Box sx={{display:'flex',gap:0.5}}>
-                          <Tooltip title="Edit"><IconButton size="small" onClick={(e)=>{e.stopPropagation();openEdit(t);}} sx={{color:C.brand}}><EditIcon sx={{fontSize:15}}/></IconButton></Tooltip>
-                          <Tooltip title="Set Login Credentials"><IconButton size="small" onClick={(e)=>{e.stopPropagation();setCredDialog(t);setCred({username:'',password:''});}} sx={{color:C.brand}}><KeyIcon sx={{fontSize:15}}/></IconButton></Tooltip>
-                          {t.username && (
-                              <Tooltip title="Reset Password">
-                                <IconButton size="small"
-                                  onClick={(e)=>{e.stopPropagation();setResetTeacherDialog(t);}}
-                                  sx={{color:C.danger}}>
-                                  <RestoreIcon sx={{fontSize:15}}/>
-                                </IconButton>
-                              </Tooltip>
-                            )}
-                          {t.isActive&&<Tooltip title="Deactivate"><IconButton size="small" onClick={(e)=>{e.stopPropagation();handleDeactivate(t.id);}} sx={{color:C.danger}}><DeleteIcon sx={{fontSize:15}}/></IconButton></Tooltip>}
+      <Box sx={{p:2.5,pt:1.5,overflowX:'auto'}}>
+        {teachers.length===0 ? (
+          <Typography sx={{color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>No teachers have been added yet — contact the Service Provider.</Typography>
+        ) : (
+          <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'4px'}}>
+            <Table size="small" sx={{borderCollapse:'collapse'}}>
+              <TableHead><TableRow>
+                {['#','Name','Emp. No.','Email','Phone','Subjects','Status','Login','Actions'].map(h=>(
+                  <TableCell key={h} sx={{...hc,...(h==='Actions'?{borderRight:'none'}:{})}}>{h}</TableCell>
+                ))}
+              </TableRow></TableHead>
+              <TableBody>
+                {teachers.map((t,idx)=>(
+                  <TableRow key={t.id} sx={{backgroundColor:idx%2===0?C.white:'#fbfbfb'}}>
+                    <TableCell sx={{...bc,color:C.muted,textAlign:'center',width:40}}>{idx+1}</TableCell>
+                    <TableCell sx={{...bc,fontWeight:600}}>{t.firstName} {t.lastName}</TableCell>
+                    <TableCell sx={{...bc,fontFamily:'monospace',fontSize:'0.7rem'}}>{t.employeeNumber||'—'}</TableCell>
+                    <TableCell sx={{...bc,color:'#575757'}}>{t.email||'—'}</TableCell>
+                    <TableCell sx={bc}>{t.phone||'—'}</TableCell>
+                    <TableCell sx={bc}>
+                      {(t.subjects||[]).length>0 ? (
+                        <Box sx={{display:'flex',flexWrap:'wrap',gap:0.5}}>
+                          {(t.subjects||[]).slice(0,3).map(s=>(
+                            <Chip key={s.id} label={s.name} size="small" sx={{fontSize:'0.58rem',fontWeight:600,height:18,bgcolor:'#f2f2f2',color:'#3f3f3f'}}/>
+                          ))}
+                          {(t.subjects||[]).length>3&&<Chip label={`+${(t.subjects||[]).length-3}`} size="small" sx={{fontSize:'0.58rem',height:18,bgcolor:C.headerBg,color:C.muted}}/>}
                         </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </Box>
-
-        <Box sx={{flex:'1 1 40%',minWidth:320,borderLeft:`1px solid ${C.border}`,background:C.sidebar}}>
-          {!dialog ? (
-            <DetailEmpty icon={<SchoolIcon sx={{fontSize:34,color:C.border}}/>} text="Select a teacher to edit, or click + to add a new teacher."/>
-          ) : (
-            <DetailPanel
-              title={editing?`Edit Teacher — ${editing.firstName} ${editing.lastName}`:'Add Teacher'}
-              onClose={()=>setDialog(false)}
-              createdAt={editing?.createdAt}
-              fmt={fmtDate}
-              onReset={()=>editing?openEdit(editing):openAdd()}
-              onSave={handleSave}
-              saving={saving}
-              saveLabel={editing?'Update':'Add Teacher'}
-            >
-              <FormRow label="First Name" required>
-                <TextField value={form.firstName} size="small" fullWidth
-                  error={!!errors.firstName} helperText={errors.firstName||''}
-                  inputProps={{maxLength:50}}
-                  onChange={e=>{setForm(f=>({...f,firstName:e.target.value}));if(errors.firstName)setErrors(v=>({...v,firstName:''}));}}/>
-              </FormRow>
-              <FormRow label="Last Name" required>
-                <TextField value={form.lastName} size="small" fullWidth
-                  error={!!errors.lastName} helperText={errors.lastName||''}
-                  inputProps={{maxLength:50}}
-                  onChange={e=>{setForm(f=>({...f,lastName:e.target.value}));if(errors.lastName)setErrors(v=>({...v,lastName:''}));}}/>
-              </FormRow>
-              <FormRow label="Employee Number">
-                <TextField value={form.employeeNumber} size="small" fullWidth
-                  error={!!errors.employeeNumber} helperText={errors.employeeNumber||''}
-                  inputProps={{maxLength:20}}
-                  onChange={e=>{setForm(f=>({...f,employeeNumber:e.target.value}));if(errors.employeeNumber)setErrors(v=>({...v,employeeNumber:''}));}}/>
-              </FormRow>
-              <FormRow label="Gender">
-                <TextField select value={form.gender} onChange={e=>setForm(f=>({...f,gender:e.target.value}))} size="small" fullWidth>
-                  <MenuItem value="">—</MenuItem><MenuItem value="Male">Male</MenuItem><MenuItem value="Female">Female</MenuItem>
-                </TextField>
-              </FormRow>
-              <FormRow label="Email">
-                <TextField value={form.email} size="small" fullWidth
-                  placeholder="teacher@school.co.za"
-                  error={!!errors.email} helperText={errors.email||''}
-                  inputProps={{maxLength:100}}
-                  onChange={e=>{setForm(f=>({...f,email:e.target.value}));if(errors.email)setErrors(v=>({...v,email:''}));}}/>
-              </FormRow>
-              <FormRow label="Phone" required>
-                <TextField value={form.phone} size="small" fullWidth
-                  placeholder="0821234567"
-                  error={!!errors.phone}
-                  helperText={errors.phone||`${(form.phone||'').replace(/\D/g,'').length}/10 digits`}
-                  inputProps={{maxLength:15}}
-                  onChange={e=>{
-                    const val=e.target.value.replace(/[^\d\s+\-()]/g,'');
-                    setForm(f=>({...f,phone:val}));
-                    if(errors.phone)setErrors(v=>({...v,phone:''}));
-                  }}/>
-              </FormRow>
-              <FormRow label="Subjects">
-                {allNatSubjects.length===0 ? (
-                  <Typography sx={{fontSize:'0.69rem',color:C.muted,fontFamily:"'IBM Plex Sans', sans-serif"}}>Loading subjects…</Typography>
-                ) : (
-                  <Box sx={{display:'flex',flexWrap:'wrap',gap:0.75,maxHeight:160,overflowY:'auto',p:1,border:`1px solid ${C.border}`,borderRadius:'6px',background:C.white}}>
-                    {allNatSubjects.map(ns=>{
-                      const selected=selSubjects.includes(ns.id);
-                      return (
-                        <Chip key={ns.id} label={ns.name} size="small" clickable
-                          onClick={()=>setSelSubjects(p=>selected?p.filter(x=>x!==ns.id):[...p,ns.id])}
-                          sx={{fontWeight:600,fontSize:'0.63rem',fontFamily:"'IBM Plex Sans', sans-serif",
-                            background:selected?C.brand:C.white,color:selected?C.white:C.text,
-                            border:`1px solid ${selected?C.brand:C.border}`}}/>
-                      );
-                    })}
-                  </Box>
-                )}
-                {selSubjects.length>0&&(
-                  <Typography sx={{fontSize:'0.63rem',color:C.accent,mt:0.75,fontFamily:"'IBM Plex Sans', sans-serif"}}>
-                    {selSubjects.length} subject{selSubjects.length!==1?'s':''} selected
-                  </Typography>
-                )}
-              </FormRow>
-            </DetailPanel>
-          )}
-        </Box>
+                      ):(
+                        <Typography sx={{fontSize:'0.69rem',color:C.muted,fontStyle:'italic',fontFamily:"'IBM Plex Sans', sans-serif"}}>None</Typography>
+                      )}
+                    </TableCell>
+                    <TableCell sx={bc}>
+                      <Chip label={t.isActive?'Active':'Inactive'} size="small" sx={{fontWeight:700,fontSize:'0.62rem',bgcolor:t.isActive?'#f0f0f0':'#f5f5f5',color:t.isActive?C.accent:C.muted}}/>
+                    </TableCell>
+                    <TableCell sx={bc}>
+                      <Chip label={t.username?'Set':'Not set'} size="small" sx={{fontWeight:700,fontSize:'0.62rem',bgcolor:t.username?'#f2f2f2':'#f7f7f7',color:t.username?'#3f3f3f':C.danger}}/>
+                    </TableCell>
+                    <TableCell sx={{...bc,borderRight:'none'}}>
+                      <Box sx={{display:'flex',gap:0.5}}>
+                        <Tooltip title="Set Login Credentials">
+                          <IconButton size="small" onClick={()=>{setCredDialog(t);setCred({username:'',password:''}); }} sx={{color:C.brand}}>
+                            <KeyIcon sx={{fontSize:15}}/>
+                          </IconButton>
+                        </Tooltip>
+                        {t.username&&(
+                          <Tooltip title="Reset Password">
+                            <IconButton size="small" onClick={()=>setResetTeacherDialog(t)} sx={{color:C.danger}}>
+                              <RestoreIcon sx={{fontSize:15}}/>
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
       </Box>
 
-      {/* Credentials dialog */}
+      {/* ── Set Credentials dialog ── */}
       <Dialog open={!!credDialog} onClose={()=>setCredDialog(null)} maxWidth="xs" fullWidth PaperProps={{sx:{borderRadius:'10px'}}}>
         <DialogTitle sx={{fontWeight:700,color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>
           Set Login — {credDialog?.firstName} {credDialog?.lastName}
@@ -1110,64 +950,42 @@ const TeachersSection = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      {/* ── Teacher Reset Confirm ── */}
-      <Dialog open={!!resetTeacherDialog && !resetTeacherResult}
-        onClose={()=>setResetTeacherDialog(null)} maxWidth="xs" fullWidth
-        PaperProps={{sx:{borderRadius:'10px'}}}>
-        <DialogTitle sx={{fontWeight:700,color:C.danger,fontFamily:"'IBM Plex Sans', sans-serif"}}>
-          Reset Teacher Password
-        </DialogTitle>
+
+      {/* ── Reset Password confirm ── */}
+      <Dialog open={!!resetTeacherDialog&&!resetTeacherResult} onClose={()=>setResetTeacherDialog(null)} maxWidth="xs" fullWidth PaperProps={{sx:{borderRadius:'10px'}}}>
+        <DialogTitle sx={{fontWeight:700,color:C.danger,fontFamily:"'IBM Plex Sans', sans-serif"}}>Reset Teacher Password</DialogTitle>
         <Divider/>
         <DialogContent sx={{pt:2.5}}>
           <InfoBanner color={C.danger} bg={C.dangerBg} border="#EF9A9A">
-            This will reset the password for{' '}
-            <strong>{resetTeacherDialog?.firstName} {resetTeacherDialog?.lastName}</strong>.
-            Their current password will stop working immediately.
+            This will reset the password for <strong>{resetTeacherDialog?.firstName} {resetTeacherDialog?.lastName}</strong>. Their current password will stop working immediately.
           </InfoBanner>
           <Typography sx={{fontSize:'0.75rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>
-            The new temporary password will be shown <strong>once only</strong>.
-            Give it to the teacher in person or over the phone.
+            The new temporary password will be shown <strong>once only</strong>. Give it to the teacher in person or over the phone.
           </Typography>
         </DialogContent>
         <Divider/>
         <DialogActions sx={{px:3,py:2,gap:1}}>
-          <Button onClick={()=>setResetTeacherDialog(null)} sx={{textTransform:'none',color:C.muted}}>
-            Cancel
-          </Button>
-          <Button variant="contained"
+          <Button onClick={()=>setResetTeacherDialog(null)} sx={{textTransform:'none',color:C.muted}}>Cancel</Button>
+          <Button variant="contained" disabled={saving}
             onClick={async()=>{
               setSaving(true);
               try {
-                const res = await fetch(
-                  `${BASE}/api/management/teachers/${resetTeacherDialog.id}/reset-password`,
-                  {method:'POST', headers:authH()}
-                );
-                const d = await res.json();
-                if (res.ok) {
-                  setResetTeacherResult(d);
-                } else {
-                  toast(d.message||'Failed to reset','error');
-                  setResetTeacherDialog(null);
-                }
-              } catch { toast('Network error','error'); setResetTeacherDialog(null); }
+                const res=await fetch(`${BASE}/api/management/teachers/${resetTeacherDialog.id}/reset-password`,{method:'POST',headers:authH()});
+                const d=await res.json();
+                if(res.ok){setResetTeacherResult(d);}
+                else{toast(d.message||'Failed to reset','error');setResetTeacherDialog(null);}
+              } catch{toast('Network error','error');setResetTeacherDialog(null);}
               setSaving(false);
             }}
-            disabled={saving}
-            sx={{background:C.danger,textTransform:'none',fontWeight:700,boxShadow:'none',
-              fontFamily:"'IBM Plex Sans', sans-serif",'&:hover':{background:'#4a4a4a'}}}>
+            sx={{background:C.danger,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>
             {saving?'Resetting…':'Yes, Reset Password'}
           </Button>
         </DialogActions>
       </Dialog>
- 
-      {/* ── Teacher Temp Password shown ONCE ── */}
-      <Dialog open={!!resetTeacherResult}
-        onClose={()=>{setResetTeacherResult(null);setResetTeacherDialog(null);}}
-        maxWidth="xs" fullWidth
-        PaperProps={{sx:{borderRadius:'10px'}}}>
-        <DialogTitle sx={{fontWeight:700,color:C.accent,fontFamily:"'IBM Plex Sans', sans-serif"}}>
-          Teacher Password Reset
-        </DialogTitle>
+
+      {/* ── Temp password display ── */}
+      <Dialog open={!!resetTeacherResult} onClose={()=>{setResetTeacherResult(null);setResetTeacherDialog(null);}} maxWidth="xs" fullWidth PaperProps={{sx:{borderRadius:'10px'}}}>
+        <DialogTitle sx={{fontWeight:700,color:C.accent,fontFamily:"'IBM Plex Sans', sans-serif"}}>Teacher Password Reset</DialogTitle>
         <Divider/>
         <DialogContent sx={{pt:2.5}}>
           <Box sx={{background:'#f7f7f7',border:'1px solid #dfdfdf',borderRadius:'8px',p:2,mb:2,textAlign:'center'}}>
@@ -1182,20 +1000,14 @@ const TeachersSection = () => {
             </Typography>
           </Box>
           <Box sx={{background:C.dangerBg,border:'1px solid #EF9A9A',borderRadius:'6px',p:1.5}}>
-            <Typography sx={{fontSize:'0.72rem',fontWeight:700,color:C.danger,fontFamily:"'IBM Plex Sans', sans-serif"}}>
-              This password will NOT be shown again
-            </Typography>
-            <Typography sx={{fontSize:'0.7rem',color:C.danger,fontFamily:"'IBM Plex Sans', sans-serif",mt:0.5}}>
-              Give it to the teacher directly. They will be forced to change it on next login.
-            </Typography>
+            <Typography sx={{fontSize:'0.72rem',fontWeight:700,color:C.danger,fontFamily:"'IBM Plex Sans', sans-serif"}}>This password will NOT be shown again</Typography>
+            <Typography sx={{fontSize:'0.7rem',color:C.danger,fontFamily:"'IBM Plex Sans', sans-serif",mt:0.5}}>Give it to the teacher directly. They will be forced to change it on next login.</Typography>
           </Box>
         </DialogContent>
         <Divider/>
         <DialogActions sx={{px:3,py:2}}>
-          <Button variant="contained"
-            onClick={()=>{setResetTeacherResult(null);setResetTeacherDialog(null);}}
-            sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',
-              fontFamily:"'IBM Plex Sans', sans-serif"}}>
+          <Button variant="contained" onClick={()=>{setResetTeacherResult(null);setResetTeacherDialog(null);}}
+            sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}}>
             I've written it down — Close
           </Button>
         </DialogActions>
@@ -2614,8 +2426,6 @@ const NAV = [
   {key:'overview', label:'Dashboard',   icon:<DashboardIcon sx={{fontSize:19}}/>},
   {key:'students', label:'Students',    icon:<PeopleAltIcon sx={{fontSize:19}}/>},
   {key:'teachers', label:'Teachers',    icon:<SchoolIcon sx={{fontSize:19}}/>},
-  {key:'timetable',label:'Timetable',   icon:<CalendarMonthIcon sx={{fontSize:19}}/>},
-  {key:'setup',    label:'School Setup',icon:<SettingsIcon sx={{fontSize:19}}/>},
   {key:'events',   label:'Events',        icon:<EventIcon sx={{fontSize:19}}/> },
   {key:'announcements', label:'Announcements', icon:<CampaignIcon sx={{fontSize:19}}/> },
   {key:'reports',  label:'Reports',       icon:<AssessmentIcon sx={{fontSize:19}}/> },
@@ -2731,11 +2541,9 @@ const ManagementDashboard = () => {
         {active==='overview'       && <OverviewSection/>}
         {active==='students'       && <StudentsSection/>}
         {active==='teachers'       && <TeachersSection/>}
-        {active==='timetable'      && <TimetableSection/>}
         {active==='events'         && <EventsSection/>}
         {active==='announcements'  && <AnnouncementsSection/>}
         {active==='reports'        && <ReportsSection/>}
-        {active==='setup'          && <SetupSection/>}
         {active==='support'        && <SupportSection/>}
       </Box>
 

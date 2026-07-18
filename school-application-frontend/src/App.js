@@ -24,13 +24,16 @@ import AssignmentDetail from './pages/AssignmentDetail';   // ← ADD
 import StudentQuizAttempt from './pages/StudentQuizAttempt';
 
 // ── System admin pages ────────────────────────────────────────
-import SystemLoginPage    from './pages/system/SystemLoginPage';
-import SystemDashboard    from './pages/system/SystemDashboard';
-import SystemSchoolsPage  from './pages/system/SystemSchoolsPage';
-import SystemAdminsPage   from './pages/system/SystemAdminsPage';
-import SystemLogsPage     from './pages/system/SystemLogsPage';
-import SystemTicketsPage  from './pages/system/SystemTicketsPage';
-import SystemTeamPage     from './pages/system/SystemTeamPage';
+import SystemLoginPage        from './pages/system/SystemLoginPage';
+import SystemDashboard        from './pages/system/SystemDashboard';
+import SystemSchoolsPage      from './pages/system/SystemSchoolsPage';
+import SystemAdminsPage       from './pages/system/SystemAdminsPage';
+import SystemLogsPage         from './pages/system/SystemLogsPage';
+import SystemTicketsPage      from './pages/system/SystemTicketsPage';
+import SystemTeamPage         from './pages/system/SystemTeamPage';
+import SystemSchoolSetup      from './pages/system/SystemSchoolSetup';
+import SystemSchoolTeachers   from './pages/system/SystemSchoolTeachers';
+import SystemSchoolTimetable  from './pages/system/SystemSchoolTimetable';
 import SystemProtectedRoute from './components/system/SystemProtectedRoute';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
 import TeacherProtectedRoute from './components/TeacherProtectedRoute';
@@ -130,6 +133,15 @@ const AppShell = () => {
           } />
           <Route path="/system/team" element={
             <SystemProtectedRoute><SystemTeamPage /></SystemProtectedRoute>
+          } />
+          <Route path="/system/school-setup" element={
+            <SystemProtectedRoute><SystemSchoolSetup /></SystemProtectedRoute>
+          } />
+          <Route path="/system/school-teachers" element={
+            <SystemProtectedRoute><SystemSchoolTeachers /></SystemProtectedRoute>
+          } />
+          <Route path="/system/school-timetable" element={
+            <SystemProtectedRoute><SystemSchoolTimetable /></SystemProtectedRoute>
           } />
         </Routes>
       </Box>

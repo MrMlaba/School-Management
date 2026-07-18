@@ -18,8 +18,9 @@ const { requireParent, resetParentCredentials, parentLogin, parentChangePassword
 const { schoolAdminTicketsRouter, systemAdminTicketsRouter } = require('./routes/supportRoutes');
 const { router: systemRouter, requireSystemAdmin: requireSystemAdminFromSystem } = require('./routes/systemRoutes');
 const { router: managementRoutes, getStudentReportData, buildReportCardHTML, htmlToPdfBuffer, getSchoolLogoUrl } = require('./routes/managementRoutes');
-const phase2Routes     = require('./routes/phase2Routes');
-const phase3Routes     = require('./routes/phase3Routes');
+const phase2Routes            = require('./routes/phase2Routes');
+const phase3Routes            = require('./routes/phase3Routes');
+const systemSchoolMgmtRoutes  = require('./routes/systemSchoolMgmtRoutes');
 const eventsRoutes     = require('./routes/eventsRoutes');
 const { teacherQuizRouter, studentQuizRouter } = require('./routes/quizRoutes');
 const chatRoutes       = require('./routes/chatRoutes');
@@ -82,6 +83,7 @@ app.use(authRouter);
 // ─── System Admin Routes ──────────────────────────────────────────────────────
 app.use('/api/system', systemRouter);
 app.use('/api/system', requireSystemAdmin, systemAdminTicketsRouter);
+app.use('/api/system/schools/:schoolId', requireSystemAdmin, systemSchoolMgmtRoutes);
 
 // GET /api/system/health — real infrastructure status, not app-level stats.
 // Pings the database directly rather than trusting the pool's last-known state,

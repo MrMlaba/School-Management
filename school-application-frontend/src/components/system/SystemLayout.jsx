@@ -11,6 +11,9 @@ import GroupsRoundedIcon            from '@mui/icons-material/GroupsRounded';
 import LogoutRoundedIcon            from '@mui/icons-material/LogoutRounded';
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import CheckRoundedIcon             from '@mui/icons-material/CheckRounded';
+import SettingsRoundedIcon          from '@mui/icons-material/SettingsRounded';
+import PeopleAltRoundedIcon         from '@mui/icons-material/PeopleAltRounded';
+import CalendarMonthRoundedIcon     from '@mui/icons-material/CalendarMonthRounded';
 import API_BASE from '../../config';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -68,6 +71,12 @@ const NAV_MAIN = [
 const NAV_PINNED = [
   { label: 'Tickets', path: '/system/tickets', Icon: SupportAgentRoundedIcon, badge: true },
   { label: 'IT Team', path: '/system/team',    Icon: GroupsRoundedIcon },
+];
+
+const NAV_SCHOOL = [
+  { label: 'School Setup',  path: '/system/school-setup',     Icon: SettingsRoundedIcon },
+  { label: 'Teachers',      path: '/system/school-teachers',  Icon: PeopleAltRoundedIcon },
+  { label: 'Timetable',     path: '/system/school-timetable', Icon: CalendarMonthRoundedIcon },
 ];
 
 // ── Health pill ───────────────────────────────────────────────────────────────
@@ -146,6 +155,13 @@ const SchoolSelector = ({ selectedSchoolId, selectedSchoolName, onSchoolChange, 
   }, []);
 
   const select = (s) => {
+    if (s) {
+      sessionStorage.setItem('selectedSchoolId', s.id);
+      sessionStorage.setItem('selectedSchoolName', s.name);
+    } else {
+      sessionStorage.removeItem('selectedSchoolId');
+      sessionStorage.removeItem('selectedSchoolName');
+    }
     onSchoolChange(s ? { schoolId: s.id, schoolName: s.name } : { schoolId: null, schoolName: null });
     setAnchor(null);
   };
@@ -217,6 +233,8 @@ const SystemLayout = ({ title, subtitle, selectedSchoolId, selectedSchoolName, o
   };
 
   const handleSchoolChange = onSchoolChange || (() => {});
+  const navSchoolId = selectedSchoolId || sessionStorage.getItem('selectedSchoolId');
+  const navSchoolName = selectedSchoolName || sessionStorage.getItem('selectedSchoolName');
 
   return (
     <ThemeProvider theme={theme}>
@@ -254,6 +272,19 @@ const SystemLayout = ({ title, subtitle, selectedSchoolId, selectedSchoolName, o
             {NAV_MAIN.map(item => (
               <NavItem key={item.path} item={item} active={location.pathname === item.path} />
             ))}
+
+            {/* Per-school management — only when a school is selected */}
+            {navSchoolId && (
+              <>
+                <Box sx={{ mx: 2, my: 1, borderTop: `1px solid ${BORDER}` }} />
+                <Typography sx={{ fontFamily: FONT, fontSize: '0.58rem', fontWeight: 700, color: INK_FAINT, textTransform: 'uppercase', letterSpacing: '0.1em', px: 2.5, mb: 0.5 }} noWrap>
+                  {navSchoolName || 'School'}
+                </Typography>
+                {NAV_SCHOOL.map(item => (
+                  <NavItem key={item.path} item={item} active={location.pathname === item.path} />
+                ))}
+              </>
+            )}
           </Box>
 
           {/* Pinned */}
