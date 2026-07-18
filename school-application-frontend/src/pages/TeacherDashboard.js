@@ -67,7 +67,7 @@ const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 
 const redirectOn401 = (responses, navigate) => {
   if (responses.some(r => r.status === 401)) {
-    ['teacherToken', 'teacherName', 'teacherSchool'].forEach(k => sessionStorage.removeItem(k));
+    ['teacherToken', 'teacherFirstName', 'teacherLastName', 'teacherSchool'].forEach(k => sessionStorage.removeItem(k));
     navigate('/teacher-login');
     return true;
   }

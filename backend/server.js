@@ -595,12 +595,18 @@ app.post('/api/assignments/:id/submit', requireStudent, upload.single('file'), a
   const v = validateFile(req.file, 'additional');
   if (!v.valid) return res.status(400).json({ success: false, message: v.error });
   try {
+    const ext      = path.extname(req.file.originalname).toLowerCase();
+    const filename = crypto.randomBytes(16).toString('hex') + ext;
+    await pool.query(
+      'INSERT INTO document_files (filename, original_name, mimetype, file_size, data) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (filename) DO NOTHING',
+      [filename, req.file.originalname, req.file.mimetype, req.file.size, req.file.buffer]
+    );
     const { rows } = await pool.query(
       `INSERT INTO assignment_submissions (assignment_id, student_id, filename, originalname, mimetype)
        VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-      [assignmentId, studentId, req.file.filename, req.file.originalname, req.file.mimetype]
+      [assignmentId, studentId, filename, req.file.originalname, req.file.mimetype]
     );
-    res.status(201).json({ success: true, submissionId: rows[0].id, url: '/api/documents/' + req.file.filename });
+    res.status(201).json({ success: true, submissionId: rows[0].id, url: '/api/documents/' + filename });
   } catch (err) {
     console.error('[submit assignment]', err);
     res.status(500).json({ success: false, message: 'Failed to submit' });
