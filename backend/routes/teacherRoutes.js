@@ -5,10 +5,11 @@
 //  FIX 10: Attendance cannot be marked for future dates or >30 days in the past
 // ─────────────────────────────────────────────────────────────────────────────
 
-const express = require('express');
-const jwt     = require('jsonwebtoken');
-const bcrypt  = require('bcrypt');
-const pool    = require('../db');
+const express           = require('express');
+const jwt               = require('jsonwebtoken');
+const bcrypt            = require('bcrypt');
+const pool              = require('../db');
+const { logAudit }      = require('../auth');
 const multer  = require('multer');
 const fs      = require('fs');
 const path    = require('path');
@@ -153,6 +154,7 @@ const login = async (req, res) => {
     if (!valid)
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     await pool.query('UPDATE teachers SET last_login = NOW() WHERE id = $1', [teacher.id]);
+    await logAudit(pool, { actor: teacher.username, actorRole: 'teacher', action: 'LOGIN', target: null, school: teacher.school_name, schoolId: teacher.school_id });
     const token = jwt.sign(
       { id: teacher.id, firstName: teacher.first_name, lastName: teacher.last_name,
         schoolId: teacher.school_id, schoolName: teacher.school_name, username: teacher.username },

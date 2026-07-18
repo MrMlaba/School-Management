@@ -389,12 +389,12 @@ router.get('/api/system/logs', requireSystemAdmin, async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 //  HELPER: write an audit log entry
 // ─────────────────────────────────────────────────────────────
-async function logAudit(db, { actor, actorRole, action, target, school, detail }) {
+async function logAudit(db, { actor, actorRole, action, target, school, schoolId, detail }) {
   try {
     await db.query(
-      `INSERT INTO audit_logs (actor, actor_role, action, target, school, detail)
-       VALUES ($1,$2,$3,$4,$5,$6)`,
-      [actor, actorRole, action, target || null, school || null, detail || null]
+      `INSERT INTO audit_logs (actor, actor_role, action, target, school, school_id, detail)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [actor, actorRole, action, target || null, school || null, schoolId || null, detail || null]
     );
   } catch (err) {
     console.error('Audit log error:', err.message);

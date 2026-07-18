@@ -1,7 +1,8 @@
-const bcrypt  = require('bcrypt');
-const jwt     = require('jsonwebtoken');
-const crypto  = require('crypto');
-const pool    = require('../db');
+const bcrypt        = require('bcrypt');
+const jwt           = require('jsonwebtoken');
+const crypto        = require('crypto');
+const pool          = require('../db');
+const { logAudit }  = require('../auth');
 
 const PARENT_JWT_SECRET = process.env.PARENT_JWT_SECRET;
 if (!PARENT_JWT_SECRET) throw new Error('PARENT_JWT_SECRET environment variable is required');
@@ -82,6 +83,7 @@ const parentLogin = async (req, res) => {
     if (!valid) return res.status(401).json({ message: 'Invalid credentials' });
 
     await pool.query('UPDATE parents SET last_login = NOW() WHERE id = $1', [parent.id]);
+    await logAudit(pool, { actor: parent.username, actorRole: 'parent', action: 'LOGIN', target: null, schoolId: parent.school_id });
 
     const token = jwt.sign(
       { id: parent.id, schoolId: parent.school_id, firstName: parent.first_name, lastName: parent.last_name },

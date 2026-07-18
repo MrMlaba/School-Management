@@ -162,7 +162,7 @@ app.post('/api/admin-login', schoolAdminLoginLimiter, async (req, res) => {
     const valid = await bcrypt.compare(password, admin.password_hash);
     if (!valid) return res.status(401).json({ success: false, message: 'Invalid credentials' });
     await pool.query('UPDATE school_admins SET last_login = NOW() WHERE id = $1', [admin.id]);
-    await logAudit(pool, { actor: admin.username, actorRole: 'school_admin', action: 'LOGIN', target: null, school: admin.school });
+    await logAudit(pool, { actor: admin.username, actorRole: 'school_admin', action: 'LOGIN', target: null, school: admin.school, schoolId: admin.school_id });
     const token = jwt.sign(
       { id: admin.id, username: admin.username, name: admin.name, school: admin.school, schoolId: admin.school_id },
       SCHOOL_JWT_SECRET,
@@ -943,7 +943,7 @@ async function handleSchoolAdminLogin(req, res) {
     const valid = await bcrypt.compare(password, admin.password_hash);
     if (!valid)            return res.status(401).json({ success: false, message: 'Invalid credentials' });
     await pool.query('UPDATE school_admins SET last_login = NOW() WHERE id = $1', [admin.id]);
-    await logAudit(pool, { actor: admin.username, actorRole: 'school_admin', action: 'LOGIN', target: null, school: admin.school });
+    await logAudit(pool, { actor: admin.username, actorRole: 'school_admin', action: 'LOGIN', target: null, school: admin.school, schoolId: admin.school_id });
     const token = jwt.sign(
       { id: admin.id, username: admin.username, name: admin.name, school: admin.school, schoolId: admin.school_id },
       SCHOOL_JWT_SECRET,

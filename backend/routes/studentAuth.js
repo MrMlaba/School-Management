@@ -1,8 +1,9 @@
 const express = require('express');
-const bcrypt  = require('bcrypt');
-const jwt     = require('jsonwebtoken');
-const crypto  = require('crypto');
-const pool    = require('../db');
+const bcrypt        = require('bcrypt');
+const jwt           = require('jsonwebtoken');
+const crypto        = require('crypto');
+const pool          = require('../db');
+const { logAudit }  = require('../auth');
 
 const STUDENT_JWT_SECRET = process.env.STUDENT_JWT_SECRET;
 if (!STUDENT_JWT_SECRET) throw new Error('STUDENT_JWT_SECRET environment variable is required');
@@ -160,6 +161,7 @@ const studentLogin = async (req, res) => {
     if (!valid) return res.status(401).json({ message: 'Invalid credentials' });
 
     await pool.query('UPDATE enrolled_students SET last_login = NOW() WHERE id = $1', [student.id]);
+    await logAudit(pool, { actor: student.student_number, actorRole: 'student', action: 'LOGIN', target: null, schoolId: student.school_id });
 
     const token = jwt.sign(
       { id: student.id, studentNumber: student.student_number, schoolId: student.school_id, firstName: student.first_name, lastName: student.last_name },
