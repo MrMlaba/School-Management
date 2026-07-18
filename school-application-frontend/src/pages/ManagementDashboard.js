@@ -63,8 +63,21 @@ const C = {
 };
 
 const BASE  = `${API_BASE}`;
-const authH = () => ({ Authorization: `Bearer ${sessionStorage.getItem('adminToken')}` });
+const authH = () => {
+  const t = sessionStorage.getItem('adminToken');
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
+
+// Redirect to login on any 401 across all management API calls
+const redirectOn401 = (responses, navigate) => {
+  if (responses.some(r => r.status === 401)) {
+    ['adminToken','adminSchool','adminName'].forEach(k => sessionStorage.removeItem(k));
+    navigate('/login');
+    return true;
+  }
+  return false;
+};
 
 const hc = {
   background: C.headerBg, color: C.text, fontWeight: 700,
@@ -168,6 +181,7 @@ const DetailPanel = ({ title, onClose, createdAt, fmt, onReset, onSave, saving, 
    OVERVIEW
 ═══════════════════════════════════════════════════════════════ */
 const OverviewSection = () => {
+  const navigate = useNavigate();
   const [stats,   setStats]   = useState(null);
   const [teachers,setTeachers]= useState([]);
   const [recent,  setRecent]  = useState([]);
@@ -189,8 +203,9 @@ const OverviewSection = () => {
         fetch(`${BASE}/api/management/enrolled-students?recent=1`, { headers: authH() }),
         fetch(`${BASE}/api/management/attendance/weekly`,          { headers: authH() }),
         fetch(`${BASE}/api/management/announcements`,              { headers: authH() }),
-        fetch(`${BASE}/api/management/events/upcoming`, { headers: authH() }),
+        fetch(`${BASE}/api/management/events/upcoming`,            { headers: authH() }),
       ]);
+      if (redirectOn401([s, t, r, att, ann, evt], navigate)) return;
       if (s.ok) setStats(await s.json());
       if (t.ok) setTeachers(await t.json());
       if (r.ok) setRecent(await r.json());
