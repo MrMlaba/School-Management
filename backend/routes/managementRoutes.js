@@ -162,7 +162,7 @@ router.get('/attendance/weekly', async (req, res) => {
               COUNT(*) FILTER (WHERE a.status IN ('present','late')) AS "present",
               COUNT(*) FILTER (WHERE a.status='absent') AS "absent"
        FROM attendance a
-       WHERE a.school_id=$1 AND a.date>=DATE_TRUNC('week',CURRENT_DATE) AND a.date<DATE_TRUNC('week',CURRENT_DATE)+INTERVAL '5 days'
+       WHERE a.school_id=$1 AND a.date>=DATE_TRUNC('week',CURRENT_DATE) AND a.date<=CURRENT_DATE
        GROUP BY a.date ORDER BY a.date ASC`,
       [schoolId]
     );

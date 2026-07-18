@@ -203,7 +203,7 @@ const OverviewSection = () => {
         fetch(`${BASE}/api/management/enrolled-students?recent=1`, { headers: authH() }),
         fetch(`${BASE}/api/management/attendance/weekly`,          { headers: authH() }),
         fetch(`${BASE}/api/management/announcements`,              { headers: authH() }),
-        fetch(`${BASE}/api/management/events/upcoming`,            { headers: authH() }),
+        fetch(`${BASE}/api/management/upcoming-events`,             { headers: authH() }),
       ]);
       if (redirectOn401([s, t, r, att, ann, evt], navigate)) return;
       if (s.ok) setStats(await s.json());
@@ -275,8 +275,8 @@ const OverviewSection = () => {
                 <YAxis tick={{fontSize:11,fontFamily:"'IBM Plex Sans', sans-serif",fill:C.muted}} axisLine={false} tickLine={false}/>
                 <ReTip contentStyle={{fontFamily:"'IBM Plex Sans', sans-serif",fontSize:11,borderRadius:6,border:`1px solid ${C.border}`}}/>
                 <Legend wrapperStyle={{fontSize:11,fontFamily:"'IBM Plex Sans', sans-serif"}}/>
-                <Bar dataKey="present" fill={C.accent} radius={[4,4,0,0]} name="Present"/>
-                <Bar dataKey="absent"  fill={C.danger} radius={[4,4,0,0]} name="Absent"/>
+                <Bar dataKey="present" fill={C.accent} radius={[4,4,0,0]} name="Present" minPointSize={3}/>
+                <Bar dataKey="absent"  fill={C.danger} radius={[4,4,0,0]} name="Absent" minPointSize={3}/>
               </BarChart>
             </ResponsiveContainer>
           </Card_>
@@ -823,6 +823,7 @@ const TeachersSection = () => {
   const [teachers,           setTeachers]           = useState([]);
   const [loading,            setLoading]            = useState(true);
   const [selected,           setSelected]           = useState(null);
+  const [search,             setSearch]             = useState('');
   const [credDialog,         setCredDialog]         = useState(null);
   const [cred,               setCred]               = useState({username:'',password:''});
   const [saving,             setSaving]             = useState(false);
@@ -871,9 +872,13 @@ const TeachersSection = () => {
             </Tooltip>
           }
         />
-        <InfoBanner>
-          Teacher profiles and subjects are managed by the Service Provider. Use this panel to view details and set or reset login credentials.
-        </InfoBanner>
+        <TextField
+          placeholder="Search by name or employee number…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          size="small"
+          sx={{ width: 300, mb: 1.5, '& .MuiOutlinedInput-root': { borderRadius: '6px', fontSize: '0.75rem', fontFamily: "'IBM Plex Sans', sans-serif" } }}
+        />
       </Box>
 
       <Box sx={{display:'flex',minHeight:460}}>
@@ -890,7 +895,14 @@ const TeachersSection = () => {
                   ))}
                 </TableRow></TableHead>
                 <TableBody>
-                  {teachers.map((t,idx)=>(
+                  {(search
+                    ? teachers.filter(t => {
+                        const q = search.toLowerCase();
+                        return (t.firstName+' '+t.lastName).toLowerCase().includes(q)
+                          || (t.employeeNumber||'').toLowerCase().includes(q);
+                      })
+                    : teachers
+                  ).map((t,idx)=>(
                     <TableRow key={t.id} onClick={()=>setSelected(t)}
                       sx={{cursor:'pointer',
                         boxShadow:selected?.id===t.id?`inset 3px 0 0 0 ${C.brand}`:'none',

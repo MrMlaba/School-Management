@@ -227,8 +227,7 @@ const SystemLayout = ({ title, subtitle, selectedSchoolId, selectedSchoolName, o
   const openTickets = useOpenTicketCount();
 
   const handleLogout = () => {
-    sessionStorage.removeItem('systemToken');
-    sessionStorage.removeItem('systemUsername');
+    ['systemToken', 'systemUsername', 'selectedSchoolId', 'selectedSchoolName'].forEach(k => sessionStorage.removeItem(k));
     navigate('/system');
   };
 
