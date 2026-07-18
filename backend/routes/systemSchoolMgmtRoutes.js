@@ -13,6 +13,24 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const sid = req => req.params.schoolId;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+//  SCHOOL CONFIG (grades + streams configured at school creation)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+router.get('/config', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT grades, streams FROM schools WHERE id = $1',
+      [sid(req)]
+    );
+    if (!rows.length) return res.status(404).json({ message: 'School not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('[sys school config GET]', err);
+    res.status(500).json({ message: 'Failed to fetch school config' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 //  ACADEMIC YEARS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -306,6 +324,56 @@ router.delete('/setup/subjects/:id', async (req, res) => {
   } catch (err) {
     console.error('[sys subjects DELETE]', err);
     res.status(500).json({ message: 'Failed to remove subject' });
+  }
+});
+
+// POST /setup/subjects/custom — create a new national subject + add it to this school
+router.post('/setup/subjects/custom', async (req, res) => {
+  const { name, grade, stream, academicYearId } = req.body;
+  if (!name?.trim() || !grade || !academicYearId)
+    return res.status(400).json({ message: 'name, grade, and academicYearId are required' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const gr = parseInt(grade);
+    const code = name.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) || 'CUST';
+    // Upsert national subject
+    const { rows: ns } = await client.query(
+      `INSERT INTO national_subjects (name, code, grade_min, grade_max, stream)
+       VALUES ($1, $2, $3, $3, $4)
+       ON CONFLICT DO NOTHING
+       RETURNING id`,
+      [name.trim(), code, gr, stream || null]
+    );
+    let nsId = ns[0]?.id;
+    if (!nsId) {
+      const { rows: ex } = await client.query(
+        `SELECT id FROM national_subjects WHERE name = $1 AND grade_min = $2 AND COALESCE(stream,'') = COALESCE($3,'')`,
+        [name.trim(), gr, stream || null]
+      );
+      nsId = ex[0]?.id;
+    }
+    if (!nsId) {
+      await client.query('ROLLBACK');
+      return res.status(500).json({ message: 'Failed to create national subject' });
+    }
+    const { rows } = await client.query(
+      `INSERT INTO school_subjects
+         (school_id, academic_year_id, national_subject_id, name, code, grade, stream)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (school_id, academic_year_id, national_subject_id, grade, COALESCE(stream, 'ALL'))
+       DO UPDATE SET is_active = true
+       RETURNING *`,
+      [sid(req), academicYearId, nsId, name.trim(), code, gr, stream || null]
+    );
+    await client.query('COMMIT');
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[sys subjects/custom POST]', err);
+    res.status(500).json({ message: 'Failed to add custom subject' });
+  } finally {
+    client.release();
   }
 });
 

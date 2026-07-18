@@ -527,7 +527,12 @@ const DashboardTab = ({ onNavigate }) => {
           <Card>
             <CardHeader title="Pending Attendance" subtitle="Lessons not yet marked today" />
             <Box sx={{ px:2.5, pb:2.5 }}>
-              {data.pendingAttendance.length === 0 ? (
+              {data.todaySlots.length === 0 ? (
+                <Box sx={{ display:'flex', alignItems:'center', gap:1.5, py:1 }}>
+                  <CheckCircleIcon sx={{ color:C.muted, fontSize:22 }} />
+                  <Typography sx={{ color:C.muted, fontWeight:600, fontSize:'0.875rem', fontFamily:"'IBM Plex Sans', sans-serif" }}>No classes scheduled for today</Typography>
+                </Box>
+              ) : data.pendingAttendance.length === 0 ? (
                 <Box sx={{ display:'flex', alignItems:'center', gap:1.5, py:1 }}>
                   <CheckCircleIcon sx={{ color:C.accent, fontSize:22 }} />
                   <Typography sx={{ color:C.accent, fontWeight:600, fontSize:'0.875rem', fontFamily:"'IBM Plex Sans', sans-serif" }}>All attendance marked for today</Typography>

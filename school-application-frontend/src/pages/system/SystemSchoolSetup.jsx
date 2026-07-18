@@ -16,8 +16,8 @@ const token = () => sessionStorage.getItem('systemToken');
 const authH = () => ({ Authorization: `Bearer ${token()}` });
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 
-const STREAMS = ['Science', 'Commerce', 'Humanities'];
-const GRADES  = [8, 9, 10, 11, 12];
+const ALL_STREAMS = ['Science', 'Commerce', 'Humanities'];
+const ALL_GRADES  = [8, 9, 10, 11, 12];
 
 const DEF_PERIODS = [
   { periodNumber: 1,  name: 'Period 1',      timeStart: '07:30', timeEnd: '08:15', isBreak: false },
@@ -63,9 +63,12 @@ export default function SystemSchoolSetup() {
   const [periods,  setPeriods] = useState([]);
   const [subjects, setSubjects]= useState([]);
   const [classes,  setClasses] = useState([]);
-  const [natSubs,  setNatSubs] = useState([]);
-  const [saving,   setSaving]  = useState(false);
-  const [snack,    setSnack]   = useState({ open: false, msg: '', sev: 'success' });
+  const [natSubs,    setNatSubs]    = useState([]);
+  const [saving,     setSaving]    = useState(false);
+  const [snack,      setSnack]     = useState({ open: false, msg: '', sev: 'success' });
+  const [schoolGrades,  setSchoolGrades]  = useState(ALL_GRADES);
+  const [schoolStreams,  setSchoolStreams]  = useState(ALL_STREAMS);
+  const [customName, setCustomName] = useState('');
 
   const toast = (msg, sev = 'success') => setSnack({ open: true, msg, sev });
   const BASE = `${API_BASE}/api/system/schools/${schoolId}`;
@@ -108,7 +111,21 @@ export default function SystemSchoolSetup() {
     fetchSummary();
     fetchYears();
     fetchPeriods();
-  }, [fetchSummary, fetchYears, fetchPeriods, schoolId]);
+    // Load school's configured grades and streams
+    fetch(`${BASE}/config`, { headers: authH() })
+      .then(r => r.ok ? r.json() : null)
+      .then(cfg => {
+        if (!cfg) return;
+        if (Array.isArray(cfg.grades) && cfg.grades.length > 0) {
+          const nums = cfg.grades.map(g => parseInt(g.toString().replace(/\D/g, ''))).filter(Boolean);
+          if (nums.length > 0) setSchoolGrades(nums.sort((a, b) => a - b));
+        }
+        if (Array.isArray(cfg.streams) && cfg.streams.length > 0) {
+          setSchoolStreams(cfg.streams);
+        }
+      })
+      .catch(() => {});
+  }, [fetchSummary, fetchYears, fetchPeriods, schoolId, BASE]);
 
   useEffect(() => {
     if (summary?.currentYearId) {
@@ -214,6 +231,25 @@ export default function SystemSchoolSetup() {
   const removeSubject = async (id) => {
     await fetch(`${BASE}/setup/subjects/${id}`, { method: 'DELETE', headers: authH() });
     toast('Subject removed'); fetchSubjects(summary.currentYearId); fetchSummary();
+  };
+
+  const addCustomSubject = async () => {
+    if (!customName.trim()) return toast('Enter a subject name', 'error');
+    if (!addGrade) return toast('Select a grade first', 'error');
+    if (!summary?.currentYearId) return toast('Set academic year first', 'error');
+    setSaving(true);
+    const r = await fetch(`${BASE}/setup/subjects/custom`, {
+      method: 'POST', headers: jsonH(),
+      body: JSON.stringify({
+        name: customName.trim(),
+        grade: parseInt(addGrade),
+        stream: parseInt(addGrade) >= 10 ? addStream || null : null,
+        academicYearId: summary.currentYearId,
+      }),
+    });
+    setSaving(false);
+    if (r.ok) { toast(`"${customName.trim()}" added`); setCustomName(''); fetchSubjects(summary.currentYearId); fetchSummary(); }
+    else { const e = await r.json(); toast(e.message || 'Failed', 'error'); }
   };
 
   // ── Classes ──────────────────────────────────────────────────────────────────
@@ -386,21 +422,21 @@ export default function SystemSchoolSetup() {
               <Typography sx={{ color: '#F59E0B', fontFamily: FONT, fontSize: '0.8rem', mb: 2 }}>Set academic year first.</Typography>
             )}
             <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-              <TextField select label="Grade" value={addGrade} onChange={e => { setAddGrade(e.target.value); setAddStream(''); setSelNat([]); }} size="small" sx={{ width: 110 }}>
-                {GRADES.map(g => <MenuItem key={g} value={g}>Grade {g}</MenuItem>)}
+              <TextField select label="Grade" value={addGrade} onChange={e => { setAddGrade(e.target.value); setAddStream(''); setSelNat([]); setCustomName(''); }} size="small" sx={{ width: 110 }}>
+                {schoolGrades.map(g => <MenuItem key={g} value={g}>Grade {g}</MenuItem>)}
               </TextField>
               {parseInt(addGrade) >= 10 && (
                 <TextField select label="Stream" value={addStream} onChange={e => { setAddStream(e.target.value); setSelNat([]); }} size="small" sx={{ width: 140 }}>
                   <MenuItem value="">— All streams —</MenuItem>
-                  {STREAMS.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                  {schoolStreams.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
                 </TextField>
               )}
             </Box>
             {addGrade && (
               <Box sx={{ mb: 2 }}>
-                <Typography sx={{ fontFamily: FONT, fontSize: '0.72rem', color: INK_SOFT, mb: 1 }}>Available national subjects:</Typography>
+                <Typography sx={{ fontFamily: FONT, fontSize: '0.72rem', color: INK_SOFT, mb: 1 }}>Select from national subjects:</Typography>
                 {available.length === 0
-                  ? <Typography sx={{ fontFamily: FONT, fontSize: '0.8rem', color: INK_FAINT }}>All subjects for this grade/stream are already added.</Typography>
+                  ? <Typography sx={{ fontFamily: FONT, fontSize: '0.8rem', color: INK_FAINT, mb: 1 }}>All national subjects for this grade/stream are already added.</Typography>
                   : (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
                       {available.map(ns => (
@@ -418,10 +454,26 @@ export default function SystemSchoolSetup() {
                   )}
                 {available.length > 0 && (
                   <Button variant="contained" size="small" onClick={addSubjects} disabled={!selNat.length || saving}
-                    sx={{ background: TEAL, color: '#fff', textTransform: 'none', fontWeight: 700, fontFamily: FONT, boxShadow: 'none' }}>
+                    sx={{ background: TEAL, color: '#fff', textTransform: 'none', fontWeight: 700, fontFamily: FONT, boxShadow: 'none', mb: 2 }}>
                     {saving ? 'Adding…' : `Add ${selNat.length || ''} Subject${selNat.length !== 1 ? 's' : ''}`}
                   </Button>
                 )}
+
+                {/* Custom subject */}
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', mt: 1.5, pt: 1.5, borderTop: `1px solid ${BORDER}` }}>
+                  <Typography sx={{ fontFamily: FONT, fontSize: '0.72rem', color: INK_SOFT, whiteSpace: 'nowrap' }}>Custom subject:</Typography>
+                  <TextField
+                    size="small" placeholder="Type subject name…" value={customName}
+                    onChange={e => setCustomName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addCustomSubject()}
+                    sx={{ flex: 1, '& input': { fontFamily: FONT, fontSize: '0.8rem', color: INK } }}
+                    InputProps={{ sx: { bgcolor: 'rgba(255,255,255,0.04)' } }}
+                  />
+                  <Button variant="outlined" size="small" onClick={addCustomSubject} disabled={!customName.trim() || saving}
+                    sx={{ borderColor: TEAL, color: TEAL, textTransform: 'none', fontWeight: 700, fontFamily: FONT, whiteSpace: 'nowrap' }}>
+                    Add Custom
+                  </Button>
+                </Box>
               </Box>
             )}
             <Typography sx={{ fontFamily: FONT, fontSize: '0.72rem', color: INK_SOFT, mb: 1, mt: 2 }}>Added subjects:</Typography>
@@ -466,11 +518,11 @@ export default function SystemSchoolSetup() {
             )}
             <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <TextField select label="Grade" value={clsForm.grade} onChange={e => setClsForm(f => ({ ...f, grade: e.target.value, stream: '' }))} size="small" sx={{ width: 110 }}>
-                {GRADES.map(g => <MenuItem key={g} value={g}>Grade {g}</MenuItem>)}
+                {schoolGrades.map(g => <MenuItem key={g} value={g}>Grade {g}</MenuItem>)}
               </TextField>
               {parseInt(clsForm.grade) >= 10 && (
                 <TextField select label="Stream" value={clsForm.stream} onChange={e => setClsForm(f => ({ ...f, stream: e.target.value }))} size="small" sx={{ width: 140 }}>
-                  {STREAMS.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                  {schoolStreams.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
                 </TextField>
               )}
               <TextField label="Letter (A, B…)" value={clsForm.letter} onChange={e => setClsForm(f => ({ ...f, letter: e.target.value.toUpperCase() }))} size="small" sx={{ width: 130 }} inputProps={{ maxLength: 2 }} />
