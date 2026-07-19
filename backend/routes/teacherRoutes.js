@@ -75,6 +75,17 @@ async function ensureSupportTables() {
   } catch (err) {
     console.warn('[ensureSupportTables] exams.term_id:', err.message);
   }
+  // Add per-item weight columns
+  try {
+    await pool.query(`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS weight NUMERIC`);
+  } catch (err) {
+    console.warn('[ensureSupportTables] assignments.weight:', err.message);
+  }
+  try {
+    await pool.query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS weight NUMERIC`);
+  } catch (err) {
+    console.warn('[ensureSupportTables] exams.weight:', err.message);
+  }
   // term_weights — assignment/exam mark split per (class, subject, term), used by report calculator
   await pool.query(`
     CREATE TABLE IF NOT EXISTS term_weights (
@@ -433,7 +444,7 @@ router.get('/assignments', async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT a.id, a.title, a.description, a.due_date AS "dueDate",
-              a.total_marks AS "totalMarks", a.created_at AS "createdAt", a.term_id AS "termId",
+              a.total_marks AS "totalMarks", a.weight, a.created_at AS "createdAt", a.term_id AS "termId",
               c.name AS "className", ss.name AS "subjectName"
        FROM assignments a
        JOIN classes c ON c.id = a.class_id
@@ -625,17 +636,17 @@ router.post('/assignments', async (req, res) => {
   }
 
   const body = req.body || {};
-  const { classId, subjectId, title, description, dueDate, totalMarks, termId } = body;
+  const { classId, subjectId, title, description, dueDate, totalMarks, termId, weight } = body;
   if (!classId || !subjectId || !title || !dueDate)
     return res.status(400).json({ message: 'classId, subjectId, title and dueDate are required' });
 
   try {
     const { rows: cls } = await pool.query('SELECT academic_year_id FROM classes WHERE id = $1', [classId]);
     const { rows } = await pool.query(
-      `INSERT INTO assignments (school_id, class_id, subject_id, teacher_id, title, description, due_date, total_marks, academic_year_id, term_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       RETURNING id, title, due_date AS "dueDate", total_marks AS "totalMarks", term_id AS "termId"`,
-      [schoolId, classId, subjectId, teacherId, title, description || null, dueDate, totalMarks || null, cls[0]?.academic_year_id, termId || null]
+      `INSERT INTO assignments (school_id, class_id, subject_id, teacher_id, title, description, due_date, total_marks, academic_year_id, term_id, weight)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       RETURNING id, title, due_date AS "dueDate", total_marks AS "totalMarks", term_id AS "termId", weight`,
+      [schoolId, classId, subjectId, teacherId, title, description || null, dueDate, totalMarks || null, cls[0]?.academic_year_id, termId || null, weight ? Number(weight) : null]
     );
     const assignment = rows[0];
     if (req.file) {
@@ -877,7 +888,7 @@ router.get('/exams', async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT e.id, e.title, e.type, e.exam_date AS "examDate", e.total_marks AS "totalMarks",
-              e.term_id AS "termId", e.created_at AS "createdAt",
+              e.weight, e.term_id AS "termId", e.created_at AS "createdAt",
               c.name AS "className", ss.name AS "subjectName",
               (SELECT COUNT(*) FROM results r WHERE r.exam_id = e.id) AS "resultsCaptured"
        FROM exams e
@@ -897,22 +908,47 @@ router.get('/exams', async (req, res) => {
 router.post('/exams', async (req, res) => {
   const teacherId = req.teacher.id;
   const schoolId  = req.teacher.schoolId;
-  const { classId, subjectId, title, examDate, totalMarks, type, termId } = req.body;
+  const { classId, subjectId, title, examDate, totalMarks, type, termId, weight } = req.body;
   if (!classId || !subjectId || !title || !examDate)
     return res.status(400).json({ message: 'classId, subjectId, title and examDate are required' });
   try {
     await ensureSupportTables();
     const { rows: cls } = await pool.query('SELECT academic_year_id FROM classes WHERE id = $1', [classId]);
     const { rows } = await pool.query(
-      `INSERT INTO exams (school_id, class_id, subject_id, teacher_id, title, exam_date, total_marks, type, academic_year_id, term_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       RETURNING id, title, exam_date AS "examDate", total_marks AS "totalMarks", type, term_id AS "termId"`,
-      [schoolId, classId, subjectId, teacherId, title, examDate, totalMarks || 100, type || 'test', cls[0]?.academic_year_id, termId || null]
+      `INSERT INTO exams (school_id, class_id, subject_id, teacher_id, title, exam_date, total_marks, type, academic_year_id, term_id, weight)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       RETURNING id, title, exam_date AS "examDate", total_marks AS "totalMarks", type, term_id AS "termId", weight`,
+      [schoolId, classId, subjectId, teacherId, title, examDate, totalMarks || 100, type || 'test', cls[0]?.academic_year_id, termId || null, weight ? Number(weight) : null]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error('[teacher exams POST]', err);
     res.status(500).json({ message: 'Failed to create exam' });
+  }
+});
+
+// ── Weight budget — total weight already allocated for a class+subject+term ───
+// Returns how many % points are already used so the UI can show the remaining budget.
+router.get('/weight-budget', async (req, res) => {
+  const { classId, subjectId, termId } = req.query;
+  const schoolId = req.teacher.schoolId;
+  if (!classId || !subjectId || !termId) return res.json({ used: 0, remaining: 100 });
+  try {
+    const [aRes, eRes] = await Promise.all([
+      pool.query(
+        'SELECT COALESCE(SUM(weight), 0) AS total FROM assignments WHERE class_id=$1 AND subject_id=$2 AND term_id=$3 AND school_id=$4',
+        [classId, subjectId, termId, schoolId]
+      ),
+      pool.query(
+        'SELECT COALESCE(SUM(weight), 0) AS total FROM exams WHERE class_id=$1 AND subject_id=$2 AND term_id=$3 AND school_id=$4',
+        [classId, subjectId, termId, schoolId]
+      ),
+    ]);
+    const used = Number(aRes.rows[0].total) + Number(eRes.rows[0].total);
+    res.json({ used: Math.round(used * 10) / 10, remaining: Math.round((100 - used) * 10) / 10 });
+  } catch (err) {
+    console.error('[weight-budget]', err);
+    res.status(500).json({ message: 'Failed to calculate weight budget' });
   }
 });
 

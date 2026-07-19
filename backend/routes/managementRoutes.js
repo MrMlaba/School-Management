@@ -344,7 +344,7 @@ router.get('/reports/results', async (req, res) => {
     const { rows: assignmentMarks } = await pool.query(
       `SELECT sub.student_id, sub.assignment_id,
               sub.marks_obtained AS score, a.total_marks AS "maxScore",
-              a.subject_id AS "subjectId", a.title
+              a.subject_id AS "subjectId", a.title, a.weight
        FROM assignment_submissions sub
        JOIN assignments a ON a.id = sub.assignment_id
        WHERE sub.student_id = ANY($1::int[])
@@ -363,7 +363,7 @@ router.get('/reports/results', async (req, res) => {
   const { rows: examResults2 } = await pool.query(
     `SELECT r.student_id, r.exam_id,
             r.marks_obtained AS score, e.total_marks AS "maxScore",
-            e.subject_id AS "subjectId", e.title, e.type
+            e.subject_id AS "subjectId", e.title, e.type, e.weight
      FROM results r
      JOIN exams e ON e.id = r.exam_id
      WHERE r.student_id = ANY($1::int[])
@@ -459,29 +459,48 @@ async function getTermWeightsMap(classId, termId) {
 
 // ── Subject mark combiner ───────────────────────────────────────────────────────
 // Combines a subject's assignment marks and exam marks into a final percentage.
-// When weights are supplied (i.e. a term is selected), the final percentage is the
-// weighted average of the assignment % and exam %. Otherwise (no term selected,
-// or only one type of mark exists) it falls back to a simple combined percentage.
+//
+// Per-item mode (new): when any graded item has an individual weight set,
+//   final = Σ(score_i/max_i × weight_i), scaled proportionally if not all items graded.
+//
+// Legacy mode (fallback): uses the term_weights binary split (assignment% / exam%).
 function combineSubjectMarks(aMarks, eMarks, weights) {
   const aScore = aMarks.reduce((s, m) => s + (parseFloat(m.score) || 0), 0);
   const aMax   = aMarks.reduce((s, m) => s + (parseFloat(m.maxScore) || 0), 0);
   const eScore = eMarks.reduce((s, m) => s + (parseFloat(m.score) || 0), 0);
   const eMax   = eMarks.reduce((s, m) => s + (parseFloat(m.maxScore) || 0), 0);
+  const aPct   = aMax > 0 ? (aScore / aMax) * 100 : null;
+  const ePct   = eMax > 0 ? (eScore / eMax) * 100 : null;
 
-  const aPct = aMax > 0 ? (aScore / aMax) * 100 : null;
-  const ePct = eMax > 0 ? (eScore / eMax) * 100 : null;
+  const allItems = [...aMarks, ...eMarks];
+  const hasIndividualWeights = allItems.some(m => m.weight != null && parseFloat(m.weight) > 0);
 
   let percentage = null;
-  if (aPct !== null && ePct !== null) {
-    if (weights) {
-      percentage = (aPct * (weights.assignmentWeight / 100)) + (ePct * (weights.examWeight / 100));
-    } else {
-      percentage = ((aScore + eScore) / (aMax + eMax)) * 100;
+
+  if (hasIndividualWeights) {
+    // Per-item: final = Σ(score_i/max_i × weight_i), scaled if weights don't cover 100%
+    let weightedSum = 0;
+    let totalWeight = 0;
+    for (const item of allItems) {
+      const score = parseFloat(item.score);
+      const max   = parseFloat(item.maxScore);
+      const wt    = parseFloat(item.weight);
+      if (isNaN(score) || isNaN(max) || isNaN(wt) || wt <= 0 || max === 0) continue;
+      weightedSum += (score / max) * wt;
+      totalWeight += wt;
     }
-  } else if (aPct !== null) {
-    percentage = aPct;
-  } else if (ePct !== null) {
-    percentage = ePct;
+    percentage = totalWeight > 0 ? weightedSum * (100 / totalWeight) : null;
+  } else {
+    // Legacy binary-split
+    if (aPct !== null && ePct !== null) {
+      percentage = weights
+        ? (aPct * (weights.assignmentWeight / 100)) + (ePct * (weights.examWeight / 100))
+        : ((aScore + eScore) / (aMax + eMax)) * 100;
+    } else if (aPct !== null) {
+      percentage = aPct;
+    } else if (ePct !== null) {
+      percentage = ePct;
+    }
   }
 
   return {
@@ -494,8 +513,8 @@ function combineSubjectMarks(aMarks, eMarks, weights) {
     examMax:        eMax > 0 ? eMax : null,
     examPercentage: ePct !== null ? Math.round(ePct) : null,
     percentage: percentage !== null ? Math.round(percentage) : null,
-    assessments: aMarks.length + eMarks.length,
-    weights: weights || null,
+    assessments: allItems.length,
+    weights: hasIndividualWeights ? null : (weights || null),
   };
 }
 
@@ -552,7 +571,7 @@ async function getStudentReportData(schoolId, studentId, termId) {
 
   const { rows: assignmentMarks } = await pool.query(
     `SELECT sub.marks_obtained AS score, a.total_marks AS "maxScore",
-            a.subject_id AS "subjectId", a.title, 'assignment' AS type
+            a.subject_id AS "subjectId", a.title, 'assignment' AS type, a.weight
      FROM assignment_submissions sub
      JOIN assignments a ON a.id = sub.assignment_id
      WHERE sub.student_id=$1 AND sub.graded_at IS NOT NULL ${aWhere}`,
@@ -566,7 +585,7 @@ async function getStudentReportData(schoolId, studentId, termId) {
 
   const { rows: examResults } = await pool.query(
     `SELECT r.marks_obtained AS score, e.total_marks AS "maxScore",
-            e.subject_id AS "subjectId", e.title, e.type
+            e.subject_id AS "subjectId", e.title, e.type, e.weight
      FROM results r
      JOIN exams e ON e.id = r.exam_id
      WHERE r.student_id = $1

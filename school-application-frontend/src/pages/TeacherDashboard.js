@@ -24,7 +24,6 @@ import SchoolIcon         from '@mui/icons-material/School';
 import WarningAmberIcon   from '@mui/icons-material/WarningAmber';
 import TableChartIcon     from '@mui/icons-material/TableChart';
 import ListAltIcon        from '@mui/icons-material/ListAlt';
-import TuneIcon           from '@mui/icons-material/Tune';
 import QuizIcon from '@mui/icons-material/Quiz';
 import QuizTab  from './QuizTab';
 import SchoolLogoHeader from '../components/SchoolLogoHeader';
@@ -949,12 +948,13 @@ const AssignmentsTab = () => {
   const [snack,       setSnack]       = useState({ open:false, msg:'', sev:'success' });
   const toast = (msg, sev='success') => setSnack({ open:true, msg, sev });
 
-  const EMPTY = { classId:'', subjectId:'', title:'', description:'', dueDate:'', totalMarks:'', termId:'' };
+  const EMPTY = { classId:'', subjectId:'', title:'', description:'', dueDate:'', totalMarks:'', termId:'', weight:'' };
   const [form,       setForm]       = useState(EMPTY);
   const [file,       setFile]       = useState(null);
   const [slots,      setSlots]      = useState([]);
   const [terms,      setTerms]      = useState([]);
   const [filterTerm, setFilterTerm] = useState('');
+  const [budget,     setBudget]     = useState(null);
 
   const [filesDialog,        setFilesDialog]        = useState(null);
   const [assignFiles,        setAssignFiles]         = useState([]);
@@ -962,7 +962,6 @@ const AssignmentsTab = () => {
   const [submissions,        setSubmissions]         = useState([]);
   const [loadingSubs,        setLoadingSubs]         = useState(false);
   const [grading,            setGrading]             = useState({});
-  const [weightsOpen,        setWeightsOpen]         = useState(false);
 
   const fetchAll = useCallback(async () => {
     const [aRes, tRes, termsRes] = await Promise.all([
@@ -977,11 +976,19 @@ const AssignmentsTab = () => {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  useEffect(() => {
+    if (!form.classId || !form.subjectId || !form.termId) { setBudget(null); return; }
+    fetch(`${BASE}/api/teacher/weight-budget?classId=${form.classId}&subjectId=${form.subjectId}&termId=${form.termId}`, { headers:authH() })
+      .then(r => r.json()).then(d => setBudget(d)).catch(() => setBudget(null));
+  }, [form.classId, form.subjectId, form.termId]);
+
   const uniqueClasses  = [...new Map(slots.map(s=>[s.classId,{name:s.className,classId:s.classId}])).values()];
   const uniqueSubjects = [...new Map(slots.filter(s=>!form.classId||s.classId===form.classId||s.classId===Number(form.classId)).map(s=>[s.subjectId,{name:s.subjectName,subjectId:s.subjectId}])).values()];
 
   const handleSave = async () => {
     if (!form.classId||!form.subjectId||!form.title||!form.dueDate) return toast('Class, subject, title and due date are required','error');
+    if (!form.weight || Number(form.weight) <= 0) return toast('Weight (%) is required','error');
+    if (budget && Number(form.weight) > budget.remaining + 0.01) return toast(`Weight exceeds budget — only ${budget.remaining}% remaining for this term`,'error');
     setSaving(true);
     try {
       let res;
@@ -995,7 +1002,7 @@ const AssignmentsTab = () => {
         res = await fetch(`${BASE}/api/teacher/assignments`, { method:'POST', headers:jsonH(), body:JSON.stringify(payload) });
       }
       setSaving(false);
-      if (res.ok) { toast('Assignment created'); setDialog(false); setFile(null); setForm(EMPTY); fetchAll(); }
+      if (res.ok) { toast('Assignment created'); setDialog(false); setFile(null); setForm(EMPTY); setBudget(null); fetchAll(); }
       else { const e=await res.json(); toast(e.message||'Failed','error'); }
     } catch { setSaving(false); toast('Failed to create assignment','error'); }
   };
@@ -1051,12 +1058,8 @@ const AssignmentsTab = () => {
             </Box>
 
             <Box sx={{ display:'flex', gap:1 }}>
-              <Button size="small" variant="outlined" startIcon={<TuneIcon sx={{ fontSize:17 }} />} onClick={()=>setWeightsOpen(true)}
-                sx={{ textTransform:'none', fontWeight:700, fontFamily:"'IBM Plex Sans', sans-serif", borderColor:C.border, color:C.muted, borderRadius:'8px', '&:hover':{ borderColor:C.brand, color:C.brand } }}>
-                Term Weights
-              </Button>
               {view==='list' && (
-                <Button variant="contained" startIcon={<AddIcon />} onClick={()=>{ setForm(EMPTY); setDialog(true); }}
+                <Button variant="contained" startIcon={<AddIcon />} onClick={()=>{ setForm(EMPTY); setBudget(null); setDialog(true); }}
                   sx={{ background:C.brand, textTransform:'none', fontWeight:700, boxShadow:'none', borderRadius:'8px', fontFamily:"'IBM Plex Sans', sans-serif" }}>
                   New Assignment
                 </Button>
@@ -1095,7 +1098,7 @@ const AssignmentsTab = () => {
                 <Table size="small" sx={{ borderCollapse:'collapse' }}>
                   <TableHead>
                     <TableRow>
-                      {['Title','Class','Subject','Term','Due Date','Marks','Actions'].map(h => (
+                      {['Title','Class','Subject','Term','Due Date','Marks','Weight','Actions'].map(h => (
                         <TableCell key={h} sx={{ ...headCell, ...(h==='Actions'?{borderRight:'none'}:{}) }}>{h}</TableCell>
                       ))}
                     </TableRow>
@@ -1116,6 +1119,11 @@ const AssignmentsTab = () => {
                         </TableCell>
                         <TableCell sx={bodyCell}>{new Date(a.dueDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</TableCell>
                         <TableCell sx={bodyCell}>{a.totalMarks||'—'}</TableCell>
+                        <TableCell sx={bodyCell}>
+                          {a.weight != null
+                            ? <Chip label={`${a.weight}%`} size="small" sx={{ fontWeight:700, fontSize:'0.7rem', bgcolor:'#ECFDF5', color:'#065F46' }} />
+                            : <Typography sx={{ fontSize:'0.78rem', color:C.muted, fontStyle:'italic', fontFamily:"'IBM Plex Sans', sans-serif" }}>—</Typography>}
+                        </TableCell>
                         <TableCell sx={{ ...bodyCell, borderRight:'none' }}>
                           <Box sx={{ display:'flex', gap:0.75, flexWrap:'wrap' }}>
                             <Button size="small" variant="outlined" onClick={()=>openSubmissions(a)} sx={{ textTransform:'none', fontWeight:600, fontSize:'0.72rem', borderColor:C.brand, color:C.brand, borderRadius:'6px', fontFamily:"'IBM Plex Sans', sans-serif" }}>Submissions</Button>
@@ -1158,10 +1166,34 @@ const AssignmentsTab = () => {
             <TextField label="Total Marks" type="number" value={form.totalMarks} onChange={e=>setForm(f=>({...f,totalMarks:e.target.value}))} size="small" fullWidth />
           </Box>
           {/* Term selector */}
-          <TextField select label="Term (optional)" value={form.termId} onChange={e=>setForm(f=>({...f,termId:e.target.value}))} size="small" fullWidth helperText="Assign this to a specific school term so it appears in the correct Marks Table filter">
-            <MenuItem value="">— No specific term —</MenuItem>
+          <TextField select label="Term *" value={form.termId} onChange={e=>setForm(f=>({...f,termId:e.target.value,weight:''}))} size="small" fullWidth helperText="Term is required to track weight budget">
+            <MenuItem value="">— Select term —</MenuItem>
             {terms.map(t=><MenuItem key={t.id} value={t.id}>Term {t.termNumber || t.term_number}</MenuItem>)}
           </TextField>
+          {/* Weight field */}
+          <Box sx={{ display:'flex', gap:2, alignItems:'flex-start' }}>
+            <TextField
+              label="Weight (%) *" type="number" value={form.weight}
+              onChange={e=>setForm(f=>({...f,weight:e.target.value}))}
+              size="small" fullWidth inputProps={{ min:0.5, max:100, step:0.5 }}
+              error={!!(budget && form.weight && Number(form.weight) > budget.remaining + 0.01)}
+              helperText={
+                !form.termId ? 'Select a term to see budget' :
+                budget == null ? 'Calculating budget…' :
+                budget.remaining <= 0 ? '⚠ Term budget fully allocated (100%)' :
+                `${budget.remaining}% remaining for this class / subject / term`
+              }
+            />
+            {budget != null && form.termId && (
+              <Box sx={{ textAlign:'center', minWidth:56, pt:0.5 }}>
+                <Typography sx={{ fontSize:'1.4rem', fontWeight:700, lineHeight:1,
+                  color: budget.remaining <= 0 ? C.danger : budget.remaining < 20 ? '#F59E0B' : C.accent }}>
+                  {budget.remaining}%
+                </Typography>
+                <Typography sx={{ fontSize:'0.65rem', color:C.muted, mt:0.25 }}>left</Typography>
+              </Box>
+            )}
+          </Box>
           <Box sx={{ p:1.5, border:`1px dashed ${C.border}`, borderRadius:'8px', background:C.headerBg }}>
             <Typography sx={{ fontSize:'0.8rem', color:C.muted, mb:1, fontFamily:"'IBM Plex Sans', sans-serif" }}>📎 Attach file (PDF / image) — optional</Typography>
             <input type="file" accept="application/pdf,image/*" onChange={e=>setFile(e.target.files[0]||null)} />
@@ -1242,8 +1274,6 @@ const AssignmentsTab = () => {
         <DialogActions><Button onClick={()=>setSubmissionsDialog(null)} sx={{ textTransform:'none', color:C.muted }}>Close</Button></DialogActions>
       </Dialog>
 
-      <TermWeightsDialog open={weightsOpen} onClose={()=>setWeightsOpen(false)} toast={toast} />
-
       <Snackbar open={snack.open} autoHideDuration={4000} onClose={()=>setSnack(s=>({...s,open:false}))} anchorOrigin={{ vertical:'bottom', horizontal:'right' }}>
         <Alert severity={snack.sev} onClose={()=>setSnack(s=>({...s,open:false}))} sx={{ fontFamily:"'IBM Plex Sans', sans-serif", fontWeight:600 }}>{snack.msg}</Alert>
       </Snackbar>
@@ -1315,7 +1345,7 @@ const ExamMarksTableView = () => {
           <Box sx={{ display:'flex', gap:2, mb:1.5, p:1.5, borderRadius:'8px', background:C.headerBg, border:`1px solid ${C.border}` }}>
             {[
               { label:'Students',  value: students.length },
-              { label:'Exams',     value: exams.length },
+              { label:'Assessments', value: exams.length },
               { label:'Captured',  value: students.reduce((n,s) => n + exams.filter(e => s.marks[String(e.id)]?.graded).length, 0) },
             ].map(stat => (
               <Box key={stat.label} sx={{ px:2, py:1, borderRadius:'8px', background:C.white, border:`1px solid ${C.border}` }}>
@@ -1402,12 +1432,12 @@ const ExamsTab = () => {
   const [saving,        setSaving]        = useState(false);
   const [filterTerm,    setFilterTerm]    = useState('');
   const [view,          setView]          = useState('list'); // 'list' | 'marks'
-  const [weightsOpen,   setWeightsOpen]   = useState(false);
   const [snack,         setSnack]         = useState({ open:false, msg:'', sev:'success' });
   const toast = (msg, sev='success') => setSnack({ open:true, msg, sev });
 
-  const EMPTY = { classId:'', subjectId:'', title:'', examDate:'', totalMarks:100, type:'test', termId:'' };
-  const [form, setForm] = useState(EMPTY);
+  const EMPTY = { classId:'', subjectId:'', title:'', examDate:'', totalMarks:100, type:'test', termId:'', weight:'' };
+  const [form,   setForm]   = useState(EMPTY);
+  const [budget, setBudget] = useState(null);
 
   const fetchAll = useCallback(async () => {
     const [eRes, tRes, termsRes] = await Promise.all([
@@ -1422,15 +1452,23 @@ const ExamsTab = () => {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  useEffect(() => {
+    if (!form.classId || !form.subjectId || !form.termId) { setBudget(null); return; }
+    fetch(`${BASE}/api/teacher/weight-budget?classId=${form.classId}&subjectId=${form.subjectId}&termId=${form.termId}`, { headers:authH() })
+      .then(r => r.json()).then(d => setBudget(d)).catch(() => setBudget(null));
+  }, [form.classId, form.subjectId, form.termId]);
+
   const uniqueClasses  = [...new Map(slots.map(s=>[s.classId,{name:s.className,classId:s.classId||s.id}])).values()];
   const uniqueSubjects = [...new Map(slots.map(s=>[s.subjectName,{name:s.subjectName,subjectId:s.subjectId||s.id}])).values()];
 
   const handleSave = async () => {
     if (!form.classId||!form.subjectId||!form.title||!form.examDate) return toast('All fields are required','error');
+    if (!form.weight || Number(form.weight) <= 0) return toast('Weight (%) is required','error');
+    if (budget && Number(form.weight) > budget.remaining + 0.01) return toast(`Weight exceeds budget — only ${budget.remaining}% remaining for this term`,'error');
     setSaving(true);
     const res = await fetch(`${BASE}/api/teacher/exams`, { method:'POST', headers:jsonH(), body:JSON.stringify(form) });
     setSaving(false);
-    if (res.ok) { toast('Exam created'); setDialog(false); fetchAll(); }
+    if (res.ok) { toast('Assessment created'); setDialog(false); setBudget(null); fetchAll(); }
     else { const e=await res.json(); toast(e.message||'Failed','error'); }
   };
 
@@ -1459,8 +1497,8 @@ const ExamsTab = () => {
           <Box sx={{ display:'flex', justifyContent:'space-between', alignItems:'center', mb:1.5 }}>
             <Box sx={{ display:'flex', gap:1 }}>
               {[
-                { key:'list',  icon:<ListAltIcon sx={{ fontSize:17 }} />,   label:'Exam List'   },
-                { key:'marks', icon:<TableChartIcon sx={{ fontSize:17 }} />, label:'Marks Table' },
+                { key:'list',  icon:<ListAltIcon sx={{ fontSize:17 }} />,   label:'Assessment List' },
+                { key:'marks', icon:<TableChartIcon sx={{ fontSize:17 }} />, label:'Marks Table'     },
               ].map(v => (
                 <Button key={v.key} size="small" startIcon={v.icon} onClick={()=>setView(v.key)} sx={{
                   textTransform:'none', fontWeight:700, fontFamily:"'IBM Plex Sans', sans-serif",
@@ -1473,14 +1511,10 @@ const ExamsTab = () => {
               ))}
             </Box>
             <Box sx={{ display:'flex', gap:1 }}>
-              <Button size="small" variant="outlined" startIcon={<TuneIcon sx={{ fontSize:17 }} />} onClick={()=>setWeightsOpen(true)}
-                sx={{ textTransform:'none', fontWeight:700, fontFamily:"'IBM Plex Sans', sans-serif", borderColor:C.border, color:C.muted, borderRadius:'8px', '&:hover':{ borderColor:C.brand, color:C.brand } }}>
-                Term Weights
-              </Button>
               {view==='list' && (
-                <Button variant="contained" startIcon={<AddIcon />} onClick={()=>{ setForm(EMPTY); setDialog(true); }}
+                <Button variant="contained" startIcon={<AddIcon />} onClick={()=>{ setForm(EMPTY); setBudget(null); setDialog(true); }}
                   sx={{ background:C.brand, textTransform:'none', fontWeight:700, boxShadow:'none', borderRadius:'8px', fontFamily:"'IBM Plex Sans', sans-serif" }}>
-                  New Exam
+                  New Assessment
                 </Button>
               )}
             </Box>
@@ -1491,7 +1525,7 @@ const ExamsTab = () => {
         <Box sx={{ px:2.5, pt:2, pb:2.5 }}>
           {/* ══ LIST VIEW ══ */}
           {view==='list' && exams.length===0 && (
-            <Box sx={{ textAlign:'center', py:6 }}><GradeIcon sx={{ color:C.border, fontSize:44, mb:1 }} /><Typography sx={{ color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>No exams yet.</Typography></Box>
+            <Box sx={{ textAlign:'center', py:6 }}><GradeIcon sx={{ color:C.border, fontSize:44, mb:1 }} /><Typography sx={{ color:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>No assessments yet.</Typography></Box>
           )}
           {view==='list' && exams.length>0 && (
             <>
@@ -1513,7 +1547,7 @@ const ExamsTab = () => {
               <TableContainer component={Paper} elevation={0} sx={{ border:`1px solid ${C.border}`, borderRadius:'8px' }}>
                 <Table size="small" sx={{ borderCollapse:'collapse' }}>
                   <TableHead>
-                    <TableRow>{['Title','Class','Subject','Term','Type','Date','Results',''].map(h=><TableCell key={h} sx={{ ...headCell, ...(h===''?{borderRight:'none'}:{}) }}>{h}</TableCell>)}</TableRow>
+                    <TableRow>{['Title','Class','Subject','Term','Type','Date','Weight','Results',''].map(h=><TableCell key={h} sx={{ ...headCell, ...(h===''?{borderRight:'none'}:{}) }}>{h}</TableCell>)}</TableRow>
                   </TableHead>
                   <TableBody>
                     {(filterTerm ? exams.filter(e=>String(e.termId)===filterTerm) : exams).length===0 ? (
@@ -1529,6 +1563,11 @@ const ExamsTab = () => {
                         </TableCell>
                         <TableCell sx={bodyCell}><Chip label={e.type} size="small" sx={{ fontWeight:700, fontSize:'0.7rem', textTransform:'capitalize', bgcolor:'#EEF2FF', color:'#3730A3' }} /></TableCell>
                         <TableCell sx={bodyCell}>{new Date(e.examDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</TableCell>
+                        <TableCell sx={bodyCell}>
+                          {e.weight != null
+                            ? <Chip label={`${e.weight}%`} size="small" sx={{ fontWeight:700, fontSize:'0.7rem', bgcolor:'#ECFDF5', color:'#065F46' }} />
+                            : <Typography sx={{ fontSize:'0.78rem', color:C.muted, fontStyle:'italic', fontFamily:"'IBM Plex Sans', sans-serif" }}>—</Typography>}
+                        </TableCell>
                         <TableCell sx={bodyCell}><Typography sx={{ fontSize:'0.82rem', fontWeight:600, color:parseInt(e.resultsCaptured)>0?C.accent:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>{e.resultsCaptured} captured</Typography></TableCell>
                         <TableCell sx={{ ...bodyCell, borderRight:'none' }}>
                           <Button size="small" variant="outlined" onClick={()=>openResults(e)} sx={{ textTransform:'none', fontWeight:600, fontSize:'0.75rem', borderColor:C.brand, color:C.brand, borderRadius:'6px', fontFamily:"'IBM Plex Sans', sans-serif" }}>Enter Results</Button>
@@ -1547,7 +1586,7 @@ const ExamsTab = () => {
       </Card>
 
       <Dialog open={dialog} onClose={()=>setDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx:{ borderRadius:'12px' } }}>
-        <DialogTitle sx={{ fontWeight:700, color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>New Exam</DialogTitle>
+        <DialogTitle sx={{ fontWeight:700, color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>New Assessment</DialogTitle>
         <Divider />
         <DialogContent sx={{ pt:2.5, display:'flex', flexDirection:'column', gap:2 }}>
           <Box sx={{ display:'flex', gap:2 }}>
@@ -1568,10 +1607,34 @@ const ExamsTab = () => {
               {['test','exam','practical','assignment'].map(t=><MenuItem key={t} value={t} sx={{ textTransform:'capitalize' }}>{t}</MenuItem>)}
             </TextField>
           </Box>
-          <TextField select label="Term *" value={form.termId} onChange={e=>setForm(f=>({...f,termId:e.target.value}))} size="small" fullWidth helperText="Select the term this exam belongs to — used for report generation">
-            <MenuItem value="">— No specific term —</MenuItem>
+          <TextField select label="Term *" value={form.termId} onChange={e=>setForm(f=>({...f,termId:e.target.value,weight:''}))} size="small" fullWidth helperText="Select the term this exam belongs to — used for report generation">
+            <MenuItem value="">— Select term —</MenuItem>
             {terms.map(t=><MenuItem key={t.id} value={t.id}>Term {t.termNumber}</MenuItem>)}
           </TextField>
+          {/* Weight field */}
+          <Box sx={{ display:'flex', gap:2, alignItems:'flex-start' }}>
+            <TextField
+              label="Weight (%) *" type="number" value={form.weight}
+              onChange={e=>setForm(f=>({...f,weight:e.target.value}))}
+              size="small" fullWidth inputProps={{ min:0.5, max:100, step:0.5 }}
+              error={!!(budget && form.weight && Number(form.weight) > budget.remaining + 0.01)}
+              helperText={
+                !form.termId ? 'Select a term to see budget' :
+                budget == null ? 'Calculating budget…' :
+                budget.remaining <= 0 ? '⚠ Term budget fully allocated (100%)' :
+                `${budget.remaining}% remaining for this class / subject / term`
+              }
+            />
+            {budget != null && form.termId && (
+              <Box sx={{ textAlign:'center', minWidth:56, pt:0.5 }}>
+                <Typography sx={{ fontSize:'1.4rem', fontWeight:700, lineHeight:1,
+                  color: budget.remaining <= 0 ? C.danger : budget.remaining < 20 ? '#F59E0B' : C.accent }}>
+                  {budget.remaining}%
+                </Typography>
+                <Typography sx={{ fontSize:'0.65rem', color:C.muted, mt:0.25 }}>left</Typography>
+              </Box>
+            )}
+          </Box>
         </DialogContent>
         <Divider />
         <DialogActions sx={{ px:3, py:2, gap:1 }}>
@@ -1631,8 +1694,6 @@ const ExamsTab = () => {
           </Button>
         </DialogActions>
       </Dialog>
-
-      <TermWeightsDialog open={weightsOpen} onClose={()=>setWeightsOpen(false)} toast={toast} />
 
       <Snackbar open={snack.open} autoHideDuration={4000} onClose={()=>setSnack(s=>({...s,open:false}))} anchorOrigin={{ vertical:'bottom', horizontal:'right' }}>
         <Alert severity={snack.sev} onClose={()=>setSnack(s=>({...s,open:false}))} sx={{ fontFamily:"'IBM Plex Sans', sans-serif", fontWeight:600 }}>{snack.msg}</Alert>
@@ -1725,7 +1786,7 @@ const PAGE_META = {
   attendance:  { title:'Attendance',  subtitle:'Mark and review student attendance' },
   students:    { title:'Students',    subtitle:'View students in your classes' },
   assignments: { title:'Assignments', subtitle:'Manage assignments and view marks by term' },
-  exams:       { title:'Exams',       subtitle:'Create exams and capture results' },
+  exams:       { title:'Assessments',  subtitle:'Create tests, exams & practicals — set weights and capture results' },
   quizzes: { title:'AI Quizzes', subtitle:'Generate quizzes from your study materials using AI' },
 };
 
@@ -1758,7 +1819,7 @@ const TeacherDashboard = () => {
     { key:'attendance',  label:'Attendance',  icon:<CheckCircleIcon sx={{ fontSize:20 }} /> },
     { key:'students',    label:'Students',    icon:<PeopleAltIcon sx={{ fontSize:20 }} /> },
     { key:'assignments', label:'Assignments', icon:<AssignmentIcon sx={{ fontSize:20 }} /> },
-    { key:'exams',       label:'Exams',       icon:<GradeIcon sx={{ fontSize:20 }} /> },
+    { key:'exams',       label:'Assessments', icon:<GradeIcon sx={{ fontSize:20 }} /> },
     { key:'quizzes',     label:'AI Quizzes',  icon:<QuizIcon sx={{ fontSize:20 }} /> },
   ];
 
