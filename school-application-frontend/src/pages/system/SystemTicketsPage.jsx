@@ -135,10 +135,10 @@ const SystemTicketsPage = () => {
               onClick={() => setFilter(f.value)}
               sx={{
                 fontFamily: FONT, fontWeight: 600, fontSize: '0.78rem',
-                bgcolor: filter === f.value ? BLUE : '#fff',
+                bgcolor: filter === f.value ? BLUE : 'rgba(255,255,255,0.05)',
                 color: filter === f.value ? '#fff' : INK_SOFT,
                 border: `1px solid ${filter === f.value ? BLUE : BORDER}`,
-                '&:hover': { bgcolor: filter === f.value ? BLUE : '#F3F4F6' },
+                '&:hover': { bgcolor: filter === f.value ? BLUE : 'rgba(255,255,255,0.09)' },
               }}
             />
           ))}
@@ -149,12 +149,12 @@ const SystemTicketsPage = () => {
             <CircularProgress sx={{ color: BLUE }} size={30} />
           </Box>
         ) : (
-          <TableContainer sx={{ border: `1px solid ${BORDER}`, borderRadius: '6px', bgcolor: '#fff' }}>
+          <TableContainer sx={{ border: `1px solid ${BORDER}`, borderRadius: '6px' }}>
             <Table size="small">
               <TableHead>
                 <TableRow>
                   {['School', 'Subject', 'Priority', 'Status', 'Replies', 'Updated'].map(h => (
-                    <TableCell key={h} sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '0.7rem', color: INK_FAINT, bgcolor: '#F8FAFC', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `1px solid ${BORDER}` }}>
+                    <TableCell key={h} sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '0.7rem', color: INK_SOFT, bgcolor: 'rgba(255,255,255,0.04)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `1px solid ${BORDER}` }}>
                       {h}
                     </TableCell>
                   ))}
@@ -196,7 +196,7 @@ const SystemTicketsPage = () => {
             </DialogTitle>
             <Divider />
             <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2.5 }}>
-              <Stack direction="row" spacing={1.5}>
+              <Stack direction="row" spacing={1.5} alignItems="center">
                 <FormControl size="small" sx={{ minWidth: 140 }}>
                   <InputLabel sx={{ fontFamily: FONT, fontSize: '0.8rem' }}>Status</InputLabel>
                   <Select
@@ -209,21 +209,13 @@ const SystemTicketsPage = () => {
                     ))}
                   </Select>
                 </FormControl>
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel sx={{ fontFamily: FONT, fontSize: '0.8rem' }}>Priority</InputLabel>
-                  <Select
-                    label="Priority" value={selected.priority}
-                    onChange={e => updateTicket({ priority: e.target.value })}
-                    sx={{ fontFamily: FONT, fontSize: '0.8rem' }}
-                  >
-                    {['low', 'normal', 'high', 'urgent'].map(p => (
-                      <MenuItem key={p} value={p} sx={{ fontFamily: FONT, fontSize: '0.8rem', textTransform: 'capitalize' }}>{p}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.4 }}>
+                  <Typography sx={{ fontFamily: FONT, fontSize: '0.65rem', color: INK_FAINT, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Priority</Typography>
+                  <PriorityChip value={selected.priority} />
+                </Box>
               </Stack>
 
-              <Box sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: '8px', border: `1px solid ${BORDER}` }}>
+              <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.06)', borderRadius: '8px', border: `1px solid ${BORDER}` }}>
                 <Typography sx={{ fontFamily: FONT, fontSize: '0.85rem', color: INK, whiteSpace: 'pre-wrap' }}>{selected.description}</Typography>
               </Box>
 
