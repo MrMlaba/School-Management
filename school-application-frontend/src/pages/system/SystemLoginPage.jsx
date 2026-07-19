@@ -114,10 +114,10 @@ const SystemLoginPage = () => {
             </Box>
             <Box>
               <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '0.95rem', color: '#fff' }}>
-                System Administration
+                Management Console
               </Typography>
               <Typography sx={{ fontFamily: FONT, fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)' }}>
-                Authorised access only
+                Restricted access
               </Typography>
             </Box>
           </Box>
@@ -128,7 +128,7 @@ const SystemLoginPage = () => {
               Sign in
             </Typography>
             <Typography sx={{ fontFamily: FONT, fontSize: '0.8rem', color: '#94a3b8', mb: 2.5 }}>
-              Enter your system administrator credentials
+              Enter your credentials to continue
             </Typography>
 
             <TextField

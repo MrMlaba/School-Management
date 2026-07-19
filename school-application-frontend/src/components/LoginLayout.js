@@ -91,17 +91,19 @@ export function LeftPanel({ role, tagline, features, badge }) {
 
         {/* Main text */}
         <Box sx={{ my: 'auto' }}>
-          {/* Role badge */}
-          <Box sx={{
-            display: 'inline-flex', alignItems: 'center', gap: 0.75,
-            bgcolor: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
-            px: 1.5, py: 0.5, borderRadius: '100px', mb: 2.5,
-          }}>
-            <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#7DD3FC' }} />
-            <Typography sx={{ fontFamily: FF, fontWeight: 600, fontSize: '0.7rem', color: 'rgba(255,255,255,0.85)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-              {badge}
-            </Typography>
-          </Box>
+          {/* Optional role badge — only shown when explicitly provided */}
+          {badge && (
+            <Box sx={{
+              display: 'inline-flex', alignItems: 'center', gap: 0.75,
+              bgcolor: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
+              px: 1.5, py: 0.5, borderRadius: '100px', mb: 2.5,
+            }}>
+              <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#7DD3FC' }} />
+              <Typography sx={{ fontFamily: FF, fontWeight: 600, fontSize: '0.7rem', color: 'rgba(255,255,255,0.85)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                {badge}
+              </Typography>
+            </Box>
+          )}
 
           <Typography sx={{
             fontFamily: "'IBM Plex Serif', Georgia, serif",

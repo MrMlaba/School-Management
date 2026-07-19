@@ -4,23 +4,21 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, TextField, Button, Typography,
-  InputAdornment, IconButton, Alert, CircularProgress, Divider,
+  InputAdornment, IconButton, Alert, CircularProgress,
 } from '@mui/material';
 import BadgeOutlinedIcon         from '@mui/icons-material/BadgeOutlined';
 import LockOutlinedIcon          from '@mui/icons-material/LockOutlined';
 import VisibilityOutlinedIcon    from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
-import ArrowForwardIcon          from '@mui/icons-material/ArrowForward';
 import { LoginShell, MobileLogo, B, FF, inputSx } from '../components/LoginLayout';
 
 const LEFT = {
-  badge:    'Student Portal',
-  tagline:  'Your learning journey starts here.',
+  tagline:  'Education, simplified.',
   features: [
-    'View assignments & submit work',
-    'Check your grades & results',
-    'See your exam schedule',
-    'Take AI-powered quizzes',
+    'Secure access to your account',
+    'Digital records at your fingertips',
+    'Real-time updates and notifications',
+    'Your data, always protected',
   ],
 };
 
@@ -67,10 +65,10 @@ export default function StudentLogin() {
       {/* Heading */}
       <Box sx={{ mb: 4 }}>
         <Typography sx={{ fontFamily: "'IBM Plex Serif', Georgia, serif", fontSize: { xs: '2rem', md: '2.2rem' }, fontWeight: 600, color: B.text, lineHeight: 1.15, mb: 0.75 }}>
-          Student Sign In
+          Welcome Back
         </Typography>
         <Typography sx={{ fontFamily: FF, fontSize: '0.88rem', color: B.muted }}>
-          Sign in to access your student dashboard
+          Enter your credentials to continue
         </Typography>
       </Box>
 
@@ -126,37 +124,13 @@ export default function StudentLogin() {
         </Button>
       </Box>
 
-      {/* Other portals */}
-      <Box sx={{ mt: 4 }}>
-        <Divider sx={{ mb: 3, borderColor: B.border }}>
-          <Typography sx={{ fontFamily: FF, fontSize: '0.72rem', color: B.mutedLt, px: 1 }}>Other portals</Typography>
-        </Divider>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {[
-            { label: 'Teacher Portal',            sub: 'Sign in as a teacher',          path: '/teacher-login' },
-            { label: 'Admin Portal',              sub: 'School administration',         path: '/login' },
-            { label: 'Parent Portal',              sub: 'Sign in as a parent',           path: '/parent-login' },
-            { label: 'Check Application Status',  sub: 'Track your school application', path: '/login-applicant' },
-          ].map(link => (
-            <Box
-              key={link.path}
-              onClick={() => navigate(link.path)}
-              sx={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                p: 1.5, borderRadius: '8px', cursor: 'pointer',
-                border: `1px solid ${B.border}`, bgcolor: B.white,
-                transition: 'all 0.15s',
-                '&:hover': { borderColor: B.accent, bgcolor: B.brandLt },
-              }}
-            >
-              <Box>
-                <Typography sx={{ fontFamily: FF, fontWeight: 600, fontSize: '0.82rem', color: B.text }}>{link.label}</Typography>
-                <Typography sx={{ fontFamily: FF, fontSize: '0.7rem', color: B.muted }}>{link.sub}</Typography>
-              </Box>
-              <ArrowForwardIcon sx={{ fontSize: 16, color: B.muted }} />
-            </Box>
-          ))}
-        </Box>
+      <Box sx={{ mt: 4, textAlign: 'center' }}>
+        <Typography
+          onClick={() => navigate('/login-applicant')}
+          sx={{ fontFamily: FF, fontSize: '0.78rem', color: B.muted, cursor: 'pointer', '&:hover': { color: B.accent } }}
+        >
+          Check application status
+        </Typography>
       </Box>
     </LoginShell>
   );

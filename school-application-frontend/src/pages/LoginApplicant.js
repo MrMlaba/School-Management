@@ -201,28 +201,6 @@ export default function LoginApplicant() {
             </Button>
           </Box>
 
-          {/* Other portals */}
-          <Box sx={{ mt: 4 }}>
-            <Divider sx={{ mb: 3, borderColor: B.border }}>
-              <Typography sx={{ fontFamily: FF, fontSize: '0.72rem', color: B.mutedLt, px: 1 }}>Other portals</Typography>
-            </Divider>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {[
-                { label: 'Apply to a school',   sub: 'Start a new application',   path: '/' },
-                { label: 'Student Portal',      sub: 'Sign in as a student',       path: '/student-login' },
-                { label: 'Parent Portal',       sub: 'Sign in as a parent',        path: '/parent-login' },
-                { label: 'Teacher / Admin',     sub: 'Staff portal access',        path: '/login' },
-              ].map(link => (
-                <Box key={link.path} onClick={() => navigate(link.path)} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, borderRadius: '8px', cursor: 'pointer', border: `1px solid ${B.border}`, bgcolor: B.white, transition: 'all 0.15s', '&:hover': { borderColor: B.accent, bgcolor: B.brandLt } }}>
-                  <Box>
-                    <Typography sx={{ fontFamily: FF, fontWeight: 600, fontSize: '0.82rem', color: B.text }}>{link.label}</Typography>
-                    <Typography sx={{ fontFamily: FF, fontSize: '0.7rem', color: B.muted }}>{link.sub}</Typography>
-                  </Box>
-                  <ArrowForwardIcon sx={{ fontSize: 16, color: B.muted }} />
-                </Box>
-              ))}
-            </Box>
-          </Box>
         </Box>
       </Box>
     </Box>
