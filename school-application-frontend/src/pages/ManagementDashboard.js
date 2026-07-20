@@ -93,7 +93,7 @@ const bc = {
 
 const DAYS    = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const GRADES  = [8,9,10,11,12];
-const STREAMS = ['Science','Commerce','Humanities'];
+const STREAMS = ['Physics','Commerce','Humanities'];
 const LETTERS = ['A','B','C','D','E','F'];
 const TERMS   = [1,2,3,4];
 

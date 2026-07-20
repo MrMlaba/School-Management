@@ -451,14 +451,12 @@ router.get('/setup/classes', async (req, res) => {
     let query = `
       SELECT c.*,
         (SELECT COUNT(*) FROM enrolled_students es
-         WHERE es.school_id = c.school_id
-           AND NULLIF(regexp_replace(es.grade, '[^0-9]', '', 'g'), '')::INTEGER = c.grade
-           AND es.is_active = true) AS enrolled_count
+         WHERE es.class_id = c.id AND es.is_active = true) AS enrolled_count
       FROM classes c WHERE c.school_id = $1 AND c.is_active = true`;
     const params = [sid(req)];
     if (academicYearId) { params.push(academicYearId); query += ` AND c.academic_year_id = $${params.length}`; }
     if (grade)          { params.push(parseInt(grade)); query += ` AND c.grade = $${params.length}`; }
-    query += ' ORDER BY c.grade ASC, c.letter ASC';
+    query += ' ORDER BY c.grade ASC, c.stream ASC NULLS FIRST, c.letter ASC';
     const { rows } = await pool.query(query, params);
     res.json(rows);
   } catch (err) {
@@ -479,15 +477,18 @@ router.post('/setup/classes', async (req, res) => {
         return res.status(400).json({ message: 'academicYearId, grade and letter are required' });
       const gr = parseInt(grade);
       if (gr >= 10 && !stream)
-        return res.status(400).json({ message: `Grade ${gr} requires a stream (Science/Commerce/Humanities)` });
+        return res.status(400).json({ message: `Grade ${gr} requires a stream (Physics/Commerce/Humanities)` });
       if (gr < 10 && stream)
         return res.status(400).json({ message: `Grade ${gr} does not use streams` });
-      const className = `${gr}${letter.toUpperCase()}`;
+      // Streamed grades can have the same letter across different streams
+      // (10A Physics and 10A Commerce are different classes), so the stream
+      // is part of the class's identity, not just metadata on it.
+      const className = stream ? `${gr}${letter.toUpperCase()} ${stream}` : `${gr}${letter.toUpperCase()}`;
       const { rows } = await client.query(
         `INSERT INTO classes (school_id, academic_year_id, grade, stream, letter, name, capacity)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (school_id, academic_year_id, grade, letter)
-         DO UPDATE SET stream = $4, capacity = $7, is_active = true
+         ON CONFLICT (school_id, academic_year_id, grade, COALESCE(stream, 'NONE'), letter)
+         DO UPDATE SET capacity = $7, is_active = true
          RETURNING *`,
         [sid(req), academicYearId, gr, stream || null, letter.toUpperCase(), className, capacity || 40]
       );

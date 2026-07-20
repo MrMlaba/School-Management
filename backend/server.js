@@ -1312,8 +1312,12 @@ async function ensureTables() {
       stream     TEXT
     )
   `);
-  // Fix legacy stream value 'Physics' → 'Science' so it matches the frontend dropdown
-  await pool.query(`UPDATE national_subjects SET stream = 'Science' WHERE stream = 'Physics'`);
+  // The public application form's "Subject Stream" dropdown (ApplicationForm.js)
+  // hardcodes 'Physics'/'Commerce'/'Humanities' — that's the real, live value
+  // every applicant actually submits, and what schools.streams defaults to.
+  // Reverses an earlier migration that had gone the other way and caused
+  // enrolled students' streams to stop matching subjects tagged 'Science'.
+  await pool.query(`UPDATE national_subjects SET stream = 'Physics' WHERE stream = 'Science'`);
 
   // Seed national subjects — only inserts rows that don't already exist by code
   await pool.query(`
@@ -1334,12 +1338,12 @@ async function ensureTables() {
       ('Creative Arts',                      'ART',  8, 9,  NULL),
       -- Grade 10–12 general
       ('Mathematical Literacy',              'MATL', 10, 12, NULL),
-      -- Science stream
-      ('Physical Sciences',                  'PSCI', 10, 12, 'Science'),
-      ('Life Sciences',                      'LSCI', 10, 12, 'Science'),
-      ('Agricultural Sciences',              'AGRI', 10, 12, 'Science'),
-      ('Information Technology',             'IT',   10, 12, 'Science'),
-      ('Geography',                          'GEOG', 10, 12, 'Science'),
+      -- Physics stream
+      ('Physical Sciences',                  'PSCI', 10, 12, 'Physics'),
+      ('Life Sciences',                      'LSCI', 10, 12, 'Physics'),
+      ('Agricultural Sciences',              'AGRI', 10, 12, 'Physics'),
+      ('Information Technology',             'IT',   10, 12, 'Physics'),
+      ('Geography',                          'GEOG', 10, 12, 'Physics'),
       -- Commerce stream
       ('Accounting',                         'ACC',  10, 12, 'Commerce'),
       ('Business Studies',                   'BUS',  10, 12, 'Commerce'),
@@ -1802,6 +1806,30 @@ async function ensureTables() {
 
   console.log('✅ Recovered core schema verified');
   // ───────────────────────────────────────────────────────────────────────────
+
+  // Streamed grades (10-12) can have the same letter across different streams
+  // — "10A Physics" and "10A Commerce" are different classes — so the old
+  // UNIQUE(school_id, academic_year_id, grade, letter) constraint (which
+  // ignored stream entirely) made that impossible. Replaced with an
+  // expression index that treats "no stream" (grades 8-9) as its own slot.
+  try {
+    await pool.query(`ALTER TABLE classes DROP CONSTRAINT IF EXISTS classes_school_id_academic_year_id_grade_letter_key`);
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS classes_unique_idx
+        ON classes (school_id, academic_year_id, grade, COALESCE(stream, 'NONE'), letter)
+    `);
+  } catch (err) {
+    console.warn('Migration note (classes stream-aware uniqueness):', err.message);
+  }
+
+  // enrolled_students needs a direct class assignment (not just loose grade/
+  // stream text) so enrollment can allocate students into a specific class
+  // by capacity — see allocateClass() in managementRoutes.js.
+  try {
+    await pool.query(`ALTER TABLE enrolled_students ADD COLUMN IF NOT EXISTS class_id INTEGER REFERENCES classes(id) ON DELETE SET NULL`);
+  } catch (err) {
+    console.warn('Migration note (enrolled_students.class_id):', err.message);
+  }
 
   // assignment_submissions
   await pool.query(`

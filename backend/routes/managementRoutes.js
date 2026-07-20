@@ -17,15 +17,20 @@ const pool      = require('../db');
 const puppeteer = require('puppeteer');
 
 // ── Stream derivation (exact match) ──────────────────────────────────────────
+// The application form's "Subject Stream" dropdown offers exactly Physics/
+// Commerce/Humanities (ApplicationForm.js) — those are the real values this
+// ever receives, not full subject names. The subjectStreamMap fallback below
+// only exists for older/other callers that might still pass a specific
+// subject name (e.g. "Accounting") instead of a stream name directly.
 const deriveStream = (grade, subject) => {
-  const gr = parseInt(grade, 10);
+  const gr = parseInt(String(grade).replace(/[^0-9]/g, ''), 10);
   if (gr < 10 || !subject) return null;
   const val = subject.trim().toLowerCase();
-  const exactStreams = { 'science':'Science','commerce':'Commerce','humanities':'Humanities','general':'General' };
+  const exactStreams = { 'physics':'Physics','science':'Science','commerce':'Commerce','humanities':'Humanities','general':'General' };
   if (exactStreams[val]) return exactStreams[val];
   const subjectStreamMap = {
-    'physical sciences':'Science','life sciences':'Science',
-    'engineering graphics and design':'Science','agricultural sciences':'Science',
+    'physical sciences':'Physics','life sciences':'Physics',
+    'engineering graphics and design':'Physics','agricultural sciences':'Physics',
     'accounting':'Commerce','business studies':'Commerce','economics':'Commerce',
     'hospitality studies':'Commerce','consumer studies':'Commerce','tourism':'Commerce',
     'history':'Humanities','visual arts':'Humanities','dramatic arts':'Humanities',
@@ -33,6 +38,36 @@ const deriveStream = (grade, subject) => {
   };
   return subjectStreamMap[val] || 'General';
 };
+
+// ── Class allocation — picks the first non-full class matching grade+stream,
+// in letter order (A before B before C…), so admission naturally fills class A
+// before spilling into class B. Throws a descriptive error the enrollment
+// route turns into a 409 when there's no room or no matching class at all.
+async function allocateClass(client, schoolId, gradeStr, stream) {
+  const gradeNum = parseInt(String(gradeStr).replace(/[^0-9]/g, ''), 10);
+  const label = `Grade ${gradeNum}${stream ? ' ' + stream : ''}`;
+  const { rows: candidates } = await client.query(
+    `SELECT c.id, c.name, c.capacity,
+            (SELECT COUNT(*) FROM enrolled_students es WHERE es.class_id = c.id AND es.is_active = true) AS enrolled_count
+     FROM classes c
+     WHERE c.school_id = $1 AND c.grade = $2 AND c.is_active = true
+       AND c.stream IS NOT DISTINCT FROM $3
+     ORDER BY c.letter ASC`,
+    [schoolId, gradeNum, stream || null]
+  );
+  if (!candidates.length) {
+    const err = new Error(`No class has been set up for ${label} yet — ask your system administrator to create one before enrolling this student.`);
+    err.code = 'NO_CLASS';
+    throw err;
+  }
+  const open = candidates.find(c => parseInt(c.enrolled_count, 10) < c.capacity);
+  if (!open) {
+    const err = new Error(`All ${label} classes are full (capacity reached) — ask your system administrator to create another class.`);
+    err.code = 'CLASS_FULL';
+    throw err;
+  }
+  return open;
+}
 
 // ── Grade where clause helper ─────────────────────────────────────────────────
 function gradeWhere(paramIndex) {
@@ -111,9 +146,18 @@ router.post('/enroll', async (req, res) => {
     const { rows: numRows } = await client.query(`SELECT generate_student_number($1) AS num`, [schoolId]);
     const studentNumber = numRows[0].num;
     const stream = deriveStream(app.grade, app.subject);
+
+    let allocatedClass;
+    try {
+      allocatedClass = await allocateClass(client, schoolId, app.grade, stream);
+    } catch (allocErr) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ message: allocErr.message, code: allocErr.code });
+    }
+
     const { rows: inserted } = await client.query(
-      `INSERT INTO enrolled_students (school_id,application_id,student_number,first_name,last_name,national_id,email,phone,date_of_birth,gender,grade,stream,enrolled_by,notes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
-      [schoolId,applicationId,studentNumber,app.first_name,app.last_name,app.national_id||null,app.email||null,app.phone||null,app.date_of_birth||null,app.gender||null,app.grade,stream,adminId||null,notes||null]
+      `INSERT INTO enrolled_students (school_id,application_id,student_number,first_name,last_name,national_id,email,phone,date_of_birth,gender,grade,stream,class_id,enrolled_by,notes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      [schoolId,applicationId,studentNumber,app.first_name,app.last_name,app.national_id||null,app.email||null,app.phone||null,app.date_of_birth||null,app.gender||null,app.grade,stream,allocatedClass.id,adminId||null,notes||null]
     );
     const enrolledStudent = inserted[0];
     if (app.parent_phone || app.parent_email) {
@@ -127,7 +171,7 @@ router.post('/enroll', async (req, res) => {
       await client.query(`INSERT INTO student_parents (student_id,parent_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [enrolledStudent.id, parentId]);
     }
     await client.query('COMMIT');
-    res.status(201).json({ message: 'Student enrolled successfully', studentNumber, student: { id: enrolledStudent.id, studentNumber, firstName: enrolledStudent.first_name, lastName: enrolledStudent.last_name, grade: enrolledStudent.grade, stream: enrolledStudent.stream, enrollmentDate: enrolledStudent.enrollment_date } });
+    res.status(201).json({ message: `Student enrolled successfully into ${allocatedClass.name}`, studentNumber, student: { id: enrolledStudent.id, studentNumber, firstName: enrolledStudent.first_name, lastName: enrolledStudent.last_name, grade: enrolledStudent.grade, stream: enrolledStudent.stream, className: allocatedClass.name, enrollmentDate: enrolledStudent.enrollment_date } });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[enroll]', err);

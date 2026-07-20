@@ -16,7 +16,7 @@ const token = () => sessionStorage.getItem('systemToken');
 const authH = () => ({ Authorization: `Bearer ${token()}` });
 const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 
-const ALL_STREAMS = ['Science', 'Commerce', 'Humanities'];
+const ALL_STREAMS = ['Physics', 'Commerce', 'Humanities'];
 const ALL_GRADES  = [8, 9, 10, 11, 12];
 
 const DEF_PERIODS = [

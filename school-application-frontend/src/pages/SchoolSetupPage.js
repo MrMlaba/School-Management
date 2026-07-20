@@ -53,7 +53,7 @@ const authH = () => ({ Authorization: `Bearer ${sessionStorage.getItem('adminTok
 const json  = body => ({ 'Content-Type': 'application/json', ...authH() });
 
 const GRADES  = [8, 9, 10, 11, 12];
-const STREAMS = ['Science', 'Commerce', 'Humanities'];
+const STREAMS = ['Physics', 'Commerce', 'Humanities'];
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 const TERMS   = [1, 2, 3, 4];
 
