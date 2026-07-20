@@ -415,6 +415,36 @@ app.get('/api/student/assignments', requireStudent, async (req, res) => {
   }
 });
 
+// Reference files the teacher attached to the assignment itself (instructions,
+// worksheets, etc.) — distinct from the student's own submitted file.
+app.get('/api/student/assignments/:id/files', requireStudent, async (req, res) => {
+  try {
+    const { rows: srows } = await pool.query(
+      'SELECT grade, stream, school_id FROM enrolled_students WHERE id = $1',
+      [req.student.id]
+    );
+    if (!srows.length) return res.status(404).json({ message: 'Student not found' });
+    const { grade, stream, school_id } = srows[0];
+    const numericGrade = parseInt((grade || '').replace(/[^0-9]/g, ''), 10) || null;
+    const { rows: visible } = await pool.query(
+      `SELECT a.id FROM assignments a JOIN classes c ON c.id = a.class_id
+       WHERE a.id = $1 AND c.school_id = $2
+         AND ($3::int IS NULL OR c.grade = $3)
+         AND ($4::text IS NULL OR c.stream IS NULL OR c.stream = $4)`,
+      [req.params.id, school_id, numericGrade, stream || null]
+    );
+    if (!visible.length) return res.status(404).json({ message: 'Assignment not found' });
+    const { rows } = await pool.query(
+      'SELECT id, filename, originalname, mimetype, uploaded_at AS "uploadedAt" FROM assignment_files WHERE assignment_id = $1 ORDER BY uploaded_at DESC',
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[student assignment files]', err);
+    res.status(500).json({ message: 'Failed to load files' });
+  }
+});
+
 // GET /api/student/exams
 app.get('/api/student/exams', requireStudent, async (req, res) => {
   try {

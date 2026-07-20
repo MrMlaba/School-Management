@@ -26,7 +26,9 @@ import WarningAmberIcon   from '@mui/icons-material/WarningAmber';
 import TableChartIcon     from '@mui/icons-material/TableChart';
 import ListAltIcon        from '@mui/icons-material/ListAlt';
 import QuizIcon from '@mui/icons-material/Quiz';
+import ArticleIcon from '@mui/icons-material/Article';
 import QuizTab  from './QuizTab';
+import MaterialsTab from './MaterialsTab';
 import SchoolLogoHeader from '../components/SchoolLogoHeader';
 
 /* ─── Tokens ─────────────────────────────────────────────────────────── */
@@ -1838,7 +1840,8 @@ const PAGE_META = {
   students:    { title:'Students',    subtitle:'View students in your classes' },
   assignments: { title:'Assignments', subtitle:'Manage assignments and view marks by term' },
   exams:       { title:'Assessments',  subtitle:'Create tests, exams & practicals — set weights and capture results' },
-  quizzes: { title:'AI Quizzes', subtitle:'Generate quizzes from your study materials using AI' },
+  quizzes: { title:'AI Quizzes', subtitle:'Generate quizzes from your learning materials using AI' },
+  materials: { title:'Learning Materials', subtitle:'Notes and resources students see, grouped by subject' },
 };
 
 const TeacherDashboard = () => {
@@ -1871,6 +1874,7 @@ const TeacherDashboard = () => {
     { key:'students',    label:'Students',    icon:<PeopleAltIcon sx={{ fontSize:20 }} /> },
     { key:'assignments', label:'Assignments', icon:<AssignmentIcon sx={{ fontSize:20 }} /> },
     { key:'exams',       label:'Assessments', icon:<GradeIcon sx={{ fontSize:20 }} /> },
+    { key:'materials',   label:'Learning Materials', icon:<ArticleIcon sx={{ fontSize:20 }} /> },
     { key:'quizzes',     label:'AI Quizzes',  icon:<QuizIcon sx={{ fontSize:20 }} /> },
   ];
 
@@ -1942,7 +1946,8 @@ const TeacherDashboard = () => {
           {tab==='students'    && <StudentsTab    initClassId={tabParams.classId} />}
           {tab==='assignments' && <AssignmentsTab />}
           {tab==='exams'       && <ExamsTab       />}
-          {tab==='quizzes' && <QuizTab />}
+          {tab==='materials'   && <MaterialsTab   />}
+          {tab==='quizzes' && <QuizTab onGoToMaterials={()=>navigateTab('materials')} />}
         </Box>
       </Box>
     </Box>

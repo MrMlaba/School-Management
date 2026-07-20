@@ -137,6 +137,7 @@ export default function AssignmentDetail() {
 
   const [assignment,    setAssignment]    = useState(null);
   const [submission,    setSubmission]    = useState(undefined); // undefined = loading, null = none
+  const [assignmentFiles, setAssignmentFiles] = useState([]);
   const [pageLoading,   setPageLoading]   = useState(true);
   const [uploading,     setUploading]     = useState(false);
   const [uploadProgress,setUploadProgress]= useState(0);
@@ -153,14 +154,15 @@ export default function AssignmentDetail() {
     if (!token) navigate('/student-login');
   }, [token, navigate]);
 
-  /* ── Load assignment + existing submission in parallel ── */
+  /* ── Load assignment + existing submission + attached files in parallel ── */
   const loadData = useCallback(async () => {
     if (!token) return;
     const headers = { Authorization: `Bearer ${token}` };
     try {
-      const [aRes, sRes] = await Promise.all([
+      const [aRes, sRes, fRes] = await Promise.all([
         fetch(`${BASE}/api/student/assignments`,                  { headers }),
         fetch(`${BASE}/api/student/assignments/${id}/submission`, { headers }),
+        fetch(`${BASE}/api/student/assignments/${id}/files`,      { headers }),
       ]);
 
       if (aRes.status === 401 || sRes.status === 401) {
@@ -179,6 +181,8 @@ export default function AssignmentDetail() {
       } else {
         setSubmission(null);
       }
+
+      setAssignmentFiles(fRes.ok ? await fRes.json() : []);
     } catch (err) {
       console.error('[AssignmentDetail]', err);
       setError('Failed to load. Please refresh the page.');
@@ -417,6 +421,32 @@ export default function AssignmentDetail() {
               <Typography sx={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.75, whiteSpace: 'pre-wrap', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 {assignment.description}
               </Typography>
+            </>
+          )}
+
+          {assignmentFiles.length > 0 && (
+            <>
+              <Divider sx={{ my: 2, borderColor: C.border }} />
+              <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', mb: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                Attached by your teacher
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {assignmentFiles.map(f => (
+                  <Box key={f.id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, p: 1.5, border: `1px solid ${C.border}`, borderRadius: '10px', flexWrap: 'wrap' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                      <InsertDriveFileIcon sx={{ color: C.brand, fontSize: 20, flexShrink: 0 }} />
+                      <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: C.brand, fontFamily: "'Plus Jakarta Sans', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {f.originalname || f.filename}
+                      </Typography>
+                    </Box>
+                    <Button size="small" variant="outlined" disabled={openingFile}
+                      onClick={() => openDocument(f.filename)}
+                      sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.75rem', borderColor: C.brand, color: C.brand, borderRadius: '8px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      View
+                    </Button>
+                  </Box>
+                ))}
+              </Box>
             </>
           )}
         </Paper>
