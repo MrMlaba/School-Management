@@ -1604,7 +1604,7 @@ const ExamsTab = () => {
             <TextField label="Date *" type="date" value={form.examDate} onChange={e=>setForm(f=>({...f,examDate:e.target.value}))} size="small" fullWidth InputLabelProps={{ shrink:true }} />
             <TextField label="Total Marks" type="number" value={form.totalMarks} onChange={e=>setForm(f=>({...f,totalMarks:e.target.value}))} size="small" fullWidth />
             <TextField select label="Type" value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} size="small" fullWidth>
-              {['test','exam','practical','assignment'].map(t=><MenuItem key={t} value={t} sx={{ textTransform:'capitalize' }}>{t}</MenuItem>)}
+              {['test','exam','practical'].map(t=><MenuItem key={t} value={t} sx={{ textTransform:'capitalize' }}>{t}</MenuItem>)}
             </TextField>
           </Box>
           <TextField select label="Term *" value={form.termId} onChange={e=>setForm(f=>({...f,termId:e.target.value,weight:''}))} size="small" fullWidth helperText="Select the term this exam belongs to — used for report generation">
@@ -1640,7 +1640,7 @@ const ExamsTab = () => {
         <DialogActions sx={{ px:3, py:2, gap:1 }}>
           <Button onClick={()=>setDialog(false)} sx={{ textTransform:'none', color:C.muted }}>Cancel</Button>
           <Button variant="contained" onClick={handleSave} disabled={saving} sx={{ background:C.brand, textTransform:'none', fontWeight:700, boxShadow:'none', borderRadius:'8px', fontFamily:"'IBM Plex Sans', sans-serif" }}>
-            {saving?'Saving…':'Create Exam'}
+            {saving?'Saving…':`Create ${form.type.charAt(0).toUpperCase()}${form.type.slice(1)}`}
           </Button>
         </DialogActions>
       </Dialog>
