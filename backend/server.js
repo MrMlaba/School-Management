@@ -361,6 +361,29 @@ app.get('/api/student/me', requireStudent, async (req, res) => {
   }
 });
 
+// Students may only update their own contact details — phone and email —
+// nothing else about their record (name, grade, class, etc.) is self-service.
+app.patch('/api/student/me', requireStudent, async (req, res) => {
+  const { phone, email } = req.body || {};
+  if (email && !/^\S+@\S+\.\S+$/.test(email))
+    return res.status(400).json({ message: 'Enter a valid email address' });
+  if (phone && !/^[0-9+\s-]{7,15}$/.test(phone))
+    return res.status(400).json({ message: 'Enter a valid phone number' });
+  try {
+    const { rows } = await pool.query(
+      `UPDATE enrolled_students SET phone = COALESCE($1, phone), email = COALESCE($2, email), updated_at = NOW()
+       WHERE id = $3
+       RETURNING id, phone, email`,
+      [phone || null, email || null, req.student.id]
+    );
+    if (!rows.length) return res.status(404).json({ message: 'Student not found' });
+    res.json({ success: true, ...rows[0] });
+  } catch (err) {
+    console.error('[student me PATCH]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 app.get('/api/student/assignments', requireStudent, async (req, res) => {
   try {
     const { rows: srows } = await pool.query(
@@ -1829,6 +1852,20 @@ async function ensureTables() {
     await pool.query(`ALTER TABLE enrolled_students ADD COLUMN IF NOT EXISTS class_id INTEGER REFERENCES classes(id) ON DELETE SET NULL`);
   } catch (err) {
     console.warn('Migration note (enrolled_students.class_id):', err.message);
+  }
+
+  // exams/assignments.weight — teacher-set % weighting toward the term total.
+  // Was already in use by the app code (POST /exams, POST /assignments,
+  // /weight-budget) but had no CREATE/ALTER anywhere, so it only existed on
+  // the live database from a manual change — codifying it here so it
+  // survives a future rebuild.
+  for (const col of [
+    `ALTER TABLE exams       ADD COLUMN IF NOT EXISTS weight NUMERIC`,
+    `ALTER TABLE assignments ADD COLUMN IF NOT EXISTS weight NUMERIC`,
+  ]) {
+    try { await pool.query(col); } catch (err) {
+      console.warn('Migration note (exams/assignments.weight):', err.message);
+    }
   }
 
   // assignment_submissions

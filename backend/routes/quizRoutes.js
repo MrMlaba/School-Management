@@ -8,25 +8,23 @@
 const express  = require('express');
 const multer   = require('multer');
 const path     = require('path');
-const fs       = require('fs');
 const crypto   = require('crypto');
 const pool     = require('../db');
 
 // ── File extraction helpers ───────────────────────────────────────────────────
-async function extractText(filePath, mimetype) {
+async function extractText(buffer, mimetype) {
   try {
     if (mimetype === 'application/pdf') {
       const pdfParse = require('pdf-parse');
-      const buf  = fs.readFileSync(filePath);
-      const data = await pdfParse(buf);
+      const data = await pdfParse(buffer);
       return data.text || '';
     }
     if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
       const mammoth = require('mammoth');
-      const result  = await mammoth.extractRawText({ path: filePath });
+      const result  = await mammoth.extractRawText({ buffer });
       return result.value || '';
     }
-    return fs.readFileSync(filePath, 'utf-8');
+    return buffer.toString('utf-8');
   } catch (err) {
     console.error('[extractText]', err);
     return '';
@@ -206,19 +204,11 @@ function validateClosesAt(closesAt) {
 }
 
 // ── Multer setup for material uploads ─────────────────────────────────────────
-const materialStorage = multer.diskStorage({
-  destination: (_, __, cb) => {
-    const dir = path.join(__dirname, '..', 'uploads', 'materials');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (_, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, crypto.randomBytes(16).toString('hex') + ext);
-  },
-});
+// Stored in Postgres (document_files, BYTEA) rather than on disk — disk
+// storage doesn't survive a redeploy on free hosts with no persistent volume
+// (see assignment_files for the same pattern already used elsewhere).
 const uploadMaterial = multer({
-  storage:    materialStorage,
+  storage:    multer.memoryStorage(),
   limits:     { fileSize: 20 * 1024 * 1024 },
   fileFilter: (_, file, cb) => {
     const allowed = ['.pdf', '.docx', '.txt', '.md'];
@@ -238,13 +228,16 @@ teacherQuizRouter.post('/materials', uploadMaterial.single('file'), async (req, 
   const { title, subjectId, classId, textContent } = req.body;
   if (!title) return res.status(400).json({ message: 'Title is required' });
   try {
-    let extracted_text = '', filename = null, originalname = null, mimetype = null, material_type = 'text';
+    let extracted_text = '', filename = null, originalname = null, material_type = 'text';
     if (req.file) {
-      filename      = req.file.filename;
-      originalname  = req.file.originalname;
-      mimetype      = req.file.mimetype;
-      material_type = path.extname(originalname).slice(1).toLowerCase();
-      extracted_text = await extractText(path.join(__dirname, '..', 'uploads', 'materials', filename), mimetype);
+      originalname   = req.file.originalname;
+      material_type  = path.extname(originalname).slice(1).toLowerCase();
+      extracted_text = await extractText(req.file.buffer, req.file.mimetype);
+      filename = crypto.randomBytes(16).toString('hex') + path.extname(originalname).toLowerCase();
+      await pool.query(
+        'INSERT INTO document_files (filename, original_name, mimetype, file_size, data) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (filename) DO NOTHING',
+        [filename, originalname, req.file.mimetype, req.file.size, req.file.buffer]
+      );
     } else if (textContent) {
       extracted_text = textContent;
     } else {
@@ -284,6 +277,24 @@ teacherQuizRouter.get('/materials', async (req, res) => {
   }
 });
 
+teacherQuizRouter.get('/materials/:id/download', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT m.filename, m.originalname, d.mimetype, d.data
+       FROM teacher_materials m JOIN document_files d ON d.filename = m.filename
+       WHERE m.id = $1 AND m.teacher_id = $2`,
+      [req.params.id, req.teacher.id]
+    );
+    if (!rows.length) return res.status(404).json({ message: 'File not found' });
+    res.setHeader('Content-Disposition', `inline; filename="${rows[0].originalname}"`);
+    res.setHeader('Content-Type', rows[0].mimetype || 'application/octet-stream');
+    res.send(rows[0].data);
+  } catch (err) {
+    console.error('[materials download]', err);
+    res.status(500).json({ message: 'Failed to download file' });
+  }
+});
+
 teacherQuizRouter.delete('/materials/:id', async (req, res) => {
   const teacherId = req.teacher.id;
   try {
@@ -293,8 +304,7 @@ teacherQuizRouter.delete('/materials/:id', async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ message: 'Material not found' });
     if (rows[0].filename) {
-      const fp = path.join(__dirname, '..', 'uploads', 'materials', rows[0].filename);
-      if (fs.existsSync(fp)) fs.unlinkSync(fp);
+      await pool.query('DELETE FROM document_files WHERE filename = $1', [rows[0].filename]);
     }
     res.json({ message: 'Material deleted' });
   } catch (err) {
@@ -497,6 +507,73 @@ teacherQuizRouter.get('/quizzes/:id/results', async (req, res) => {
 //  STUDENT QUIZ ROUTER
 // ═══════════════════════════════════════════════════════════════════════════════
 const studentQuizRouter = express.Router();
+
+// ── Learning materials — grouped per subject on the frontend using
+// subjectId/subjectName on each row. A material reaches a student either by
+// being pinned to their specific class, or tagged with a subject that
+// matches their grade+stream (same matching used for school_subjects
+// elsewhere) when no specific class was chosen.
+studentQuizRouter.get('/materials', async (req, res) => {
+  const studentId = req.student.id;
+  try {
+    const { rows: stuRows } = await pool.query(
+      `SELECT class_id, grade, stream, school_id FROM enrolled_students WHERE id = $1`, [studentId]
+    );
+    if (!stuRows.length) return res.status(404).json({ message: 'Student not found' });
+    const { class_id, grade, stream, school_id } = stuRows[0];
+    const numGrade = parseInt((grade || '').replace(/[^0-9]/g, '')) || 0;
+
+    const { rows } = await pool.query(
+      `SELECT m.id, m.title, m.material_type, m.originalname, m.created_at,
+              ss.id AS "subjectId", ss.name AS "subjectName"
+       FROM teacher_materials m
+       LEFT JOIN school_subjects ss ON ss.id = m.subject_id
+       WHERE m.school_id = $1
+         AND (
+           ($2::int IS NOT NULL AND m.class_id = $2)
+           OR (m.subject_id IS NOT NULL AND ss.grade = $3 AND ss.stream IS NOT DISTINCT FROM $4)
+         )
+       ORDER BY ss.name ASC NULLS LAST, m.created_at DESC`,
+      [school_id, class_id || null, numGrade, stream || null]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[student materials]', err);
+    res.status(500).json({ message: 'Failed to load materials' });
+  }
+});
+
+studentQuizRouter.get('/materials/:id/download', async (req, res) => {
+  const studentId = req.student.id;
+  try {
+    const { rows: stuRows } = await pool.query(
+      `SELECT class_id, grade, stream, school_id FROM enrolled_students WHERE id = $1`, [studentId]
+    );
+    if (!stuRows.length) return res.status(404).json({ message: 'Student not found' });
+    const { class_id, grade, stream, school_id } = stuRows[0];
+    const numGrade = parseInt((grade || '').replace(/[^0-9]/g, '')) || 0;
+
+    const { rows } = await pool.query(
+      `SELECT m.filename, m.originalname, d.mimetype, d.data
+       FROM teacher_materials m
+       LEFT JOIN school_subjects ss ON ss.id = m.subject_id
+       JOIN document_files d ON d.filename = m.filename
+       WHERE m.id = $1 AND m.school_id = $2
+         AND (
+           ($3::int IS NOT NULL AND m.class_id = $3)
+           OR (m.subject_id IS NOT NULL AND ss.grade = $4 AND ss.stream IS NOT DISTINCT FROM $5)
+         )`,
+      [req.params.id, school_id, class_id || null, numGrade, stream || null]
+    );
+    if (!rows.length) return res.status(404).json({ message: 'File not found' });
+    res.setHeader('Content-Disposition', `inline; filename="${rows[0].originalname}"`);
+    res.setHeader('Content-Type', rows[0].mimetype || 'application/octet-stream');
+    res.send(rows[0].data);
+  } catch (err) {
+    console.error('[student materials download]', err);
+    res.status(500).json({ message: 'Failed to download file' });
+  }
+});
 
 studentQuizRouter.get('/quizzes', async (req, res) => {
   const studentId = req.student.id;

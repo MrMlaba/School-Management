@@ -2,7 +2,7 @@
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Avatar, CircularProgress,
-  IconButton, Tooltip, LinearProgress,
+  IconButton, Tooltip, LinearProgress, Stack,
 } from '@mui/material';
 import AssignmentIcon         from '@mui/icons-material/Assignment';
 import CalendarTodayIcon      from '@mui/icons-material/CalendarToday';
@@ -29,6 +29,8 @@ import PersonOutlineIcon      from '@mui/icons-material/PersonOutline';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import DownloadIcon           from '@mui/icons-material/Download';
 import ErrorOutlineIcon       from '@mui/icons-material/ErrorOutline';
+import EditOutlinedIcon       from '@mui/icons-material/EditOutlined';
+import FolderOutlinedIcon     from '@mui/icons-material/FolderOutlined';
 import SchoolLogoHeader from '../components/SchoolLogoHeader';
 import API_BASE from '../config';
 
@@ -328,6 +330,7 @@ function Sidebar({student,desktopTab,setDesktopTab,overdueCount,pendingQuizzesCo
     {key:'deadlines',  label:'Deadlines',   icon:<ScheduleIcon   sx={{fontSize:17}}/>},
     {key:'exams', label:'Exams', icon:<SchoolIcon sx={{fontSize:17}}/>},
     {key:'attendance', label:'Attendance', icon:<EventAvailableIcon sx={{fontSize:17}}/>},
+    {key:'materials', label:'Materials', icon:<FolderOutlinedIcon sx={{fontSize:17}}/>},
     {key:'profile', label:'My Profile', icon:<PersonOutlineIcon sx={{fontSize:17}}/>},
   ];
   const LINKS = [
@@ -420,6 +423,7 @@ export default function StudentDashboard() {
   const [exams, setExams] = useState([]);
   const [performance,    setPerformance]    = useState(null); // { subjectResults, average }
   const [attendance,     setAttendance]     = useState(null); // { records, summary }
+  const [materials,      setMaterials]      = useState([]);
   const [reportTerms,    setReportTerms]    = useState([]);
   const [loadErrors,     setLoadErrors]     = useState([]); // plain-language messages for sections that failed to load
   const [mobileTab,      setMobileTab]      = useState('home');
@@ -435,7 +439,7 @@ export default function StudentDashboard() {
     (async()=>{
       const errors = [];
       try {
-        const [pRes,aRes,sRes,qRes,eRes,perfRes,attRes,rtRes] = await Promise.all([
+        const [pRes,aRes,sRes,qRes,eRes,perfRes,attRes,rtRes,matRes] = await Promise.all([
           fetch(`${BASE}/api/student/me`,             {headers}),
           fetch(`${BASE}/api/student/assignments`,    {headers}),
           fetch(`${BASE}/api/student/submissions`,    {headers}),
@@ -444,6 +448,7 @@ export default function StudentDashboard() {
           fetch(`${BASE}/api/student/performance`,    {headers}),
           fetch(`${BASE}/api/student/attendance`,     {headers}),
           fetch(`${BASE}/api/student/report-terms`,   {headers}),
+          fetch(`${BASE}/api/student/materials`,      {headers}),
         ]);
         if (pRes.status===401){sessionStorage.removeItem('studentToken');navigate('/student-login');return;}
         if (pRes.ok) setStudent(await pRes.json());
@@ -458,6 +463,7 @@ export default function StudentDashboard() {
         if (perfRes?.ok) setPerformance(await perfRes.json()); else errors.push('Your average mark could not be loaded.');
         if (attRes?.ok) setAttendance(await attRes.json()); else errors.push('Attendance could not be loaded.');
         if (rtRes?.ok) setReportTerms(await rtRes.json());
+        if (matRes?.ok) setMaterials(await matRes.json()); else errors.push('Learning materials could not be loaded.');
       } catch(e){
         console.error(e);
         errors.push('Some information could not be loaded — check your connection.');
@@ -669,6 +675,7 @@ export default function StudentDashboard() {
             {label:'Class Chat', icon:<ChatBubbleOutlineIcon sx={{fontSize:22,color:T.blue}}/>, href:`/classroom-chat/${gradeId}`, disabled:false},
             {label:'My Profile', icon:<PersonOutlineIcon    sx={{fontSize:22,color:T.blue}}/>, onClick:()=>setMobileTab('profile'), disabled:false},
             {label:'Attendance', icon:<EventAvailableIcon   sx={{fontSize:22,color:T.blue}}/>, onClick:()=>setMobileTab('attendance'), disabled:false},
+            {label:'Materials',  icon:<FolderOutlinedIcon    sx={{fontSize:22,color:T.blue}}/>, onClick:()=>setMobileTab('materials'), disabled:false},
             {label:'Messages',   icon:<MenuBookIcon          sx={{fontSize:22,color:T.ink4}}/>, href:'#', disabled:true},
           ].map(link=>(
             <Box key={link.label}
@@ -821,7 +828,8 @@ export default function StudentDashboard() {
           {desktopTab==='deadlines'   && <DeadlinesSection pendingDeadlines={pendingDeadlines} fullWidth/>}
           {desktopTab==='exams' && <ExamsSection exams={exams} fullWidth/>}
           {desktopTab==='attendance' && <AttendanceSection attendance={attendance}/>}
-          {desktopTab==='profile' && <ProfileSection student={student} reportTerms={reportTerms}/>}
+          {desktopTab==='materials' && <MaterialsSection materials={materials}/>}
+          {desktopTab==='profile' && <ProfileSection student={student} setStudent={setStudent} reportTerms={reportTerms}/>}
         </Box>
 
         {/* ── FIX: Mobile content — sd-scroll for iOS smooth scroll, mob-content for safe bottom padding ── */}
@@ -832,7 +840,8 @@ export default function StudentDashboard() {
           {mobileTab==='grades'  && <MobileGrades/>}
           {mobileTab==='exams' && <ExamsSection exams={exams} fullWidth/>}
           {mobileTab==='attendance' && <AttendanceSection attendance={attendance}/>}
-          {mobileTab==='profile' && <ProfileSection student={student} reportTerms={reportTerms}/>}
+          {mobileTab==='materials' && <MaterialsSection materials={materials}/>}
+          {mobileTab==='profile' && <ProfileSection student={student} setStudent={setStudent} reportTerms={reportTerms}/>}
           {mobileTab==='more'    && <MobileMore/>}
         </Box>
       </Box>
@@ -1188,9 +1197,41 @@ function AttendanceSection({ attendance }) {
   );
 }
 
-function ProfileSection({ student, reportTerms }) {
+function ProfileSection({ student, setStudent, reportTerms }) {
   const [downloadingId, setDownloadingId] = useState(null);
   const [downloadError, setDownloadError] = useState('');
+
+  const [editingContact, setEditingContact] = useState(false);
+  const [contactForm,    setContactForm]    = useState({ phone: '', email: '' });
+  const [contactSaving,  setContactSaving]  = useState(false);
+  const [contactError,   setContactError]   = useState('');
+
+  const startEditContact = () => {
+    setContactForm({ phone: student.phone || '', email: student.email || '' });
+    setContactError('');
+    setEditingContact(true);
+  };
+
+  const saveContact = async () => {
+    setContactSaving(true);
+    setContactError('');
+    try {
+      const token = sessionStorage.getItem('studentToken');
+      const res = await fetch(`${BASE}/api/student/me`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ phone: contactForm.phone, email: contactForm.email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setContactError(data.message || 'Could not save your changes.'); return; }
+      setStudent(prev => prev ? { ...prev, phone: data.phone, email: data.email } : prev);
+      setEditingContact(false);
+    } catch {
+      setContactError('Network error — check your connection and try again.');
+    } finally {
+      setContactSaving(false);
+    }
+  };
 
   const downloadReportCard = async (termId) => {
     setDownloadingId(termId);
@@ -1222,16 +1263,58 @@ function ProfileSection({ student, reportTerms }) {
             <Typography sx={{fontSize:'0.8rem',color:T.ink3,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{student.grade}{student.stream?` · ${student.stream}`:''}</Typography>
           </Box>
         </Box>
+        <Box sx={{display:'flex',justifyContent:'flex-end',mb:1}}>
+          {!editingContact ? (
+            <Button size="small" onClick={startEditContact} startIcon={<EditOutlinedIcon sx={{fontSize:15}}/>}
+              sx={{textTransform:'none',fontWeight:700,fontSize:'0.75rem',color:T.blue,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>
+              Edit contact info
+            </Button>
+          ) : (
+            <Stack direction="row" spacing={1}>
+              <Button size="small" onClick={()=>setEditingContact(false)}
+                sx={{textTransform:'none',fontWeight:600,fontSize:'0.75rem',color:T.ink3,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>
+                Cancel
+              </Button>
+              <Button size="small" variant="contained" disabled={contactSaving} onClick={saveContact}
+                startIcon={contactSaving?<CircularProgress size={12} sx={{color:'#fff'}}/>:null}
+                sx={{textTransform:'none',fontWeight:700,fontSize:'0.75rem',background:T.blue,boxShadow:'none',borderRadius:'6px',fontFamily:"'Plus Jakarta Sans',sans-serif"}}>
+                {contactSaving?'Saving…':'Save'}
+              </Button>
+            </Stack>
+          )}
+        </Box>
+        {contactError && (
+          <Typography sx={{color:T.red,fontSize:'0.78rem',fontFamily:"'Plus Jakarta Sans',sans-serif",mb:1}}>{contactError}</Typography>
+        )}
         <Box sx={{display:'grid',gridTemplateColumns:{xs:'1fr',sm:'1fr 1fr'},gap:1.5}}>
+          <Box sx={{p:1.5,borderRadius:'var(--r-sm)',background:T.paper3,border:`1px solid ${T.border}`}}>
+            <Typography sx={{fontSize:'0.68rem',color:T.ink4,fontFamily:"'Plus Jakarta Sans',sans-serif",textTransform:'uppercase',letterSpacing:'0.06em',mb:'3px'}}>Student Number</Typography>
+            <Typography sx={{fontSize:'0.88rem',fontWeight:600,color:T.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",wordBreak:'break-word'}}>{student.studentNumber||'—'}</Typography>
+          </Box>
+          <Box sx={{p:1.5,borderRadius:'var(--r-sm)',background:T.paper3,border:`1px solid ${T.border}`}}>
+            <Typography sx={{fontSize:'0.68rem',color:T.ink4,fontFamily:"'Plus Jakarta Sans',sans-serif",textTransform:'uppercase',letterSpacing:'0.06em',mb:'3px'}}>Enrolled</Typography>
+            <Typography sx={{fontSize:'0.88rem',fontWeight:600,color:T.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",wordBreak:'break-word'}}>{fmtDate(student.enrollmentDate)}</Typography>
+          </Box>
           {[
-            {label:'Student Number', value:student.studentNumber||'—'},
-            {label:'Email',          value:student.email||'—'},
-            {label:'Phone',          value:student.phone||'—'},
-            {label:'Enrolled',       value:fmtDate(student.enrollmentDate)},
+            {label:'Email', key:'email', value:student.email, type:'email'},
+            {label:'Phone', key:'phone', value:student.phone, type:'tel'},
           ].map(f=>(
-            <Box key={f.label} sx={{p:1.5,borderRadius:'var(--r-sm)',background:T.paper3,border:`1px solid ${T.border}`}}>
+            <Box key={f.key} sx={{p:1.5,borderRadius:'var(--r-sm)',background:T.paper3,border:`1px solid ${editingContact?T.blue:T.border}`}}>
               <Typography sx={{fontSize:'0.68rem',color:T.ink4,fontFamily:"'Plus Jakarta Sans',sans-serif",textTransform:'uppercase',letterSpacing:'0.06em',mb:'3px'}}>{f.label}</Typography>
-              <Typography sx={{fontSize:'0.88rem',fontWeight:600,color:T.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",wordBreak:'break-word'}}>{f.value}</Typography>
+              {editingContact ? (
+                <input
+                  type={f.type}
+                  value={contactForm[f.key]}
+                  onChange={e=>setContactForm(p=>({...p,[f.key]:e.target.value}))}
+                  style={{
+                    width:'100%', border:'none', outline:'none', background:'transparent',
+                    fontSize:'0.88rem', fontWeight:600, color:T.ink,
+                    fontFamily:"'Plus Jakarta Sans',sans-serif", padding:0,
+                  }}
+                />
+              ) : (
+                <Typography sx={{fontSize:'0.88rem',fontWeight:600,color:T.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",wordBreak:'break-word'}}>{f.value||'—'}</Typography>
+              )}
             </Box>
           ))}
         </Box>
@@ -1266,6 +1349,80 @@ function ProfileSection({ student, reportTerms }) {
             ))}
         </Box>
       </Card>
+    </Box>
+  );
+}
+
+function MaterialsSection({ materials }) {
+  const [downloadingId, setDownloadingId] = useState(null);
+  const [error, setError] = useState('');
+
+  const downloadMaterial = async (id) => {
+    setDownloadingId(id);
+    setError('');
+    try {
+      const token = sessionStorage.getItem('studentToken');
+      const res = await fetch(`${BASE}/api/student/materials/${id}/download`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) { setError('Could not open this file.'); return; }
+      const blob = await res.blob();
+      window.open(URL.createObjectURL(blob), '_blank');
+    } catch {
+      setError('Network error while opening the file.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const groups = {};
+  materials.forEach(m => {
+    const key = m.subjectName || 'General';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(m);
+  });
+  const subjectNames = Object.keys(groups).sort();
+
+  return (
+    <Box sx={{display:'flex',flexDirection:'column',gap:2}}>
+      {error && (
+        <Box sx={{display:'flex',alignItems:'center',gap:1,p:1.25,borderRadius:'var(--r-sm)',background:T.redL}}>
+          <ErrorOutlineIcon sx={{fontSize:17,color:T.red,flexShrink:0}}/>
+          <Typography sx={{fontSize:'0.82rem',color:T.red,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{error}</Typography>
+        </Box>
+      )}
+      {materials.length===0 ? (
+        <Box className="sd-card" sx={{textAlign:'center',py:7}}>
+          <FolderOutlinedIcon sx={{fontSize:44,color:T.ink5,mb:1.5}}/>
+          <Typography sx={{color:T.ink3,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:600,fontSize:'0.95rem'}}>No learning materials yet</Typography>
+          <Typography sx={{color:T.ink4,fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:'0.82rem',mt:0.5}}>Your teachers haven't uploaded any notes or materials.</Typography>
+        </Box>
+      ) : subjectNames.map(subject => (
+        <Card key={subject} title={subject} aside={
+          <Box sx={{px:1.25,py:'3px',borderRadius:'6px',background:T.paper3}}>
+            <Typography sx={{fontSize:'0.65rem',fontWeight:700,color:T.ink3,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{groups[subject].length}</Typography>
+          </Box>
+        }>
+          <Box sx={{p:1.75,display:'flex',flexDirection:'column',gap:1}}>
+            {groups[subject].map(m => (
+              <Box key={m.id} sx={{display:'flex',alignItems:'center',justifyContent:'space-between',px:1.75,py:1.25,borderRadius:'var(--r-sm)',background:T.paper3,border:`1px solid ${T.border}`,flexWrap:'wrap',gap:1}}>
+                <Box sx={{display:'flex',alignItems:'center',gap:1.25,minWidth:0}}>
+                  <DescriptionOutlinedIcon sx={{fontSize:20,color:T.blue,flexShrink:0}}/>
+                  <Box sx={{minWidth:0}}>
+                    <Typography sx={{fontSize:'0.88rem',fontWeight:700,color:T.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.title}</Typography>
+                    <Typography sx={{fontSize:'0.7rem',color:T.ink4,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{m.originalname || 'Text note'} · {fmtDate(m.createdAt)}</Typography>
+                  </Box>
+                </Box>
+                <Button size="small" variant="contained" disabled={downloadingId===m.id} onClick={()=>downloadMaterial(m.id)}
+                  startIcon={downloadingId===m.id?<CircularProgress size={14} sx={{color:'#fff'}}/>:<DownloadIcon sx={{fontSize:16}}/>}
+                  sx={{background:T.blue,textTransform:'none',fontWeight:700,fontSize:'0.78rem',boxShadow:'none',fontFamily:"'Plus Jakarta Sans',sans-serif",borderRadius:'8px','&:hover':{background:'#1D4ED8'}}}>
+                  {downloadingId===m.id?'Opening…':'View'}
+                </Button>
+              </Box>
+            ))}
+          </Box>
+        </Card>
+      ))}
     </Box>
   );
 }

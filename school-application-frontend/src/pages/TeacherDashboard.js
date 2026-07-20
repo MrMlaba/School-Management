@@ -10,6 +10,7 @@ import {
 } from '@mui/material';
 import AddIcon            from '@mui/icons-material/Add';
 import DeleteIcon         from '@mui/icons-material/Delete';
+import EditIcon           from '@mui/icons-material/Edit';
 import CheckCircleIcon    from '@mui/icons-material/CheckCircle';
 import CalendarMonthIcon  from '@mui/icons-material/CalendarMonth';
 import PeopleAltIcon      from '@mui/icons-material/PeopleAlt';
@@ -944,6 +945,7 @@ const AssignmentsTab = () => {
   const [view,       setView]       = useState('list');   // 'list' | 'marks'
   const [assignments, setAssignments] = useState([]);
   const [dialog,      setDialog]      = useState(false);
+  const [editingId,   setEditingId]   = useState(null);
   const [saving,      setSaving]      = useState(false);
   const [snack,       setSnack]       = useState({ open:false, msg:'', sev:'success' });
   const toast = (msg, sev='success') => setSnack({ open:true, msg, sev });
@@ -993,7 +995,11 @@ const AssignmentsTab = () => {
     try {
       let res;
       const payload = { ...form, termId: form.termId || undefined };
-      if (file) {
+      if (editingId) {
+        // Text-field edits only — replacing the attached file isn't supported
+        // here, use the existing Files dialog for that.
+        res = await fetch(`${BASE}/api/teacher/assignments/${editingId}`, { method:'PATCH', headers:jsonH(), body:JSON.stringify(payload) });
+      } else if (file) {
         const fd = new FormData();
         Object.entries(payload).forEach(([k,v]) => v !== undefined && fd.append(k,v));
         fd.append('file', file);
@@ -1002,9 +1008,21 @@ const AssignmentsTab = () => {
         res = await fetch(`${BASE}/api/teacher/assignments`, { method:'POST', headers:jsonH(), body:JSON.stringify(payload) });
       }
       setSaving(false);
-      if (res.ok) { toast('Assignment created'); setDialog(false); setFile(null); setForm(EMPTY); setBudget(null); fetchAll(); }
+      if (res.ok) { toast(editingId?'Assignment updated':'Assignment created'); setDialog(false); setEditingId(null); setFile(null); setForm(EMPTY); setBudget(null); fetchAll(); }
       else { const e=await res.json(); toast(e.message||'Failed','error'); }
-    } catch { setSaving(false); toast('Failed to create assignment','error'); }
+    } catch { setSaving(false); toast('Failed to save assignment','error'); }
+  };
+
+  const openEdit = (a) => {
+    setEditingId(a.id);
+    setForm({
+      classId: a.classId, subjectId: a.subjectId, title: a.title,
+      description: a.description || '', dueDate: a.dueDate?.slice(0,10) || '',
+      totalMarks: a.totalMarks ?? '', termId: a.termId || '', weight: a.weight ?? '',
+    });
+    setFile(null);
+    setBudget(null);
+    setDialog(true);
   };
 
   const handleDelete = async (id) => {
@@ -1059,7 +1077,7 @@ const AssignmentsTab = () => {
 
             <Box sx={{ display:'flex', gap:1 }}>
               {view==='list' && (
-                <Button variant="contained" startIcon={<AddIcon />} onClick={()=>{ setForm(EMPTY); setBudget(null); setDialog(true); }}
+                <Button variant="contained" startIcon={<AddIcon />} onClick={()=>{ setForm(EMPTY); setEditingId(null); setFile(null); setBudget(null); setDialog(true); }}
                   sx={{ background:C.brand, textTransform:'none', fontWeight:700, boxShadow:'none', borderRadius:'8px', fontFamily:"'IBM Plex Sans', sans-serif" }}>
                   New Assignment
                 </Button>
@@ -1128,6 +1146,7 @@ const AssignmentsTab = () => {
                           <Box sx={{ display:'flex', gap:0.75, flexWrap:'wrap' }}>
                             <Button size="small" variant="outlined" onClick={()=>openSubmissions(a)} sx={{ textTransform:'none', fontWeight:600, fontSize:'0.72rem', borderColor:C.brand, color:C.brand, borderRadius:'6px', fontFamily:"'IBM Plex Sans', sans-serif" }}>Submissions</Button>
                             <Button size="small" variant="outlined" onClick={()=>openFiles(a)}       sx={{ textTransform:'none', fontWeight:600, fontSize:'0.72rem', borderColor:C.accent, color:C.accent, borderRadius:'6px', fontFamily:"'IBM Plex Sans', sans-serif" }}>Files</Button>
+                            <IconButton size="small" onClick={()=>openEdit(a)} sx={{ color:C.muted }}><EditIcon sx={{ fontSize:16 }} /></IconButton>
                             <IconButton size="small" onClick={()=>handleDelete(a.id)} sx={{ color:C.danger }}><DeleteIcon sx={{ fontSize:16 }} /></IconButton>
                           </Box>
                         </TableCell>
@@ -1146,7 +1165,7 @@ const AssignmentsTab = () => {
 
       {/* ── Create Assignment Dialog ── */}
       <Dialog open={dialog} onClose={()=>setDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx:{ borderRadius:'12px' } }}>
-        <DialogTitle sx={{ fontWeight:700, color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>New Assignment</DialogTitle>
+        <DialogTitle sx={{ fontWeight:700, color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>{editingId?'Edit Assignment':'New Assignment'}</DialogTitle>
         <Divider />
         <DialogContent sx={{ pt:2.5, display:'flex', flexDirection:'column', gap:2 }}>
           <Box sx={{ display:'flex', gap:2 }}>
@@ -1194,18 +1213,24 @@ const AssignmentsTab = () => {
               </Box>
             )}
           </Box>
-          <Box sx={{ p:1.5, border:`1px dashed ${C.border}`, borderRadius:'8px', background:C.headerBg }}>
-            <Typography sx={{ fontSize:'0.8rem', color:C.muted, mb:1, fontFamily:"'IBM Plex Sans', sans-serif" }}>📎 Attach file (PDF / image) — optional</Typography>
-            <input type="file" accept="application/pdf,image/*" onChange={e=>setFile(e.target.files[0]||null)} />
-            {file && <Typography sx={{ fontSize:'0.8rem', color:C.accent, mt:0.75, fontFamily:"'IBM Plex Sans', sans-serif" }}>✓ {file.name}</Typography>}
-          </Box>
+          {editingId ? (
+            <Typography sx={{ fontSize:'0.78rem', color:C.muted, fontStyle:'italic', fontFamily:"'IBM Plex Sans', sans-serif" }}>
+              To replace the attached file, use the "Files" button on this assignment instead.
+            </Typography>
+          ) : (
+            <Box sx={{ p:1.5, border:`1px dashed ${C.border}`, borderRadius:'8px', background:C.headerBg }}>
+              <Typography sx={{ fontSize:'0.8rem', color:C.muted, mb:1, fontFamily:"'IBM Plex Sans', sans-serif" }}>📎 Attach file (PDF / image) — optional</Typography>
+              <input type="file" accept="application/pdf,image/*" onChange={e=>setFile(e.target.files[0]||null)} />
+              {file && <Typography sx={{ fontSize:'0.8rem', color:C.accent, mt:0.75, fontFamily:"'IBM Plex Sans', sans-serif" }}>✓ {file.name}</Typography>}
+            </Box>
+          )}
         </DialogContent>
         <Divider />
         <DialogActions sx={{ px:3, py:2, gap:1 }}>
-          <Button onClick={()=>setDialog(false)} sx={{ textTransform:'none', color:C.muted }}>Cancel</Button>
+          <Button onClick={()=>{ setDialog(false); setEditingId(null); }} sx={{ textTransform:'none', color:C.muted }}>Cancel</Button>
           <Button variant="contained" onClick={handleSave} disabled={saving}
             sx={{ background:C.brand, textTransform:'none', fontWeight:700, boxShadow:'none', borderRadius:'8px', fontFamily:"'IBM Plex Sans', sans-serif" }}>
-            {saving?'Saving…':'Create Assignment'}
+            {saving?'Saving…':editingId?'Save Changes':'Create Assignment'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1427,6 +1452,7 @@ const ExamsTab = () => {
   const [slots,         setSlots]         = useState([]);
   const [terms,         setTerms]         = useState([]);
   const [dialog,        setDialog]        = useState(false);
+  const [editingId,     setEditingId]     = useState(null);
   const [resultsDialog, setResultsDialog] = useState(null);
   const [resultsData,   setResultsData]   = useState(null);
   const [saving,        setSaving]        = useState(false);
@@ -1466,10 +1492,31 @@ const ExamsTab = () => {
     if (!form.weight || Number(form.weight) <= 0) return toast('Weight (%) is required','error');
     if (budget && Number(form.weight) > budget.remaining + 0.01) return toast(`Weight exceeds budget — only ${budget.remaining}% remaining for this term`,'error');
     setSaving(true);
-    const res = await fetch(`${BASE}/api/teacher/exams`, { method:'POST', headers:jsonH(), body:JSON.stringify(form) });
+    const url    = editingId ? `${BASE}/api/teacher/exams/${editingId}` : `${BASE}/api/teacher/exams`;
+    const method = editingId ? 'PATCH' : 'POST';
+    const res = await fetch(url, { method, headers:jsonH(), body:JSON.stringify(form) });
     setSaving(false);
-    if (res.ok) { toast('Assessment created'); setDialog(false); setBudget(null); fetchAll(); }
+    if (res.ok) { toast(editingId?'Assessment updated':'Assessment created'); setDialog(false); setEditingId(null); setBudget(null); fetchAll(); }
     else { const e=await res.json(); toast(e.message||'Failed','error'); }
+  };
+
+  const openEdit = (exam) => {
+    setEditingId(exam.id);
+    setForm({
+      classId: exam.classId, subjectId: exam.subjectId, title: exam.title,
+      examDate: exam.examDate?.slice(0,10) || '', totalMarks: exam.totalMarks,
+      type: exam.type, termId: exam.termId || '', weight: exam.weight ?? '',
+    });
+    setBudget(null);
+    setDialog(true);
+  };
+
+  const handleDeleteExam = async (exam) => {
+    const warn = parseInt(exam.resultsCaptured,10) > 0 ? ` This will also delete ${exam.resultsCaptured} captured result(s).` : '';
+    if (!window.confirm(`Delete "${exam.title}"?${warn}`)) return;
+    const res = await fetch(`${BASE}/api/teacher/exams/${exam.id}`, { method:'DELETE', headers:authH() });
+    if (res.ok) { toast('Assessment deleted'); fetchAll(); }
+    else { const e=await res.json(); toast(e.message||'Failed to delete','error'); }
   };
 
   const openResults = async (exam) => {
@@ -1512,7 +1559,7 @@ const ExamsTab = () => {
             </Box>
             <Box sx={{ display:'flex', gap:1 }}>
               {view==='list' && (
-                <Button variant="contained" startIcon={<AddIcon />} onClick={()=>{ setForm(EMPTY); setBudget(null); setDialog(true); }}
+                <Button variant="contained" startIcon={<AddIcon />} onClick={()=>{ setForm(EMPTY); setEditingId(null); setBudget(null); setDialog(true); }}
                   sx={{ background:C.brand, textTransform:'none', fontWeight:700, boxShadow:'none', borderRadius:'8px', fontFamily:"'IBM Plex Sans', sans-serif" }}>
                   New Assessment
                 </Button>
@@ -1570,7 +1617,11 @@ const ExamsTab = () => {
                         </TableCell>
                         <TableCell sx={bodyCell}><Typography sx={{ fontSize:'0.82rem', fontWeight:600, color:parseInt(e.resultsCaptured)>0?C.accent:C.muted, fontFamily:"'IBM Plex Sans', sans-serif" }}>{e.resultsCaptured} captured</Typography></TableCell>
                         <TableCell sx={{ ...bodyCell, borderRight:'none' }}>
-                          <Button size="small" variant="outlined" onClick={()=>openResults(e)} sx={{ textTransform:'none', fontWeight:600, fontSize:'0.75rem', borderColor:C.brand, color:C.brand, borderRadius:'6px', fontFamily:"'IBM Plex Sans', sans-serif" }}>Enter Results</Button>
+                          <Box sx={{ display:'flex', gap:0.75, flexWrap:'wrap' }}>
+                            <Button size="small" variant="outlined" onClick={()=>openResults(e)} sx={{ textTransform:'none', fontWeight:600, fontSize:'0.75rem', borderColor:C.brand, color:C.brand, borderRadius:'6px', fontFamily:"'IBM Plex Sans', sans-serif" }}>Enter Results</Button>
+                            <IconButton size="small" onClick={()=>openEdit(e)} sx={{ color:C.muted }}><EditIcon sx={{ fontSize:16 }} /></IconButton>
+                            <IconButton size="small" onClick={()=>handleDeleteExam(e)} sx={{ color:C.danger }}><DeleteIcon sx={{ fontSize:16 }} /></IconButton>
+                          </Box>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1586,7 +1637,7 @@ const ExamsTab = () => {
       </Card>
 
       <Dialog open={dialog} onClose={()=>setDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx:{ borderRadius:'12px' } }}>
-        <DialogTitle sx={{ fontWeight:700, color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>New Assessment</DialogTitle>
+        <DialogTitle sx={{ fontWeight:700, color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>{editingId?'Edit Assessment':'New Assessment'}</DialogTitle>
         <Divider />
         <DialogContent sx={{ pt:2.5, display:'flex', flexDirection:'column', gap:2 }}>
           <Box sx={{ display:'flex', gap:2 }}>
@@ -1638,9 +1689,9 @@ const ExamsTab = () => {
         </DialogContent>
         <Divider />
         <DialogActions sx={{ px:3, py:2, gap:1 }}>
-          <Button onClick={()=>setDialog(false)} sx={{ textTransform:'none', color:C.muted }}>Cancel</Button>
+          <Button onClick={()=>{ setDialog(false); setEditingId(null); }} sx={{ textTransform:'none', color:C.muted }}>Cancel</Button>
           <Button variant="contained" onClick={handleSave} disabled={saving} sx={{ background:C.brand, textTransform:'none', fontWeight:700, boxShadow:'none', borderRadius:'8px', fontFamily:"'IBM Plex Sans', sans-serif" }}>
-            {saving?'Saving…':`Create ${form.type.charAt(0).toUpperCase()}${form.type.slice(1)}`}
+            {saving?'Saving…':editingId?'Save Changes':`Create ${form.type.charAt(0).toUpperCase()}${form.type.slice(1)}`}
           </Button>
         </DialogActions>
       </Dialog>

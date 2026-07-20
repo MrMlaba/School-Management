@@ -445,6 +445,7 @@ router.get('/assignments', async (req, res) => {
     const { rows } = await pool.query(
       `SELECT a.id, a.title, a.description, a.due_date AS "dueDate",
               a.total_marks AS "totalMarks", a.weight, a.created_at AS "createdAt", a.term_id AS "termId",
+              a.class_id AS "classId", a.subject_id AS "subjectId",
               c.name AS "className", ss.name AS "subjectName"
        FROM assignments a
        JOIN classes c ON c.id = a.class_id
@@ -664,6 +665,31 @@ router.post('/assignments', async (req, res) => {
   } catch (err) {
     console.error('[teacher assignments POST]', err);
     res.status(500).json({ message: 'Failed to create assignment' });
+  }
+});
+
+// Text-field edits only (title, description, due date, marks, term, weight,
+// class/subject) — replacing the attached file is handled separately via the
+// existing Files dialog, not this route.
+router.patch('/assignments/:id', async (req, res) => {
+  const teacherId = req.teacher.id;
+  const { classId, subjectId, title, description, dueDate, totalMarks, termId, weight } = req.body;
+  if (!classId || !subjectId || !title || !dueDate)
+    return res.status(400).json({ message: 'classId, subjectId, title and dueDate are required' });
+  try {
+    const { rows: cls } = await pool.query('SELECT academic_year_id FROM classes WHERE id = $1', [classId]);
+    const { rows } = await pool.query(
+      `UPDATE assignments SET class_id=$1, subject_id=$2, title=$3, description=$4, due_date=$5,
+              total_marks=$6, academic_year_id=$7, term_id=$8, weight=$9
+       WHERE id = $10 AND teacher_id = $11
+       RETURNING id, title, due_date AS "dueDate", total_marks AS "totalMarks", term_id AS "termId", weight`,
+      [classId, subjectId, title, description || null, dueDate, totalMarks || null, cls[0]?.academic_year_id, termId || null, weight ? Number(weight) : null, req.params.id, teacherId]
+    );
+    if (!rows.length) return res.status(404).json({ message: 'Assignment not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('[teacher assignments PATCH]', err);
+    res.status(500).json({ message: 'Failed to update assignment' });
   }
 });
 
@@ -889,6 +915,7 @@ router.get('/exams', async (req, res) => {
     const { rows } = await pool.query(
       `SELECT e.id, e.title, e.type, e.exam_date AS "examDate", e.total_marks AS "totalMarks",
               e.weight, e.term_id AS "termId", e.created_at AS "createdAt",
+              e.class_id AS "classId", e.subject_id AS "subjectId",
               c.name AS "className", ss.name AS "subjectName",
               (SELECT COUNT(*) FROM results r WHERE r.exam_id = e.id) AS "resultsCaptured"
        FROM exams e
@@ -924,6 +951,40 @@ router.post('/exams', async (req, res) => {
   } catch (err) {
     console.error('[teacher exams POST]', err);
     res.status(500).json({ message: 'Failed to create exam' });
+  }
+});
+
+router.patch('/exams/:id', async (req, res) => {
+  const teacherId = req.teacher.id;
+  const { classId, subjectId, title, examDate, totalMarks, type, termId, weight } = req.body;
+  if (!classId || !subjectId || !title || !examDate)
+    return res.status(400).json({ message: 'classId, subjectId, title and examDate are required' });
+  try {
+    const { rows: cls } = await pool.query('SELECT academic_year_id FROM classes WHERE id = $1', [classId]);
+    const { rows } = await pool.query(
+      `UPDATE exams SET class_id=$1, subject_id=$2, title=$3, exam_date=$4, total_marks=$5, type=$6,
+              academic_year_id=$7, term_id=$8, weight=$9
+       WHERE id = $10 AND teacher_id = $11
+       RETURNING id, title, exam_date AS "examDate", total_marks AS "totalMarks", type, term_id AS "termId", weight`,
+      [classId, subjectId, title, examDate, totalMarks || 100, type || 'test', cls[0]?.academic_year_id, termId || null, weight ? Number(weight) : null, req.params.id, teacherId]
+    );
+    if (!rows.length) return res.status(404).json({ message: 'Exam not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('[teacher exams PATCH]', err);
+    res.status(500).json({ message: 'Failed to update exam' });
+  }
+});
+
+router.delete('/exams/:id', async (req, res) => {
+  const teacherId = req.teacher.id;
+  try {
+    const { rows } = await pool.query('DELETE FROM exams WHERE id = $1 AND teacher_id = $2 RETURNING id', [req.params.id, teacherId]);
+    if (!rows.length) return res.status(404).json({ message: 'Exam not found' });
+    res.json({ message: 'Exam deleted' });
+  } catch (err) {
+    console.error('[teacher exams DELETE]', err);
+    res.status(500).json({ message: 'Failed to delete exam' });
   }
 });
 
