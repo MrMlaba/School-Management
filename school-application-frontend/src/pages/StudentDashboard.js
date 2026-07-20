@@ -32,6 +32,7 @@ import ErrorOutlineIcon       from '@mui/icons-material/ErrorOutline';
 import EditOutlinedIcon       from '@mui/icons-material/EditOutlined';
 import FolderOutlinedIcon     from '@mui/icons-material/FolderOutlined';
 import SchoolLogoHeader from '../components/SchoolLogoHeader';
+import OfflineBanner from '../components/OfflineBanner';
 import API_BASE from '../config';
 
 /* ─── Google Fonts ─────────────────────────────────────────────────────── */
@@ -176,7 +177,7 @@ const T = {
   ink2:   '#1F3329',
   ink3:   '#4B6860',   // was #6B7280 — green-tinted muted
   ink4:   '#7A9E95',   // was #9CA3AF
-  ink5:   '#D1E8E0',   // was #D1D5DB — green-tinted border
+  ink5:   '#A9D6C1',   // was #D1D5DB — green-tinted border
  
   // ── Surfaces ───────────────────────────────────────────────
   paper:  '#FFFFFF',
@@ -199,7 +200,7 @@ const T = {
   blueL:  '#EFF6FF',
  
   // ── Borders — green-tinted ──────────────────────────────────
-  border: '#D1E8E0',   // was #E5E7EB — green-tinted
+  border: '#A9D6C1',   // was #E5E7EB — green-tinted, darkened for visibility
 };
 
 const SIDEBAR_W = 240;
@@ -749,6 +750,8 @@ export default function StudentDashboard() {
 
       {/* Main content */}
       <Box sx={{flex:1,ml:{xs:0,md:`${SIDEBAR_W}px`},minHeight:'100dvh',display:'flex',flexDirection:'column'}}>
+
+        <OfflineBanner/>
 
         {/* Load errors — distinguishes "something broke" from "you just have none" */}
         {loadErrors.length>0 && (

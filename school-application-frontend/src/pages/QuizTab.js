@@ -31,7 +31,7 @@ const C = {
   brand:     '#1A3557',
   accent:    '#2E7D32',
   accentBg:  '#E8F5E9',
-  border:    '#E2E8F0',
+  border:    '#B8C2CC',
   headerBg:  '#F8FAFC',
   bg:        '#F0F4F8',
   rowAlt:    '#FAFBFC',

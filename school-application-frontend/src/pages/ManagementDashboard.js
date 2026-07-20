@@ -46,7 +46,7 @@ const C = {
   brand:    '#1A3557', brandDark: '#122740',   // restored navy-blue (primary buttons / headers / accents)
   accent:   '#2E7D32',                       // semantic GREEN (active / success / present)
   sidebar:  '#f9f9f9', sidebarAct: '#eeeeee',
-  border:   '#dadada',
+  border:   '#BFBFBF',
   text:     '#000000', muted: '#7a7a7a',
   white:    '#ffffff', bg: '#f0f0f0',
   danger:   '#C62828', dangerBg: '#FFEBEE',   // semantic RED (delete / deactivate / absent)

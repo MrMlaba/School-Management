@@ -18,7 +18,7 @@ export const core = {
   warn:       '#D97706',
   warnBg:     '#FFFBEB',
   link:       '#1565C0',
-  border:     '#E2E8F0',
+  border:     '#B8C2CC',
   headerBg:   '#F8FAFC',
   bg:         '#F0F4F8',
   text:       '#000000',

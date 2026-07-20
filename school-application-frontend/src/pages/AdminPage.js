@@ -6,9 +6,10 @@ import {
   DialogActions, Divider, Chip, CircularProgress, Snackbar, Checkbox,
   Grid, Card, CardContent, Accordion, AccordionSummary, AccordionDetails,
   Stack, IconButton, Tooltip, ToggleButton, ToggleButtonGroup, Container,
-  Avatar, FormControlLabel, Switch,
+  Avatar, FormControlLabel, Switch, TextField, InputAdornment,
 } from '@mui/material';
 import MuiAlert from '@mui/material/Alert';
+import SearchIcon from '@mui/icons-material/Search';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -33,7 +34,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 const T = {
   brand:    '#1A3557',
   accent:   '#2E7D32',
-  border:   '#D0D7DE',
+  border:   '#B8C2CC',
   headerBg: '#F0F4F8',
   rowHover: '#F0F5FF',
   rowAlt:   '#FAFBFC',
@@ -175,6 +176,7 @@ const AdminPage = () => {
   const [selectedIds, setSelectedIds]               = useState([]);
   const [bulkMode, setBulkMode]                     = useState(false);
   const [viewMode, setViewMode]                     = useState('table');
+  const [searchTerm, setSearchTerm]                 = useState('');
   const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument]     = useState(null);
   const [docPreviewUrl, setDocPreviewUrl]           = useState(null);
@@ -206,7 +208,15 @@ const AdminPage = () => {
   const adminSchool = sessionStorage.getItem('adminSchool');
 
   /* ── Derived data ───────────────────────────────────────────────────── */
-  const filteredApps = applications.filter(app => app.status !== 'accepted');
+  // Lets school admin jump straight to a specific applicant (e.g. when they
+  // arrive in person to confirm enrolment) instead of scrolling grade by
+  // grade — matches on National ID or last name, across all grades.
+  const searchQuery = searchTerm.trim().toLowerCase();
+  const matchesSearch = app => !searchQuery
+    || (app.nationalId || '').toLowerCase().includes(searchQuery)
+    || (app.lastName   || '').toLowerCase().includes(searchQuery);
+
+  const filteredApps = applications.filter(app => app.status !== 'accepted' && matchesSearch(app));
 
   const stats = useMemo(() => {
     const total = applications.length;
@@ -437,7 +447,7 @@ const AdminPage = () => {
               width: 28, height: 28, borderRadius: '4px',
               bgcolor: app.status === 'approved' ? '#F1F5F9' : '#E8F5E9',
               color:  app.status === 'approved' ? '#CBD5E1'  : '#2E7D32',
-              border: `1px solid ${app.status === 'approved' ? '#E2E8F0' : '#A5D6A7'}`,
+              border: `1px solid ${app.status === 'approved' ? '#B8C2CC' : '#A5D6A7'}`,
               '&:hover': { bgcolor: '#2E7D32', color: '#fff', borderColor: '#2E7D32' },
             }}
           >
@@ -455,7 +465,7 @@ const AdminPage = () => {
               width: 28, height: 28, borderRadius: '4px',
               bgcolor: app.status === 'rejected' ? '#F1F5F9' : '#FFEBEE',
               color:  app.status === 'rejected' ? '#CBD5E1'  : '#C62828',
-              border: `1px solid ${app.status === 'rejected' ? '#E2E8F0' : '#EF9A9A'}`,
+              border: `1px solid ${app.status === 'rejected' ? '#B8C2CC' : '#EF9A9A'}`,
               '&:hover': { bgcolor: '#C62828', color: '#fff', borderColor: '#C62828' },
             }}
           >
@@ -471,8 +481,8 @@ const AdminPage = () => {
             onClick={e => { e.stopPropagation(); updateStatus(app.id, 'pending'); }}
             sx={{
               width: 28, height: 28, borderRadius: '4px',
-              bgcolor: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0',
-              '&:hover': { bgcolor: '#E2E8F0', color: T.brand },
+              bgcolor: '#F8FAFC', color: '#64748B', border: '1px solid #B8C2CC',
+              '&:hover': { bgcolor: '#B8C2CC', color: T.brand },
               '&.Mui-disabled': { bgcolor: '#F8FAFC', color: '#CBD5E1', borderColor: '#F1F5F9' },
             }}
           >
@@ -601,6 +611,17 @@ const AdminPage = () => {
                 control={<Switch checked={bulkMode} onChange={e => setBulkMode(e.target.checked)} size="small" inputProps={{ id: 'bulk-select', name: 'bulk-select' }}/>}
                 label={<Typography sx={{ fontSize: '0.82rem', fontWeight: 600, color: T.text, fontFamily: "'IBM Plex Sans', sans-serif" }}>Bulk select</Typography>}
               />
+
+              <TextField
+                size="small"
+                placeholder="Search by National ID or last name…"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                sx={{ minWidth: 260, '& .MuiOutlinedInput-root': { fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.85rem' } }}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: T.muted }} /></InputAdornment>,
+                }}
+              />
             </Stack>
 
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
@@ -646,7 +667,7 @@ const AdminPage = () => {
                   textTransform: 'none', borderRadius: '6px', px: '16px', py: '9px',
                   fontFamily: "'IBM Plex Sans', sans-serif",
                   '&:hover': { bgcolor: '#FFF1F2', borderColor: '#B91C1C' },
-                  '&.Mui-disabled': { borderColor: '#E2E8F0', color: T.muted },
+                  '&.Mui-disabled': { borderColor: '#B8C2CC', color: T.muted },
                 }}
               >
                 Delete All
@@ -661,7 +682,7 @@ const AdminPage = () => {
                   textTransform: 'none', borderRadius: '6px', px: '20px', py: '9px',
                   boxShadow: 'none', fontFamily: "'IBM Plex Sans', sans-serif",
                   '&:hover': { bgcolor: '#1B5E20', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' },
-                  '&.Mui-disabled': { bgcolor: '#E2E8F0', color: T.muted },
+                  '&.Mui-disabled': { bgcolor: '#B8C2CC', color: T.muted },
                 }}
               >
                 Export to Excel
@@ -795,6 +816,7 @@ const AdminPage = () => {
                             )}
                             <TableCell sx={{ ...headCell, width: 40, textAlign: 'center' }}>#</TableCell>
                             <TableCell sx={headCell}>Full Name</TableCell>
+                            <TableCell sx={headCell}>National ID</TableCell>
                             <TableCell sx={headCell}>Email</TableCell>
                             <TableCell sx={headCell}>School</TableCell>
                             <TableCell sx={headCell}>Subject Stream</TableCell>
@@ -808,7 +830,7 @@ const AdminPage = () => {
                           {selectedGradeApps.length === 0 ? (
                             <TableRow>
                               <TableCell
-                                colSpan={bulkMode ? 9 : 8}
+                                colSpan={bulkMode ? 10 : 9}
                                 align="center"
                                 sx={{ ...bodyCell, borderRight: 'none', py: 6 }}
                               >
@@ -850,6 +872,10 @@ const AdminPage = () => {
                                 {/* Full name */}
                                 <TableCell sx={{ ...bodyCell, fontWeight: 600 }}>
                                   {app.firstName ? `${app.firstName} ${app.lastName}` : (app.name || '—')}
+                                </TableCell>
+                                {/* National ID */}
+                                <TableCell sx={{ ...bodyCell, fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                                  {app.nationalId || '—'}
                                 </TableCell>
                                 {/* Email */}
                                 <TableCell sx={{ ...bodyCell, color: '#1565C0' }}>
@@ -932,7 +958,7 @@ const AdminPage = () => {
                         <Table size="small" sx={{ borderCollapse: 'collapse' }}>
                           <TableHead>
                             <TableRow>
-                              {['#', 'Name', 'School', 'Status', 'Subject', 'Documents', 'Submitted'].map(h => (
+                              {['#', 'Name', 'National ID', 'School', 'Status', 'Subject', 'Documents', 'Submitted'].map(h => (
                                 <TableCell key={h} sx={headCell}>{h}</TableCell>
                               ))}
                               <TableCell sx={headCellLast}>Actions</TableCell>
@@ -955,6 +981,7 @@ const AdminPage = () => {
                                 <TableCell sx={{ ...bodyCell, fontWeight: 600 }}>
                                   {app.firstName ? `${app.firstName} ${app.lastName}` : (app.name || '')}
                                 </TableCell>
+                                <TableCell sx={{ ...bodyCell, fontFamily: 'monospace', fontSize: '0.8rem' }}>{app.nationalId || '—'}</TableCell>
                                 <TableCell sx={bodyCell}>{app.school}</TableCell>
                                 <TableCell sx={bodyCell}><StatusBadge status={app.status} /></TableCell>
                                 <TableCell sx={bodyCell}>

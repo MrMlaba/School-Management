@@ -15,7 +15,7 @@ const T = {
   green:  '#059669',
   red:    '#DC2626',
   redL:   '#FEE2E2',
-  border: '#D1E8E0',
+  border: '#A9D6C1',
 };
 
 const BASE = API_BASE;

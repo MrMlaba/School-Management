@@ -7,7 +7,7 @@ const T = {
   navy:'#0F1F1A', navyLight:'#1F3329',
   gold:'#D97706', goldLight:'#FDE68A',
   bg:'#F4FAF7', white:'#FFFFFF',
-  border:'#D1E8E0', muted:'#4B6860', text:'#0F1F1A',
+  border:'#A9D6C1', muted:'#4B6860', text:'#0F1F1A',
 };
 const BASE = API_BASE;
 

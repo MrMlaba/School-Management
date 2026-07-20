@@ -11,6 +11,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { core } from '../theme/tokens';
 import API_BASE from '../config';
+import OfflineBanner from '../components/OfflineBanner';
 
 const BASE  = `${API_BASE}`;
 const authH = () => ({ Authorization: `Bearer ${sessionStorage.getItem('parentToken')}` });
@@ -67,6 +68,7 @@ const ParentDashboard = () => {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: core.bg }}>
+      <OfflineBanner/>
       <Box sx={{ bgcolor: core.white, borderBottom: `1px solid ${core.border}` }}>
         <Container maxWidth="md" sx={{ py: 2.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>

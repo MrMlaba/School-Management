@@ -27,7 +27,7 @@ const T = {
   goldLight: '#FDE68A',
   bg:        '#F4FAF7',
   white:     '#FFFFFF',
-  border:    '#D1E8E0',
+  border:    '#A9D6C1',
   muted:     '#4B6860',
   text:      '#0F1F1A',
   success:   '#059669',

@@ -21,7 +21,7 @@ const C = {
   navy:     '#0F1F1A',
   brand:    '#1F3329',
   muted:    '#4B6860',
-  border:   '#D1E8E0',
+  border:   '#A9D6C1',
   white:    '#FFFFFF',
   bg:       '#F4FAF7',
   success:  '#059669',

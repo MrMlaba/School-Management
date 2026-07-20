@@ -45,7 +45,7 @@ const C = {
   amberBg:   '#FFF3E0',
   purple:    '#6A1B9A',
   purpleBg:  '#F3E5F5',
-  border:    '#E2E8F0',
+  border:    '#B8C2CC',
   headerBg:  '#F8FAFC',
   bg:        '#F0F4F8',
   rowAlt:    '#FAFBFC',

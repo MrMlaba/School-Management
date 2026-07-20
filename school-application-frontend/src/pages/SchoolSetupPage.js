@@ -23,7 +23,7 @@ import SettingsIcon      from '@mui/icons-material/Settings';
 const C = {
   brand:    '#1A3557',
   accent:   '#2E7D32',
-  border:   '#D0D7DE',
+  border:   '#B8C2CC',
   headerBg: '#F0F4F8',
   rowHover: '#F7FAFC',
   rowAlt:   '#FAFBFC',
