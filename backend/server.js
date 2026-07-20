@@ -257,13 +257,6 @@ function validateFile(file, expectedType) {
 const schoolImgDir = path.join(__dirname, 'uploads', 'schools');
 if (!fs.existsSync(schoolImgDir)) fs.mkdirSync(schoolImgDir, { recursive: true });
 
-// ─── School application form template upload — stored in PostgreSQL ───────────
-const uploadSchoolForm = multer({
-  storage:    multer.memoryStorage(),
-  limits:     { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => { cb(null, file.mimetype === 'application/pdf'); },
-});
-
 const schoolImageStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, schoolImgDir),
   filename:    (req, file, cb) => {
@@ -1009,35 +1002,9 @@ app.get('/api/schools', async (req, res) => {
   }
 });
 
-// ─── School admin: manage application form ────────────────────────────────────
-app.patch('/api/admin/schools/application-form', requireSchoolAdmin, uploadSchoolForm.single('formTemplate'), async (req, res) => {
-  try {
-    const schoolId = req.admin.schoolId;
-    const enabled  = req.body.enabled === 'true' || req.body.enabled === true;
-
-    if (req.file) {
-      const ext      = path.extname(req.file.originalname).toLowerCase();
-      const filename = crypto.randomBytes(16).toString('hex') + ext;
-      await pool.query(
-        'INSERT INTO document_files (filename, original_name, mimetype, file_size, data) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (filename) DO NOTHING',
-        [filename, req.file.originalname, req.file.mimetype, req.file.size, req.file.buffer]
-      );
-      await pool.query(
-        `UPDATE schools SET application_form_required=$1, application_form_filename=$2, application_form_originalname=$3 WHERE id=$4`,
-        [enabled, filename, req.file.originalname, schoolId]
-      );
-    } else {
-      await pool.query(
-        `UPDATE schools SET application_form_required=$1 WHERE id=$2`,
-        [enabled, schoolId]
-      );
-    }
-    res.json({ success: true });
-  } catch (err) {
-    console.error('PATCH /api/admin/schools/application-form error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
+// NOTE: application-form management (require/not + template upload) used to
+// live here as school-admin self-service. It's now a system-admin-only
+// control — see routes/systemSchoolMgmtRoutes.js (/application-form).
 
 // ─── Public: download school application form template ────────────────────────
 app.get('/api/schools/application-form/:schoolId', async (req, res) => {

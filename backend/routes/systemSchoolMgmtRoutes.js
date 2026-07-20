@@ -6,6 +6,9 @@
 const express = require('express');
 const router  = express.Router({ mergeParams: true });
 const pool    = require('../db');
+const multer  = require('multer');
+const crypto  = require('crypto');
+const path    = require('path');
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
@@ -27,6 +30,67 @@ router.get('/config', async (req, res) => {
   } catch (err) {
     console.error('[sys school config GET]', err);
     res.status(500).json({ message: 'Failed to fetch school config' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  APPLICATION FORM (hard-copy form template + whether it's required) —
+//  moved here from school-admin self-service: this is now a service-provider-
+//  level decision, not something each school configures for itself.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const uploadSchoolForm = multer({
+  storage:    multer.memoryStorage(),
+  limits:     { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => { cb(null, file.mimetype === 'application/pdf'); },
+});
+
+router.get('/application-form', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT application_form_required AS "formRequired",
+              application_form_originalname AS "formOriginalName"
+       FROM schools WHERE id = $1`,
+      [sid(req)]
+    );
+    if (!rows.length) return res.status(404).json({ message: 'School not found' });
+    const baseUrl = process.env.API_BASE || `${req.protocol}://${req.get('host')}`;
+    res.json({
+      ...rows[0],
+      formUrl: rows[0].formOriginalName ? `${baseUrl}/api/schools/application-form/${sid(req)}` : null,
+    });
+  } catch (err) {
+    console.error('[sys application-form GET]', err);
+    res.status(500).json({ message: 'Failed to fetch application form settings' });
+  }
+});
+
+router.patch('/application-form', uploadSchoolForm.single('formTemplate'), async (req, res) => {
+  try {
+    const schoolId = sid(req);
+    const enabled  = req.body.enabled === 'true' || req.body.enabled === true;
+
+    if (req.file) {
+      const ext      = path.extname(req.file.originalname).toLowerCase();
+      const filename = crypto.randomBytes(16).toString('hex') + ext;
+      await pool.query(
+        'INSERT INTO document_files (filename, original_name, mimetype, file_size, data) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (filename) DO NOTHING',
+        [filename, req.file.originalname, req.file.mimetype, req.file.size, req.file.buffer]
+      );
+      await pool.query(
+        `UPDATE schools SET application_form_required=$1, application_form_filename=$2, application_form_originalname=$3 WHERE id=$4`,
+        [enabled, filename, req.file.originalname, schoolId]
+      );
+    } else {
+      await pool.query(
+        `UPDATE schools SET application_form_required=$1 WHERE id=$2`,
+        [enabled, schoolId]
+      );
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[sys application-form PATCH]', err);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

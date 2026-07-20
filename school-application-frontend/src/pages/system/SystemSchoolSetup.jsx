@@ -70,6 +70,12 @@ export default function SystemSchoolSetup() {
   const [schoolStreams,  setSchoolStreams]  = useState(ALL_STREAMS);
   const [customName, setCustomName] = useState('');
 
+  const [formRequired,     setFormRequired]     = useState(false);
+  const [formOriginalName, setFormOriginalName] = useState(null);
+  const [formUrl,          setFormUrl]          = useState(null);
+  const [formFile,         setFormFile]         = useState(null);
+  const [formSaving,       setFormSaving]       = useState(false);
+
   const toast = (msg, sev = 'success') => setSnack({ open: true, msg, sev });
   const BASE = `${API_BASE}/api/system/schools/${schoolId}`;
 
@@ -126,6 +132,40 @@ export default function SystemSchoolSetup() {
       })
       .catch(() => {});
   }, [fetchSummary, fetchYears, fetchPeriods, schoolId, BASE]);
+
+  useEffect(() => {
+    if (!schoolId) return;
+    fetch(`${BASE}/application-form`, { headers: authH() })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        setFormRequired(!!data.formRequired);
+        setFormOriginalName(data.formOriginalName || null);
+        setFormUrl(data.formUrl || null);
+      })
+      .catch(() => {});
+  }, [BASE, schoolId]);
+
+  const handleSaveApplicationForm = async () => {
+    setFormSaving(true);
+    const fd = new FormData();
+    fd.append('enabled', String(formRequired));
+    if (formFile) fd.append('formTemplate', formFile);
+    try {
+      const res  = await fetch(`${BASE}/application-form`, { method: 'PATCH', headers: authH(), body: fd });
+      const data = await res.json();
+      if (data.success) {
+        toast('Application form settings saved.');
+        setFormFile(null);
+      } else {
+        toast('Failed to save settings.', 'error');
+      }
+    } catch {
+      toast('Network error.', 'error');
+    } finally {
+      setFormSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (summary?.currentYearId) {
@@ -311,6 +351,55 @@ export default function SystemSchoolSetup() {
               {s.label}
             </Button>
           ))}
+        </Box>
+
+        {/* ── APPLICATION FORM ── service-provider-level setting, not part of the
+            academic setup wizard above, so it's always visible regardless of step. */}
+        <Box sx={{ p: 2.5, border: `1px solid ${BORDER}`, borderRadius: '8px', bgcolor: CARD, mb: 3 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '0.78rem', fontFamily: FONT, color: INK, mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Application Form
+          </Typography>
+          <Typography sx={{ fontSize: '0.78rem', fontFamily: FONT, color: INK_FAINT, mb: 2 }}>
+            When required, applicants must download this school's hard-copy form, fill it in, and upload the completed scan alongside their other documents.
+          </Typography>
+
+          <FormControlLabel
+            sx={{ mb: 2 }}
+            control={
+              <Switch checked={formRequired} onChange={e => setFormRequired(e.target.checked)}
+                sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: TEAL }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: TEAL } }} />
+            }
+            label={
+              <Typography sx={{ fontSize: '0.82rem', fontFamily: FONT, color: INK, fontWeight: 600 }}>
+                Require hard-copy form upload
+              </Typography>
+            }
+          />
+
+          {formUrl && !formFile && (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, p: 1.5, mb: 2, border: `1px solid ${BORDER}`, borderRadius: '6px', bgcolor: BG }}>
+              <Typography sx={{ fontSize: '0.78rem', fontFamily: FONT, color: INK_SOFT }}>
+                Current template: {formOriginalName}
+              </Typography>
+              <Button size="small" href={formUrl} target="_blank"
+                sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.72rem', fontFamily: FONT, color: TEAL }}>
+                Download
+              </Button>
+            </Box>
+          )}
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <Button component="label" size="small" variant="outlined"
+              sx={{ textTransform: 'none', fontWeight: 600, fontSize: '0.75rem', fontFamily: FONT, borderColor: BORDER, color: INK_SOFT }}>
+              {formFile ? formFile.name : 'Choose PDF template'}
+              <input type="file" accept="application/pdf" hidden onChange={e => setFormFile(e.target.files[0] || null)} />
+            </Button>
+            <Button size="small" variant="contained" disabled={formSaving} onClick={handleSaveApplicationForm}
+              startIcon={formSaving ? <CircularProgress size={13} sx={{ color: '#fff' }} /> : null}
+              sx={{ background: TEAL, color: '#fff', textTransform: 'none', fontWeight: 700, fontFamily: FONT, boxShadow: 'none' }}>
+              {formSaving ? 'Saving…' : 'Save'}
+            </Button>
+          </Box>
         </Box>
 
         {/* ── YEAR ── */}

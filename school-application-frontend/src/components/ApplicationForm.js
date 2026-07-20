@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import {
   TextField, Button, MenuItem, FormControl, Select,
   Box, Typography, Grid, Chip, CircularProgress, Stack, LinearProgress,
+  Snackbar, Alert,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -10,6 +11,8 @@ import SendIcon from '@mui/icons-material/Send';
 import CheckIcon from '@mui/icons-material/Check';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const C = {
@@ -271,8 +274,21 @@ const ApplicationForm = () => {
   const [isEditMode, setIsEditMode]       = useState(false);
   const [existingApplication, setExistingApplication] = useState(null);
 
+  const [showRestorePrompt, setShowRestorePrompt] = useState(false);
+  const [draftSavedAt, setDraftSavedAt]           = useState(null);
+  const [saveSnackOpen, setSaveSnackOpen]         = useState(false);
+
   const allowedFileTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
   const maxFileSize      = 5 * 1024 * 1024;
+
+  const blankForm = () => ({
+    nationalId: '', firstName: '', lastName: '', dateOfBirth: '', gender: '',
+    email: '', phone: '', address: '', city: '',
+    parentName: '', parentPhone: '', parentEmail: '', parentOccupation: '', relationship: '',
+    schools: preselectedSchool ? [preselectedSchool] : [],
+    grade: '', subject: '', previousSchool: '', achievements: '',
+    whyAttend: '', emergencyContact: '', emergencyPhone: '', documents: [],
+  });
 
   useEffect(() => {
     fetch(`${API_BASE}/api/schools`)
@@ -280,8 +296,55 @@ const ApplicationForm = () => {
       .catch(e => console.error(e)).finally(() => setSchoolsLoading(false));
   }, []);
 
-  // Clear any stale draft on mount — form always starts fresh
-  useEffect(() => { sessionStorage.removeItem('applicationDraft'); }, []);
+  // Offer to restore a saved draft — but never when the URL is explicitly
+  // loading an already-submitted application for editing.
+  useEffect(() => {
+    if (searchParams.get('edit') === 'true') return;
+    try {
+      const raw = localStorage.getItem('applicationDraft');
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (draft?.form) {
+        setDraftSavedAt(draft.savedAt || null);
+        setShowRestorePrompt(true);
+      }
+    } catch { localStorage.removeItem('applicationDraft'); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const restoreDraft = () => {
+    try {
+      const draft = JSON.parse(localStorage.getItem('applicationDraft'));
+      if (draft?.form) {
+        setForm({ ...draft.form, documents: [] });
+        setActiveStep(draft.activeStep || 0);
+      }
+    } catch {}
+    setShowRestorePrompt(false);
+  };
+
+  const discardDraft = () => {
+    localStorage.removeItem('applicationDraft');
+    setShowRestorePrompt(false);
+  };
+
+  const saveProgress = () => {
+    const { documents, ...rest } = form;
+    localStorage.setItem('applicationDraft', JSON.stringify({
+      form: { ...rest, documents: [] },
+      activeStep,
+      savedAt: new Date().toISOString(),
+    }));
+    setSaveSnackOpen(true);
+  };
+
+  const clearForm = () => {
+    if (!window.confirm('Clear the entire form? This cannot be undone.')) return;
+    setForm(blankForm());
+    setActiveStep(0);
+    setErrors({});
+    localStorage.removeItem('applicationDraft');
+  };
 
   useEffect(() => {
     const edit = searchParams.get('edit') === 'true';
@@ -851,6 +914,29 @@ const ApplicationForm = () => {
         </Box>
       </Box>
 
+      {showRestorePrompt && (
+        <Box sx={{ bgcolor: C.navyGhost, borderBottom: `1px solid ${C.navyBorder}`, py: 1.5, px: { xs:2, md:4 } }}>
+          <Box sx={{
+            maxWidth: 900, mx: 'auto', display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5,
+          }}>
+            <Typography sx={{ fontFamily: BODY, fontSize: '0.85rem', color: C.text }}>
+              We found a saved draft{draftSavedAt ? ` from ${new Date(draftSavedAt).toLocaleString()}` : ''}. Restore it and pick up where you left off?
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              <Button size="small" variant="contained" onClick={restoreDraft}
+                sx={{ fontFamily:BODY, fontWeight:700, textTransform:'none', bgcolor:C.navy, '&:hover':{ bgcolor:C.navyDark } }}>
+                Restore
+              </Button>
+              <Button size="small" variant="outlined" onClick={discardDraft}
+                sx={{ fontFamily:BODY, fontWeight:600, textTransform:'none', borderColor:C.border, color:C.textSub }}>
+                Discard
+              </Button>
+            </Stack>
+          </Box>
+        </Box>
+      )}
+
       <Box sx={{ bgcolor: C.white, borderBottom: `1px solid ${C.border}` }}>
         <Box sx={{ maxWidth:900, mx:'auto', px:{ xs:2, md:4 }, py:0 }}>
           <Stack direction="row" sx={{ overflowX:'auto' }}>
@@ -915,8 +1001,19 @@ const ApplicationForm = () => {
           {activeStep===3 && renderStep3()}
         </Box>
 
+        <Box sx={{ mt:2.5, display:'flex', justifyContent:'flex-end', gap:1, flexWrap:'wrap' }}>
+          <Button size="small" onClick={saveProgress} startIcon={<SaveOutlinedIcon sx={{ fontSize:'16px !important' }} />}
+            sx={{ fontFamily:BODY, fontWeight:600, fontSize:'0.78rem', textTransform:'none', color:C.navy }}>
+            Save &amp; continue later
+          </Button>
+          <Button size="small" onClick={clearForm} startIcon={<RestartAltIcon sx={{ fontSize:'16px !important' }} />}
+            sx={{ fontFamily:BODY, fontWeight:600, fontSize:'0.78rem', textTransform:'none', color:C.textMuted, '&:hover':{ color:C.error } }}>
+            Clear form
+          </Button>
+        </Box>
+
         <Box sx={{
-          mt:3, pt:2.5, borderTop:`1px solid ${C.border}`,
+          mt:1.5, pt:2.5, borderTop:`1px solid ${C.border}`,
           display:'flex', justifyContent:'space-between', alignItems:'center',
           flexWrap:'wrap', gap:1.5,
         }}>
@@ -965,6 +1062,13 @@ const ApplicationForm = () => {
           Step {activeStep+1} of {STEPS.length}
         </Typography>
       </Box>
+
+      <Snackbar open={saveSnackOpen} autoHideDuration={4000} onClose={() => setSaveSnackOpen(false)}
+        anchorOrigin={{ vertical:'bottom', horizontal:'center' }}>
+        <Alert severity="success" onClose={() => setSaveSnackOpen(false)} sx={{ fontFamily:BODY }}>
+          Progress saved on this device — come back to this page anytime to continue. (Attached documents will need to be re-selected.)
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

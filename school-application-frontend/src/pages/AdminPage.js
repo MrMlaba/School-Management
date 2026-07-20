@@ -180,11 +180,6 @@ const AdminPage = () => {
   const [docPreviewUrl, setDocPreviewUrl]           = useState(null);
   const [docPreviewLoading, setDocPreviewLoading]   = useState(false);
   const [selectedGrade, setSelectedGrade]           = useState(null);
-  const [formSettingsOpen, setFormSettingsOpen]     = useState(false);
-  const [formRequired, setFormRequired]             = useState(false);
-  const [formTemplateFile, setFormTemplateFile]     = useState(null);
-  const [formTemplateUrl, setFormTemplateUrl]       = useState(null);
-  const [formSettingsSaving, setFormSettingsSaving] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen]   = useState(false);
   const [deleteTarget, setDeleteTarget]             = useState(null); // { type: 'selected'|'all'|'one', ids: [], label: '' }
   const [deleteLoading, setDeleteLoading]           = useState(false);
@@ -207,48 +202,6 @@ const AdminPage = () => {
   };
 
   useEffect(() => { fetchApplications(); }, []);
-
-  useEffect(() => {
-    // Load current school's form settings
-    const token = sessionStorage.getItem('adminToken');
-    if (!token) return;
-    fetch(`${API_BASE}/api/schools`)
-      .then(r => r.json())
-      .then(schools => {
-        const adminSch = sessionStorage.getItem('adminSchool');
-        const mine = schools.find(s => s.name === adminSch);
-        if (mine) {
-          setFormRequired(!!mine.application_form_required);
-          setFormTemplateUrl(mine.application_form_url || null);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  const handleSaveFormSettings = async () => {
-    setFormSettingsSaving(true);
-    const token = sessionStorage.getItem('adminToken');
-    const fd = new FormData();
-    fd.append('enabled', String(formRequired));
-    if (formTemplateFile) fd.append('formTemplate', formTemplateFile);
-    try {
-      const res  = await fetch(`${API_BASE}/api/admin/schools/application-form`, {
-        method: 'PATCH', headers: { Authorization: `Bearer ${token}` }, body: fd,
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSnackbar({ open: true, message: 'Application form settings saved.', severity: 'success' });
-        setFormTemplateFile(null);
-        setFormSettingsOpen(false);
-      } else {
-        setSnackbar({ open: true, message: 'Failed to save settings.', severity: 'error' });
-      }
-    } catch {
-      setSnackbar({ open: true, message: 'Network error.', severity: 'error' });
-    } finally {
-      setFormSettingsSaving(false);
-    }
-  };
 
   const adminSchool = sessionStorage.getItem('adminSchool');
 
@@ -601,14 +554,6 @@ const AdminPage = () => {
                 sx={{ borderColor: T.brand, color: T.brand, fontFamily: "'IBM Plex Sans', sans-serif", '&:hover': { bgcolor: '#EEF2FF', borderColor: T.brand } }}
               >
                 Students accepted offer
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<DescriptionOutlinedIcon />}
-                onClick={() => setFormSettingsOpen(true)}
-                sx={{ borderColor: '#e8a020', color: '#92400e', fontFamily: "'IBM Plex Sans', sans-serif", '&:hover': { bgcolor: '#fffbeb', borderColor: '#d97706' } }}
-              >
-                Application Form Settings
               </Button>
               <Button
                 variant="contained"
@@ -1192,98 +1137,7 @@ const AdminPage = () => {
           </DialogActions>
         </Dialog>
 
-        {/* ── Application Form Settings Dialog ───────────────────────── */}
-        <Dialog open={formSettingsOpen} onClose={() => setFormSettingsOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle sx={{ borderBottom: '1px solid #e2e8f0' }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between">
-              <Typography variant="h6">Application Form Settings</Typography>
-              <IconButton onClick={() => setFormSettingsOpen(false)} size="small"><CancelOutlinedIcon /></IconButton>
-            </Stack>
-          </DialogTitle>
-          <DialogContent dividers>
-            <Stack spacing={3} sx={{ pt: 1 }}>
-              <Box sx={{ p: 2.5, bgcolor: '#fffbeb', border: '1px solid #fde68a', borderLeft: '4px solid #e8a020', borderRadius: '8px' }}>
-                <Typography variant="body2" sx={{ fontWeight: 700, color: '#92400e', mb: 0.5 }}>What this does</Typography>
-                <Typography variant="body2" sx={{ color: '#78350f' }}>
-                  When enabled, applicants will be required to download your school's application form,
-                  fill it in, and upload the completed form alongside their other documents.
-                </Typography>
-              </Box>
-
-              <Box>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={formRequired}
-                      onChange={e => setFormRequired(e.target.checked)}
-                      color="warning"
-                    />
-                  }
-                  label={
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>Require application form</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Applicants must upload a completed form to submit their application to this school.
-                      </Typography>
-                    </Box>
-                  }
-                />
-              </Box>
-
-              <Box>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>Form Template (PDF)</Typography>
-                {formTemplateUrl && !formTemplateFile && (
-                  <Box sx={{ mb: 1.5, p: 1.5, bgcolor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                    <Typography variant="body2" sx={{ color: '#15803d', fontWeight: 600 }}>Current template uploaded</Typography>
-                    <Button size="small" variant="outlined" startIcon={<DownloadIcon />} href={formTemplateUrl} target="_blank"
-                      sx={{ borderColor: '#15803d', color: '#15803d', fontSize: '0.75rem' }}>
-                      Download
-                    </Button>
-                  </Box>
-                )}
-                <Box
-                  component="label"
-                  htmlFor="form-template-upload"
-                  sx={{
-                    display: 'flex', alignItems: 'center', gap: 1.5,
-                    p: 2, border: '2px dashed #e2e8f0', borderRadius: '8px',
-                    cursor: 'pointer', transition: '0.15s',
-                    '&:hover': { borderColor: '#e8a020', bgcolor: '#fffbeb' },
-                    bgcolor: formTemplateFile ? '#f0fdf4' : '#fafbfc',
-                    borderColor: formTemplateFile ? '#86efac' : '#e2e8f0',
-                  }}
-                >
-                  <DescriptionOutlinedIcon sx={{ color: formTemplateFile ? '#15803d' : '#94a3b8' }} />
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: formTemplateFile ? '#15803d' : T.text }}>
-                      {formTemplateFile ? formTemplateFile.name : 'Upload new template'}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">PDF only, max 10 MB</Typography>
-                  </Box>
-                  <input
-                    id="form-template-upload"
-                    type="file"
-                    accept="application/pdf"
-                    style={{ display: 'none' }}
-                    onChange={e => setFormTemplateFile(e.target.files[0] || null)}
-                  />
-                </Box>
-              </Box>
-            </Stack>
-          </DialogContent>
-          <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
-            <Button onClick={() => setFormSettingsOpen(false)} variant="outlined">Cancel</Button>
-            <Button
-              variant="contained"
-              disabled={formSettingsSaving}
-              startIcon={formSettingsSaving ? <CircularProgress size={14} sx={{ color: 'inherit' }} /> : null}
-              onClick={handleSaveFormSettings}
-              sx={{ background: '#1A3557', '&:hover': { background: '#122740' } }}
-            >
-              {formSettingsSaving ? 'Saving…' : 'Save Settings'}
-            </Button>
-          </DialogActions>
-        </Dialog>
+        {/* Application form require/upload settings moved to System Admin — see SystemSchoolSetup.jsx */}
 
         {/* ── Document Viewer Dialog ──────────────────────────────────── */}
         <Dialog open={documentViewerOpen} onClose={handleCloseDocViewer} maxWidth="lg" fullWidth
