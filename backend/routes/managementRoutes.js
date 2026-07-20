@@ -567,7 +567,7 @@ async function getStudentReportData(schoolId, studentId, termId) {
   // Student info
   const { rows: stuRows } = await pool.query(
     `SELECT es.id, es.student_number AS "studentNumber", es.first_name AS "firstName",
-            es.last_name AS "lastName", es.grade, es.stream, es.gender,
+            es.last_name AS "lastName", es.grade, es.stream, es.gender, es.class_id AS "classId",
             es.date_of_birth AS "dateOfBirth", es.enrollment_date AS "enrollmentDate",
             s.name AS "schoolName"
      FROM enrolled_students es
@@ -588,14 +588,26 @@ async function getStudentReportData(schoolId, studentId, termId) {
     [studentId]
   );
 
-  // Find class for this student
-  const { rows: clsRows } = await pool.query(
-    `SELECT c.id, c.name, c.grade, c.stream, c.academic_year_id
-     FROM classes c
-     WHERE c.school_id=$1 AND c.grade::TEXT=REGEXP_REPLACE($2::TEXT,'[^0-9]','','g') AND c.is_active=true
-     LIMIT 1`,
-    [schoolId, student.grade]
-  );
+  // Find class for this student — prefer the direct class_id set at enrolment
+  // time (accurate even when several classes share a grade+letter across
+  // different streams, e.g. "10A Physics" vs "10A Commerce"). Only falls back
+  // to the old grade+stream guess for students enrolled before class_id
+  // existed, and that fallback now filters by stream too so it can't pick the
+  // wrong stream's class.
+  const { rows: clsRows } = student.classId
+    ? await pool.query(
+        `SELECT c.id, c.name, c.grade, c.stream, c.academic_year_id
+         FROM classes c WHERE c.id=$1 AND c.school_id=$2`,
+        [student.classId, schoolId]
+      )
+    : await pool.query(
+        `SELECT c.id, c.name, c.grade, c.stream, c.academic_year_id
+         FROM classes c
+         WHERE c.school_id=$1 AND c.grade::TEXT=REGEXP_REPLACE($2::TEXT,'[^0-9]','','g')
+           AND c.stream IS NOT DISTINCT FROM $3 AND c.is_active=true
+         ORDER BY c.letter LIMIT 1`,
+        [schoolId, student.grade, student.stream || null]
+      );
   const cls = clsRows[0] || null;
 
   // Subjects

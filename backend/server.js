@@ -1569,6 +1569,13 @@ async function ensureTables() {
     CREATE UNIQUE INDEX IF NOT EXISTS school_subjects_unique_idx
       ON school_subjects (school_id, academic_year_id, national_subject_id, grade, COALESCE(stream, 'ALL'))
   `);
+  // Same 'Science' → 'Physics' correction as national_subjects above —
+  // school_subjects.stream is set independently (from the admin's own stream
+  // picker at add-subject time, see SystemSchoolSetup.jsx), so subjects added
+  // before that picker was fixed were left permanently tagged 'Science',
+  // silently orphaning every mark recorded against them from Physics-stream
+  // students' reports (stream filter never matched).
+  await pool.query(`UPDATE school_subjects SET stream = 'Physics' WHERE stream = 'Science'`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS terms (
