@@ -251,6 +251,99 @@ router.delete('/schools/:schoolId/logo', requireSystemAdmin, async (req, res) =>
 });
 
 // ─────────────────────────────────────────────────────────────
+//  GALLERY (public profile page photos — one-to-many, unlike the single
+//  picture/logo above)
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/system/schools/:schoolId/gallery
+// List a school's gallery photos (public — used by both the admin edit
+// screen and the public school-profile page).
+router.get('/schools/:schoolId/gallery', async (req, res) => {
+  const { schoolId } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT id, caption, sort_order, uploaded_at
+       FROM school_gallery_images
+       WHERE school_id = $1
+       ORDER BY sort_order ASC, id ASC`,
+      [schoolId]
+    );
+    return res.json(result.rows.map(r => ({ ...r, url: `/api/system/schools/${schoolId}/gallery/${r.id}/image` })));
+  } catch (err) {
+    console.error('[gallery list error]', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/system/schools/:schoolId/gallery/:imageId/image
+// Retrieve one gallery photo's bytes (public).
+router.get('/schools/:schoolId/gallery/:imageId/image', async (req, res) => {
+  const { schoolId, imageId } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT image_data, mime_type FROM school_gallery_images WHERE id = $1 AND school_id = $2`,
+      [imageId, schoolId]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Photo not found' });
+    const { image_data, mime_type } = result.rows[0];
+    res.setHeader('Content-Type', mime_type || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+    return res.send(image_data);
+  } catch (err) {
+    console.error('[gallery image error]', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/system/schools/:schoolId/gallery — add one photo (base64 body,
+// same shape as upload-image/upload-logo above)
+router.post('/schools/:schoolId/gallery', requireSystemAdmin, async (req, res) => {
+  const { schoolId } = req.params;
+  const { image, caption } = req.body || {};
+  if (!image) return res.status(400).json({ error: 'Image data required' });
+  try {
+    const school = await pool.query('SELECT id FROM schools WHERE id = $1', [schoolId]);
+    if (!school.rows[0]) return res.status(404).json({ error: 'School not found' });
+
+    const { buffer, mimeType } = decodeBase64Image(image, 'image/jpeg');
+    if (buffer.length > 5 * 1024 * 1024) return res.status(400).json({ error: 'Image must be under 5MB' });
+
+    const { rows: maxRows } = await pool.query(
+      'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM school_gallery_images WHERE school_id = $1',
+      [schoolId]
+    );
+
+    const result = await pool.query(
+      `INSERT INTO school_gallery_images (school_id, image_data, mime_type, file_size, caption, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, caption, sort_order, uploaded_at`,
+      [schoolId, buffer, mimeType, buffer.length, caption || null, maxRows[0].next_order]
+    );
+
+    return res.status(201).json({ success: true, photo: { ...result.rows[0], url: `/api/system/schools/${schoolId}/gallery/${result.rows[0].id}/image` } });
+  } catch (err) {
+    console.error('[gallery upload error]', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE /api/system/schools/:schoolId/gallery/:imageId
+router.delete('/schools/:schoolId/gallery/:imageId', requireSystemAdmin, async (req, res) => {
+  const { schoolId, imageId } = req.params;
+  try {
+    const result = await pool.query(
+      'DELETE FROM school_gallery_images WHERE id = $1 AND school_id = $2 RETURNING id',
+      [imageId, schoolId]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Photo not found' });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[gallery delete error]', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
 //  STATS
 // ─────────────────────────────────────────────────────────────
 
@@ -466,7 +559,7 @@ router.get('/schools', requireSystemAdmin, async (req, res) => {
 
 // POST /api/system/schools - Create new school
 router.post('/schools', requireSystemAdmin, async (req, res) => {
-  const { name, location, phone, email, principal, grades, streams, imageBase64, logoBase64 } = req.body;
+  const { name, location, phone, email, principal, grades, streams, about, programs, sports, imageBase64, logoBase64 } = req.body;
 
   if (!name?.trim() || !location?.trim()) {
     return res.status(400).json({ error: 'School name and location are required' });
@@ -475,8 +568,8 @@ router.post('/schools', requireSystemAdmin, async (req, res) => {
   try {
     // Create school
     const schoolResult = await pool.query(
-      `INSERT INTO schools (name, location, phone, email, principal, grades, streams, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO schools (name, location, phone, email, principal, grades, streams, about, programs, sports, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [
         name.trim(),
@@ -486,6 +579,9 @@ router.post('/schools', requireSystemAdmin, async (req, res) => {
         principal || null,
         JSON.stringify(grades || ['Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12']),
         JSON.stringify(streams || ['Physics', 'Commerce', 'Humanities']),
+        about || null,
+        JSON.stringify(programs || []),
+        JSON.stringify(sports || []),
         req.sysAdmin.username,
       ]
     );
@@ -545,7 +641,7 @@ router.post('/schools', requireSystemAdmin, async (req, res) => {
 // PATCH /api/system/schools/:schoolId - Update school
 router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
   const { schoolId } = req.params;
-  const { name, location, phone, email, principal, grades, streams, imageBase64, logoBase64, isActive } = req.body;
+  const { name, location, phone, email, principal, grades, streams, about, programs, sports, imageBase64, logoBase64, isActive } = req.body;
 
   try {
     const updateFields = [];
@@ -579,6 +675,18 @@ router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
     if (streams !== undefined && streams !== null) {
       updateFields.push(`streams = $${paramIndex++}`);
       values.push(JSON.stringify(streams));
+    }
+    if (about !== undefined) {
+      updateFields.push(`about = $${paramIndex++}`);
+      values.push(about);
+    }
+    if (programs !== undefined && programs !== null) {
+      updateFields.push(`programs = $${paramIndex++}`);
+      values.push(JSON.stringify(programs));
+    }
+    if (sports !== undefined && sports !== null) {
+      updateFields.push(`sports = $${paramIndex++}`);
+      values.push(JSON.stringify(sports));
     }
     if (isActive !== undefined) {
       updateFields.push(`is_active = $${paramIndex++}`);

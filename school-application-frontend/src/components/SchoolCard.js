@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom';
 const DISPLAY_FONT = "'Cormorant Garamond', Georgia, serif";
 const BODY_FONT    = "'Outfit', sans-serif";
 
-const SchoolCard = ({ school, onViewDetails }) => {
+const SchoolCard = ({ school }) => {
   const [hovered, setHovered] = useState(false);
   const navigate = useNavigate();
 
@@ -34,7 +34,7 @@ const SchoolCard = ({ school, onViewDetails }) => {
           ? '0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(232,160,32,0.3)'
           : '0 4px 20px rgba(0,0,0,0.4)',
       }}
-      onClick={() => onViewDetails && onViewDetails(school)}
+      onClick={() => navigate(`/schools/${school.id}`)}
     >
       {/* Image */}
       <CardMedia

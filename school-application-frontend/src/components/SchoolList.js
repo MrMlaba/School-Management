@@ -2,14 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { Grid, Typography, CircularProgress, Box } from '@mui/material';
 import SchoolCard from './SchoolCard';
-import SchoolDetailModal from './SchoolDetailModal';
 
 const SchoolList = ({ bodyFont, displayFont }) => {
   const [schools, setSchools]           = useState([]);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState(null);
-  const [selectedSchool, setSelectedSchool] = useState(null);
-  const [modalOpen, setModalOpen]       = useState(false);
 
   const BODY    = bodyFont    || "'Outfit', sans-serif";
   const DISPLAY = displayFont || "'Cormorant Garamond', serif";
@@ -24,11 +21,6 @@ const SchoolList = ({ bodyFont, displayFont }) => {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
-
-  const handleViewDetails = (school) => {
-    setSelectedSchool(school);
-    setModalOpen(true);
-  };
 
   if (loading) {
     return (
@@ -74,21 +66,13 @@ const SchoolList = ({ bodyFont, displayFont }) => {
   }
 
   return (
-    <>
-      <Grid container spacing={3}>
-        {schools.map((school) => (
-          <Grid size={{ xs: 12, sm: 6, md: 4 }} key={school.id}>
-            <SchoolCard school={school} onViewDetails={handleViewDetails} />
-          </Grid>
-        ))}
-      </Grid>
-
-      <SchoolDetailModal
-        open={modalOpen}
-        onClose={() => { setModalOpen(false); setSelectedSchool(null); }}
-        school={selectedSchool}
-      />
-    </>
+    <Grid container spacing={3}>
+      {schools.map((school) => (
+        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={school.id}>
+          <SchoolCard school={school} />
+        </Grid>
+      ))}
+    </Grid>
   );
 };
 

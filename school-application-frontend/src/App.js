@@ -8,6 +8,7 @@ import { core, fontFamily } from './theme/tokens';
 // ── Public pages ──────────────────────────────────────────────
 import Navbar from './components/Navbar';
 import HomePage from './pages/HomePage';
+import SchoolProfilePage from './pages/SchoolProfilePage';
 import ApplyPage from './pages/ApplyPage';
 import LoginPage from './pages/LoginPage';
 import AdminPage from './pages/AdminPage';
@@ -61,10 +62,10 @@ const AppShell = () => {
   || location.pathname.startsWith('/student/quiz')
   || location.pathname.startsWith('/classroom-chat')
   || location.pathname.startsWith('/parent/dashboard');
-  // Navbar is position:"absolute" so it floats on top of the Home hero image on purpose.
+  // Navbar is position:"absolute" so it floats on top of a full-bleed hero image on purpose.
   // Every other page has no hero to bleed behind it, so it must reserve the navbar's height
   // as top padding or the navbar covers that page's own header content.
-  const isHome = location.pathname === '/';
+  const isHome = location.pathname === '/' || location.pathname.startsWith('/schools/');
 
   return (
     <Box sx={{
@@ -90,6 +91,7 @@ const AppShell = () => {
         <Routes>
           {/* ── Public routes ─────────────────────────────── */}
           <Route path="/"                    element={<HomePage />} />
+          <Route path="/schools/:id"         element={<SchoolProfilePage />} />
           <Route path="/apply"               element={<ApplyPage />} />
           <Route path="/login"               element={<LoginPage />} />
           <Route path="/admin-login"         element={<LoginPage />} />

@@ -984,6 +984,52 @@ app.get('/api/schools', async (req, res) => {
   }
 });
 
+// GET /api/schools/:id — full public profile for the "click a school to see
+// its page" view on the homepage. GET /api/schools above stays list-only/
+// light (used for the homepage grid); this one adds about/programs/sports,
+// the logo, and the photo gallery for a single school.
+app.get('/api/schools/:id', async (req, res) => {
+  try {
+    const baseUrl = process.env.API_BASE || `${req.protocol}://${req.get('host')}`;
+    const { rows } = await pool.query(
+      `SELECT
+        id, name, location, phone, email, principal, grades, streams, is_active, created_at,
+        about, programs, sports, image_id, logo_id,
+        application_form_required, application_form_originalname,
+        CASE
+          WHEN image_id IS NOT NULL THEN $1 || '/api/system/schools/' || id || '/image?v=' || image_id
+          ELSE NULL
+        END as image,
+        CASE
+          WHEN logo_id IS NOT NULL THEN $1 || '/api/system/schools/' || id || '/logo?v=' || logo_id
+          ELSE NULL
+        END as logo,
+        CASE
+          WHEN application_form_filename IS NOT NULL THEN $1 || '/api/schools/application-form/' || id
+          ELSE NULL
+        END as application_form_url
+       FROM schools
+       WHERE id = $2 AND is_active = true`,
+      [baseUrl, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, message: 'School not found' });
+
+    const { rows: gallery } = await pool.query(
+      `SELECT id, caption,
+        $1 || '/api/system/schools/' || $2 || '/gallery/' || id || '/image' AS url
+       FROM school_gallery_images
+       WHERE school_id = $2
+       ORDER BY sort_order ASC, id ASC`,
+      [baseUrl, req.params.id]
+    );
+
+    res.json({ ...rows[0], gallery });
+  } catch (err) {
+    console.error('GET /api/schools/:id error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // NOTE: application-form management (require/not + template upload) used to
 // live here as school-admin self-service. It's now a system-admin-only
 // control — see routes/systemSchoolMgmtRoutes.js (/application-form).

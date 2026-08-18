@@ -22,6 +22,7 @@ const ALL_STREAMS = ['Physics', 'Commerce', 'Humanities'];
 
 const EMPTY_FORM = {
   name: '', location: '', phone: '', email: '', principal: '',
+  about: '', programs: [], sports: [],
   imageBase64: null, logoBase64: null,
   grades:  [...ALL_GRADES],
   streams: [...ALL_STREAMS],
@@ -133,6 +134,121 @@ const CheckboxGroup = ({ label, all, selected, onChange }) => (
   </Box>
 );
 
+// ── Free-form add/remove list (programs, sports) — unlike grades/streams,
+// these aren't a fixed shared list, each school defines its own. ───────────
+const TagInput = ({ label, helper, values, onChange }) => {
+  const [draft, setDraft] = useState('');
+  const add = () => {
+    const v = draft.trim();
+    if (!v || values.includes(v)) { setDraft(''); return; }
+    onChange([...values, v]);
+    setDraft('');
+  };
+  return (
+    <Box>
+      <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.75rem', color: INK_SOFT, mb: 0.75 }}>{label}</Typography>
+      {helper && <Typography sx={{ fontFamily: FONT, fontSize: '0.7rem', color: INK_FAINT, mb: 1 }}>{helper}</Typography>}
+      <Stack direction="row" spacing={1} sx={{ mb: values.length ? 1 : 0 }}>
+        <TextField size="small" fullWidth sx={fieldSx} value={draft} placeholder="Type and press Enter…"
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }} />
+        <Button onClick={add} sx={{ fontFamily: FONT, textTransform: 'none', color: BLUE, flexShrink: 0 }}>Add</Button>
+      </Stack>
+      <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+        {values.map(v => (
+          <Chip key={v} label={v} size="small" onDelete={() => onChange(values.filter(x => x !== v))}
+            sx={{ fontFamily: FONT, fontSize: '0.75rem', bgcolor: '#EFF6FF', border: `1px solid ${BLUE}30`, color: BLUE }} />
+        ))}
+      </Stack>
+    </Box>
+  );
+};
+
+// ── Photo gallery manager — one-to-many, so it needs its own upload/delete
+// calls against /gallery rather than living in the single PATCH body. Only
+// usable once the school has an id (i.e. not while creating a new one). ────
+const GalleryManager = ({ schoolId }) => {
+  const inputRef = useRef(null);
+  const [photos, setPhotos]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+
+  const load = useCallback(() => {
+    if (!schoolId) { setLoading(false); return; }
+    setLoading(true);
+    fetch(`${API}/api/system/schools/${schoolId}/gallery`, { headers: hdr() })
+      .then(r => { if (handleUnauthorized('system', r)) return null; return r.json(); })
+      .then(d => { if (d) setPhotos(Array.isArray(d) ? d : []); })
+      .catch(() => setPhotos([]))
+      .finally(() => setLoading(false));
+  }, [schoolId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file || !schoolId) return;
+    if (file.size > 5 * 1024 * 1024) { alert('Image must be under 5MB.'); return; }
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      setUploading(true);
+      try {
+        const res = await fetch(`${API}/api/system/schools/${schoolId}/gallery`, {
+          method: 'POST', headers: jsonHdr(), body: JSON.stringify({ image: evt.target.result }),
+        });
+        if (handleUnauthorized('system', res)) return;
+        if (res.ok) load();
+      } finally { setUploading(false); }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const remove = async (photoId) => {
+    const res = await fetch(`${API}/api/system/schools/${schoolId}/gallery/${photoId}`, { method: 'DELETE', headers: hdr() });
+    if (handleUnauthorized('system', res)) return;
+    if (res.ok) setPhotos(p => p.filter(x => x.id !== photoId));
+  };
+
+  if (!schoolId) {
+    return (
+      <Box>
+        <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.75rem', color: INK_SOFT, mb: 0.75 }}>Gallery</Typography>
+        <Typography sx={{ fontFamily: FONT, fontSize: '0.78rem', color: INK_FAINT, fontStyle: 'italic' }}>Save the school first to add gallery photos.</Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box>
+      <Typography sx={{ fontFamily: FONT, fontWeight: 600, fontSize: '0.75rem', color: INK_SOFT, mb: 0.75 }}>Gallery</Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: 1 }}>
+        {photos.map(p => (
+          <Box key={p.id} sx={{ position: 'relative', aspectRatio: '1', borderRadius: '6px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+            <Box component="img" src={`${API}${p.url}`} alt="" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <Box onClick={() => remove(p.id)} sx={{
+              position: 'absolute', top: 3, right: 3, width: 20, height: 20, borderRadius: '4px',
+              bgcolor: 'rgba(0,0,0,0.6)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', fontSize: '0.7rem', '&:hover': { bgcolor: core.danger },
+            }}>✕</Box>
+          </Box>
+        ))}
+        <Box
+          onClick={() => !uploading && inputRef.current?.click()}
+          sx={{
+            aspectRatio: '1', borderRadius: '6px', border: '2px dashed #e2e8f0', cursor: uploading ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#fff', '&:hover': { borderColor: BLUE },
+          }}
+        >
+          {uploading ? <CircularProgress size={16} /> : <Typography sx={{ fontFamily: FONT, fontSize: '1.3rem', color: '#94a3b8' }}>+</Typography>}
+        </Box>
+      </Box>
+      {loading && <Typography sx={{ fontFamily: FONT, fontSize: '0.75rem', color: INK_FAINT, mt: 1 }}>Loading…</Typography>}
+      <input ref={inputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" style={{ display: 'none' }} onChange={handleFile} />
+    </Box>
+  );
+};
+
 const SystemSchoolsPage = () => {
   const [schools, setSchools] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -157,12 +273,16 @@ const SystemSchoolsPage = () => {
 
   const notify = (msg, sev = 'success') => setSnack({ open: true, msg, sev });
 
+  const asList = (v) => Array.isArray(v) ? v : (typeof v === 'string' ? JSON.parse(v || '[]') : []);
+
   const populateForm = (school) => setForm({
     name: school.name || '', location: school.location || '', phone: school.phone || '',
-    email: school.email || '', principal: school.principal || '',
+    email: school.email || '', principal: school.principal || '', about: school.about || '',
     imageBase64: null, logoBase64: null,
     grades: Array.isArray(school.grades) ? school.grades : (typeof school.grades === 'string' ? JSON.parse(school.grades || '[]') : [...ALL_GRADES]),
     streams: Array.isArray(school.streams) ? school.streams : (typeof school.streams === 'string' ? JSON.parse(school.streams || '[]') : [...ALL_STREAMS]),
+    programs: asList(school.programs),
+    sports: asList(school.sports),
   });
 
   const selectSchool = (school) => {
@@ -182,7 +302,9 @@ const SystemSchoolsPage = () => {
     const body = {
       name: form.name.trim(), location: form.location.trim(),
       phone: form.phone || null, email: form.email || null, principal: form.principal || null,
+      about: form.about || null,
       grades: form.grades, streams: form.streams,
+      programs: form.programs, sports: form.sports,
       imageBase64: form.imageBase64 || null, logoBase64: form.logoBase64 || null,
     };
     try {
@@ -286,6 +408,23 @@ const SystemSchoolsPage = () => {
                   <Divider />
                   <RecordField label="Grades"><CheckboxGroup label="" all={ALL_GRADES} selected={form.grades} onChange={v => setForm(p => ({ ...p, grades: v }))} /></RecordField>
                   <RecordField label="Streams"><CheckboxGroup label="" all={ALL_STREAMS} selected={form.streams} onChange={v => setForm(p => ({ ...p, streams: v }))} /></RecordField>
+
+                  <Divider />
+                  <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '0.78rem', color: INK, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Public Profile Page
+                  </Typography>
+                  <RecordField label="About">
+                    <TextField size="small" fullWidth multiline minRows={3} sx={fieldSx} value={form.about}
+                      placeholder="A few sentences about the school — shown on its public profile page."
+                      onChange={e => setForm(p => ({ ...p, about: e.target.value }))} />
+                  </RecordField>
+                  <RecordField label="Programmes">
+                    <TagInput label="" helper="Clubs, enrichment programmes, etc." values={form.programs} onChange={v => setForm(p => ({ ...p, programs: v }))} />
+                  </RecordField>
+                  <RecordField label="Sport">
+                    <TagInput label="" helper="Codes offered at this school." values={form.sports} onChange={v => setForm(p => ({ ...p, sports: v }))} />
+                  </RecordField>
+                  <RecordField label="Gallery"><GalleryManager schoolId={selected?.id} /></RecordField>
 
                   {selected && (
                     <>
