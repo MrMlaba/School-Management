@@ -1,7 +1,6 @@
 const express    = require('express');
 const cors       = require('cors');
 const multer     = require('multer');
-const fs         = require('fs');
 const path       = require('path');
 const crypto     = require('crypto');
 const jwt        = require('jsonwebtoken');
@@ -279,43 +278,6 @@ function validateFile(file, expectedType) {
   return { valid: true };
 }
 
-// ─── School logo upload ───────────────────────────────────────────────────────
-const schoolImgDir = path.join(__dirname, 'uploads', 'schools');
-if (!fs.existsSync(schoolImgDir)) fs.mkdirSync(schoolImgDir, { recursive: true });
-
-const schoolImageStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, schoolImgDir),
-  filename:    (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, 'school_' + crypto.randomBytes(12).toString('hex') + ext);
-  },
-});
-const uploadSchoolImage = multer({
-  storage:    schoolImageStorage,
-  limits:     { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    cb(null, allowed.includes(file.mimetype));
-  },
-});
-
-app.post('/api/system/upload-image', requireSystemAdmin, uploadSchoolImage.single('image'), (req, res) => {
-  if (!req.file) return res.status(400).json({ success: false, message: 'No image file provided' });
-  res.json({ success: true, url: '/api/school-images/' + req.file.filename });
-});
-
-app.get('/api/school-images/:filename', (req, res) => {
-  const filename = path.basename(req.params.filename);
-  if (!filename || !/^[a-zA-Z0-9_.-]+$/.test(filename))
-    return res.status(400).json({ success: false, message: 'Invalid filename' });
-  const filePath = path.resolve(schoolImgDir, filename);
-  if (!filePath.startsWith(schoolImgDir + path.sep))
-    return res.status(400).json({ success: false, message: 'Invalid filename' });
-  if (!fs.existsSync(filePath))
-    return res.status(404).json({ success: false, message: 'Image not found' });
-  res.sendFile(filePath);
-});
-
 // ─── Accept any valid token (school admin / student / teacher / system) ──────
 const requireAnyAuth = (req, res, next) => {
   const header = req.headers.authorization;
@@ -344,7 +306,7 @@ app.get('/api/documents/:filename', requireAnyAuth, async (req, res) => {
   if (!filename || !/^[a-zA-Z0-9_.-]+$/.test(filename))
     return res.status(400).json({ success: false, message: 'Invalid filename' });
   try {
-    // Primary: read from PostgreSQL (application documents & school forms)
+    // Documents are stored as binary data in Postgres — see document_files.
     const { rows } = await pool.query(
       'SELECT data, mimetype, original_name FROM document_files WHERE filename = $1',
       [filename]
@@ -354,15 +316,6 @@ app.get('/api/documents/:filename', requireAnyAuth, async (req, res) => {
       res.setHeader('Content-Disposition', `inline; filename="${rows[0].original_name || filename}"`);
       return res.send(rows[0].data);
     }
-    // Fallback: disk (legacy assignment/submission files)
-    const uploadRoot = path.resolve(__dirname, 'uploads');
-    const candidates = [
-      path.join(uploadRoot, filename),
-      path.join(uploadRoot, 'assignments', filename),
-      path.join(uploadRoot, 'submissions', filename),
-    ];
-    const found = candidates.find(p => path.resolve(p).startsWith(uploadRoot + path.sep) && fs.existsSync(p));
-    if (found) return res.sendFile(path.resolve(found));
     res.status(404).json({ success: false, message: 'File not found' });
   } catch (err) {
     console.error('GET /api/documents error:', err);

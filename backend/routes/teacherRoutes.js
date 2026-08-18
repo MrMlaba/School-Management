@@ -11,7 +11,6 @@ const bcrypt            = require('bcrypt');
 const pool              = require('../db');
 const { logAudit }      = require('../auth');
 const multer  = require('multer');
-const fs      = require('fs');
 const path    = require('path');
 const crypto  = require('crypto');
 
