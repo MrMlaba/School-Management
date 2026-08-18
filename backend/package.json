@@ -8,7 +8,11 @@
 
   "scripts": {
 
-    "start": "node server.js"
+    "start": "node server.js",
+
+    "migrate": "node migrate.js",
+
+    "migrate:create": "node-pg-migrate create --migration-file-language js"
 
   },
 
@@ -29,6 +33,8 @@
     "mammoth": "^1.12.0",
 
     "multer": "^2.0.2",
+
+    "node-pg-migrate": "^9.0.0",
 
     "nodemailer": "^7.0.5",
 
