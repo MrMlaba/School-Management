@@ -1014,19 +1014,19 @@ app.get('/api/schools/:id', async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ success: false, message: 'School not found' });
 
-    const { rows: gallery } = await pool.query(
-      `SELECT id, caption,
-        $1 || '/api/system/schools/' || $2 || '/gallery/' || id || '/image' AS url
-       FROM school_gallery_images
-       WHERE school_id = $2
-       ORDER BY sort_order ASC, id ASC`,
-      [baseUrl, req.params.id]
+    const { rows: galleryRows } = await pool.query(
+      `SELECT id, caption FROM school_gallery_images WHERE school_id = $1 ORDER BY sort_order ASC, id ASC`,
+      [req.params.id]
     );
+    const gallery = galleryRows.map(r => ({
+      ...r,
+      url: `${baseUrl}/api/system/schools/${req.params.id}/gallery/${r.id}/image`,
+    }));
 
     res.json({ ...rows[0], gallery });
   } catch (err) {
     console.error('GET /api/schools/:id error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error', details: err.message });
   }
 });
 
