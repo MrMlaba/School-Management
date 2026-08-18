@@ -10,6 +10,7 @@ import MasterDetailShell from '../../components/system/MasterDetailShell';
 import RecordField from '../../components/system/RecordField';
 import { core } from '../../theme/tokens';
 import API_BASE from '../../config';
+import { handleUnauthorized } from '../../utils/authGuard';
 
 const API   = API_BASE;
 const token = () => sessionStorage.getItem('systemToken');
@@ -60,10 +61,15 @@ const SystemAdminsPage = () => {
   const load = useCallback(() => {
     setLoading(true);
     Promise.all([
-      fetch(`${API}/api/system/admins`,  { headers: hdr() }).then(r => r.json()),
-      fetch(`${API}/api/system/schools`, { headers: hdr() }).then(r => r.json()),
+      fetch(`${API}/api/system/admins`,  { headers: hdr() }),
+      fetch(`${API}/api/system/schools`, { headers: hdr() }),
     ])
+      .then(async ([aRes, sRes]) => {
+        if (handleUnauthorized('system', [aRes, sRes])) return [null, null];
+        return Promise.all([aRes.json(), sRes.json()]);
+      })
       .then(([a, s]) => {
+        if (!a || !s) return;
         setAdmins(Array.isArray(a) ? a : a.admins || a.data || []);
         setSchools(Array.isArray(s) ? s : s.schools || s.data || []);
       })
@@ -84,6 +90,7 @@ const SystemAdminsPage = () => {
     setSaving(true);
     try {
       const res  = await fetch(`${API}/api/system/admins`, { method: 'POST', headers: hdr(), body: JSON.stringify(createForm) });
+      if (handleUnauthorized('system', res)) return;
       const data = await res.json();
       if (res.ok) { notify('Admin account created.'); setIsNew(false); load(); }
       else notify(data.error || 'Failed to create admin.', 'error');
@@ -96,6 +103,7 @@ const SystemAdminsPage = () => {
     setSaving(true);
     try {
       const res = await fetch(`${API}/api/system/admins/${selected.id}/reset-password`, { method: 'PATCH', headers: hdr(), body: JSON.stringify({ newPassword }) });
+      if (handleUnauthorized('system', res)) return;
       const data = await res.json();
       if (res.ok) { notify(`Password reset for ${selected.username}.`); setResetOpen(false); setNewPassword(''); load(); }
       else notify(data.error || 'Reset failed.', 'error');
@@ -106,6 +114,7 @@ const SystemAdminsPage = () => {
   const handleToggle = async () => {
     try {
       const res = await fetch(`${API}/api/system/admins/${selected.id}/toggle-active`, { method: 'PATCH', headers: hdr() });
+      if (handleUnauthorized('system', res)) return;
       if (res.ok) { notify(`${selected.username} ${selected.is_active ? 'suspended' : 'reactivated'}.`); load(); setSelected(a => ({ ...a, is_active: !a.is_active })); }
     } catch { notify('Network error.', 'error'); }
   };
@@ -113,6 +122,7 @@ const SystemAdminsPage = () => {
   const handleDelete = async () => {
     try {
       const res = await fetch(`${API}/api/system/admins/${selected.id}`, { method: 'DELETE', headers: hdr() });
+      if (handleUnauthorized('system', res)) return;
       if (res.ok) { notify(`${selected.username} deleted.`); setConfirmDelete(false); setSelected(null); load(); }
     } catch { notify('Network error.', 'error'); }
   };

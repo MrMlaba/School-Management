@@ -19,6 +19,7 @@ import CheckCircleIcon   from '@mui/icons-material/CheckCircle';
 import PersonAddIcon     from '@mui/icons-material/PersonAdd';
 import InfoOutlinedIcon  from '@mui/icons-material/InfoOutlined';
 import * as XLSX from 'xlsx';
+import { handleUnauthorized } from '../utils/authGuard';
 
 /* ─── Design tokens (unchanged from original) ───────────────────────── */
 const C = {
@@ -380,6 +381,7 @@ const StudentsPage = () => {
         fetch(`${API_BASE}/api/management/pending-enrollment`, { headers: authHeaders }),
         fetch(`${API_BASE}/api/management/enrolled-students`,  { headers: authHeaders }),
       ]);
+      if (handleUnauthorized('admin', [pendingRes, enrolledRes])) return;
 
       if (pendingRes.ok && enrolledRes.ok) {
         const [pendingData, enrolledData] = await Promise.all([
@@ -438,6 +440,7 @@ const StudentsPage = () => {
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({ applicationId: enrollTarget.id }),
       });
+      if (handleUnauthorized('admin', res)) return;
       const data = await res.json();
 
       if (res.ok) {

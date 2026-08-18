@@ -12,6 +12,7 @@ import {
 import DeleteIcon         from '@mui/icons-material/Delete';
 import UploadFileIcon     from '@mui/icons-material/UploadFile';
 import ArticleIcon        from '@mui/icons-material/Article';
+import { handleUnauthorized } from '../utils/authGuard';
 
 const C = {
   brand:     '#1A3557',
@@ -56,11 +57,13 @@ export default function MaterialsTab() {
 
   const fetchMaterials = useCallback(async () => {
     const res = await fetch(`${BASE}/api/teacher/materials`, { headers: authH() });
+    if (handleUnauthorized('teacher', res)) return;
     if (res.ok) setMaterials(await res.json());
   }, []);
 
   const fetchSlots = useCallback(async () => {
     const res = await fetch(`${BASE}/api/teacher/timetable`, { headers: authH() });
+    if (handleUnauthorized('teacher', res)) return;
     if (res.ok) { const d = await res.json(); setSlots(d.slots || []); }
   }, []);
 
@@ -87,6 +90,7 @@ export default function MaterialsTab() {
       } else {
         res = await fetch(`${BASE}/api/teacher/materials`, { method: 'POST', headers: jsonH(), body: JSON.stringify(matForm) });
       }
+      if (handleUnauthorized('teacher', res)) return;
       if (res.ok) {
         toast('Material saved — visible to students under this subject');
         setMatForm({ title: '', subjectId: '', classId: '', textContent: '' });
@@ -103,6 +107,7 @@ export default function MaterialsTab() {
   const handleDeleteMaterial = async (id) => {
     if (!window.confirm('Delete this material? Students will no longer be able to view it.')) return;
     const res = await fetch(`${BASE}/api/teacher/materials/${id}`, { method: 'DELETE', headers: authH() });
+    if (handleUnauthorized('teacher', res)) return;
     if (res.ok) { toast('Material deleted'); fetchMaterials(); }
     else { const e = await res.json(); toast(e.message || 'Failed to delete', 'error'); }
   };

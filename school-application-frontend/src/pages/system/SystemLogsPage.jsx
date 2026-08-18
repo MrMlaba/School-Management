@@ -9,6 +9,7 @@ import SystemLayout, { FONT, BLUE, BORDER, INK_FAINT } from '../../components/sy
 import LedgerSheet from '../../components/system/LedgerSheet';
 import { core } from '../../theme/tokens';
 import API_BASE from '../../config';
+import { handleUnauthorized } from '../../utils/authGuard';
 
 const API   = API_BASE;
 const token = () => sessionStorage.getItem('systemToken');
@@ -55,9 +56,13 @@ const SystemLogsPage = () => {
     const params = new URLSearchParams({ limit: 200 });
     if (filterSchool) params.append('school', filterSchool);
     Promise.all([
-      fetch(`${API}/api/system/logs?${params}`, { headers: hdr() }).then(r => r.json()),
-      fetch(`${API}/api/system/schools`, { headers: hdr() }).then(r => r.json()),
-    ]).then(([l, s]) => { setLogs(Array.isArray(l) ? l : []); setSchools(Array.isArray(s) ? s : []); })
+      fetch(`${API}/api/system/logs?${params}`, { headers: hdr() }),
+      fetch(`${API}/api/system/schools`, { headers: hdr() }),
+    ]).then(async ([lRes, sRes]) => {
+        if (handleUnauthorized('system', [lRes, sRes])) return;
+        const [l, s] = await Promise.all([lRes.json(), sRes.json()]);
+        setLogs(Array.isArray(l) ? l : []); setSchools(Array.isArray(s) ? s : []);
+      })
       .finally(() => setLoading(false));
   }, [filterSchool]);
 

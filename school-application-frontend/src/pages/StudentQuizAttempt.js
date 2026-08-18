@@ -19,6 +19,7 @@ import ArrowBackIcon     from '@mui/icons-material/ArrowBack';
 import EmojiEventsIcon   from '@mui/icons-material/EmojiEvents';
 import LightbulbIcon     from '@mui/icons-material/Lightbulb';
 import API_BASE from '../config';
+import { handleUnauthorized } from '../utils/authGuard';
 
 const T = {
   navy:      '#0F1F1A',
@@ -82,10 +83,12 @@ export default function StudentQuizAttempt() {
     setPhase('loading');
     try {
       const res = await fetch(`${BASE}/api/student/quizzes/${id}`, { headers: authHdr() });
+      if (handleUnauthorized('student', res)) return;
 
       if (res.status === 409) {
         // Already submitted — load result
         const rRes = await fetch(`${BASE}/api/student/quizzes/${id}/result`, { headers: authHdr() });
+        if (handleUnauthorized('student', rRes)) return;
         if (rRes.ok) { setResult(await rRes.json()); setPhase('result'); }
         else setPhase('already_done');
         return;
@@ -122,12 +125,14 @@ export default function StudentQuizAttempt() {
         method: 'POST', headers: jsonHdr(),
         body:   JSON.stringify({ answers, timeTakenSeconds: timeTaken }),
       });
+      if (handleUnauthorized('student', res)) return;
 
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
         if (e.message?.includes('Already')) {
           // Race condition — load result
           const rRes = await fetch(`${BASE}/api/student/quizzes/${id}/result`, { headers: authHdr() });
+          if (handleUnauthorized('student', rRes)) return;
           if (rRes.ok) { setResult(await rRes.json()); setPhase('result'); return; }
         }
         // Don't strand the student on a permanent "Submitting…" screen or
@@ -139,6 +144,7 @@ export default function StudentQuizAttempt() {
 
       // Fetch full result with explanations
       const rRes = await fetch(`${BASE}/api/student/quizzes/${id}/result`, { headers: authHdr() });
+      if (handleUnauthorized('student', rRes)) return;
       if (rRes.ok) { setResult(await rRes.json()); setPhase('result'); }
       else {
         setSubmitError('Your quiz was submitted, but the result could not be loaded. Try refreshing the page.');

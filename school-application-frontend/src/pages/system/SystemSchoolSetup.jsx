@@ -11,6 +11,7 @@ import SystemLayout, {
   FONT, TEAL, BORDER, CARD, INK, INK_SOFT, INK_FAINT, BG,
 } from '../../components/system/SystemLayout';
 import API_BASE from '../../config';
+import { handleUnauthorized } from '../../utils/authGuard';
 
 const token = () => sessionStorage.getItem('systemToken');
 const authH = () => ({ Authorization: `Bearer ${token()}` });
@@ -81,34 +82,40 @@ export default function SystemSchoolSetup() {
 
   const fetchSummary  = useCallback(async () => {
     const r = await fetch(`${BASE}/setup/summary`, { headers: authH() });
+    if (handleUnauthorized('system', r)) return;
     if (r.ok) setSummary(await r.json());
   }, [BASE]);
 
   const fetchYears    = useCallback(async () => {
     const r = await fetch(`${BASE}/setup/academic-years`, { headers: authH() });
+    if (handleUnauthorized('system', r)) return;
     if (r.ok) setYears(await r.json());
   }, [BASE]);
 
   const fetchTerms    = useCallback(async (yearId) => {
     if (!yearId) return;
     const r = await fetch(`${BASE}/setup/terms?academicYearId=${yearId}`, { headers: authH() });
+    if (handleUnauthorized('system', r)) return;
     if (r.ok) setTerms(await r.json());
   }, [BASE]);
 
   const fetchPeriods  = useCallback(async () => {
     const r = await fetch(`${BASE}/setup/periods`, { headers: authH() });
+    if (handleUnauthorized('system', r)) return;
     if (r.ok) setPeriods(await r.json());
   }, [BASE]);
 
   const fetchSubjects = useCallback(async (yearId) => {
     if (!yearId) return;
     const r = await fetch(`${BASE}/setup/subjects?academicYearId=${yearId}`, { headers: authH() });
+    if (handleUnauthorized('system', r)) return;
     if (r.ok) setSubjects(await r.json());
   }, [BASE]);
 
   const fetchClasses  = useCallback(async (yearId) => {
     if (!yearId) return;
     const r = await fetch(`${BASE}/setup/classes?academicYearId=${yearId}`, { headers: authH() });
+    if (handleUnauthorized('system', r)) return;
     if (r.ok) setClasses(await r.json());
   }, [BASE]);
 
@@ -119,7 +126,7 @@ export default function SystemSchoolSetup() {
     fetchPeriods();
     // Load school's configured grades and streams
     fetch(`${BASE}/config`, { headers: authH() })
-      .then(r => r.ok ? r.json() : null)
+      .then(r => { if (handleUnauthorized('system', r)) return null; return r.ok ? r.json() : null; })
       .then(cfg => {
         if (!cfg) return;
         if (Array.isArray(cfg.grades) && cfg.grades.length > 0) {
@@ -136,7 +143,7 @@ export default function SystemSchoolSetup() {
   useEffect(() => {
     if (!schoolId) return;
     fetch(`${BASE}/application-form`, { headers: authH() })
-      .then(r => r.ok ? r.json() : null)
+      .then(r => { if (handleUnauthorized('system', r)) return null; return r.ok ? r.json() : null; })
       .then(data => {
         if (!data) return;
         setFormRequired(!!data.formRequired);
@@ -153,6 +160,7 @@ export default function SystemSchoolSetup() {
     if (formFile) fd.append('formTemplate', formFile);
     try {
       const res  = await fetch(`${BASE}/application-form`, { method: 'PATCH', headers: authH(), body: fd });
+      if (handleUnauthorized('system', res)) return;
       const data = await res.json();
       if (data.success) {
         toast('Application form settings saved.');
@@ -192,6 +200,7 @@ export default function SystemSchoolSetup() {
       method: 'POST', headers: jsonH(), body: JSON.stringify({ year: parseInt(newYear) }),
     });
     setSaving(false);
+    if (handleUnauthorized('system', r)) return;
     if (r.ok) { toast(`Year ${newYear} set`); fetchYears(); fetchSummary(); }
     else { const e = await r.json(); toast(e.message || 'Failed', 'error'); }
   };
@@ -213,6 +222,7 @@ export default function SystemSchoolSetup() {
       body: JSON.stringify({ academicYearId: summary.currentYearId, termNumber: n, startDate: d.s, endDate: d.e }),
     });
     setSaving(false);
+    if (handleUnauthorized('system', r)) return;
     if (r.ok) { toast(`Term ${n} saved`); fetchTerms(summary.currentYearId); fetchSummary(); }
     else { const e = await r.json(); toast(e.message || 'Failed', 'error'); }
   };
@@ -231,6 +241,7 @@ export default function SystemSchoolSetup() {
       method: 'PUT', headers: jsonH(), body: JSON.stringify({ periods: pRows }),
     });
     setSaving(false);
+    if (handleUnauthorized('system', r)) return;
     if (r.ok) { toast('Periods saved'); fetchPeriods(); fetchSummary(); }
     else { const e = await r.json(); toast(e.message || 'Failed', 'error'); }
   };
@@ -244,7 +255,7 @@ export default function SystemSchoolSetup() {
     if (!addGrade) { setNatSubs([]); return; }
     let url = `${BASE}/setup/national-subjects?grade=${addGrade}`;
     if (parseInt(addGrade) >= 10 && addStream) url += `&stream=${addStream}`;
-    fetch(url, { headers: authH() }).then(r => r.ok ? r.json() : []).then(setNatSubs).catch(() => {});
+    fetch(url, { headers: authH() }).then(r => { if (handleUnauthorized('system', r)) return []; return r.ok ? r.json() : []; }).then(setNatSubs).catch(() => {});
   }, [addGrade, addStream, BASE]);
 
   const added     = new Set(subjects.filter(s => s.grade === parseInt(addGrade) && (s.stream === addStream || (!s.stream && !addStream))).map(s => s.national_subject_id));
@@ -264,12 +275,14 @@ export default function SystemSchoolSetup() {
       method: 'POST', headers: jsonH(), body: JSON.stringify(payload),
     });
     setSaving(false);
+    if (handleUnauthorized('system', r)) return;
     if (r.ok) { toast(`${selNat.length} subject(s) added`); setSelNat([]); fetchSubjects(summary.currentYearId); fetchSummary(); }
     else { const e = await r.json(); toast(e.message || 'Failed', 'error'); }
   };
 
   const removeSubject = async (id) => {
-    await fetch(`${BASE}/setup/subjects/${id}`, { method: 'DELETE', headers: authH() });
+    const r = await fetch(`${BASE}/setup/subjects/${id}`, { method: 'DELETE', headers: authH() });
+    if (handleUnauthorized('system', r)) return;
     toast('Subject removed'); fetchSubjects(summary.currentYearId); fetchSummary();
   };
 
@@ -288,6 +301,7 @@ export default function SystemSchoolSetup() {
       }),
     });
     setSaving(false);
+    if (handleUnauthorized('system', r)) return;
     if (r.ok) { toast(`"${customName.trim()}" added`); setCustomName(''); fetchSubjects(summary.currentYearId); fetchSummary(); }
     else { const e = await r.json(); toast(e.message || 'Failed', 'error'); }
   };
@@ -311,12 +325,14 @@ export default function SystemSchoolSetup() {
       }),
     });
     setSaving(false);
+    if (handleUnauthorized('system', r)) return;
     if (r.ok) { toast(`Class ${clsForm.grade}${clsForm.letter} created`); fetchClasses(summary.currentYearId); fetchSummary(); }
     else { const e = await r.json(); toast(e.message || 'Failed', 'error'); }
   };
 
   const removeClass = async (id, name) => {
-    await fetch(`${BASE}/setup/classes/${id}`, { method: 'DELETE', headers: authH() });
+    const r = await fetch(`${BASE}/setup/classes/${id}`, { method: 'DELETE', headers: authH() });
+    if (handleUnauthorized('system', r)) return;
     toast(`Class ${name} removed`); fetchClasses(summary.currentYearId); fetchSummary();
   };
 

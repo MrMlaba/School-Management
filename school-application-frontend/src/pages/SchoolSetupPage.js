@@ -18,6 +18,7 @@ import AccessTimeIcon    from '@mui/icons-material/AccessTime';
 import MenuBookIcon      from '@mui/icons-material/MenuBook';
 import ClassIcon         from '@mui/icons-material/Class';
 import SettingsIcon      from '@mui/icons-material/Settings';
+import { handleUnauthorized } from '../utils/authGuard';
 
 /* ─── Design tokens ─────────────────────────────────────────────────── */
 const C = {
@@ -132,6 +133,7 @@ const SchoolSetupPage = () => {
   /* ── Fetch summary ───────────────────────────────────────────────── */
   const fetchSummary = useCallback(async () => {
     const res = await fetch(`${BASE}/api/setup/summary`, { headers: authH() });
+    if (handleUnauthorized('admin', res)) return;
     if (res.ok) setSummary(await res.json());
   }, []);
 
@@ -140,6 +142,7 @@ const SchoolSetupPage = () => {
   /* ── Fetch academic years ────────────────────────────────────────── */
   const fetchYears = async () => {
     const res = await fetch(`${BASE}/api/setup/academic-years`, { headers: authH() });
+    if (handleUnauthorized('admin', res)) return;
     if (res.ok) setAcademicYears(await res.json());
   };
 
@@ -147,12 +150,14 @@ const SchoolSetupPage = () => {
   const fetchTerms = async () => {
     if (!summary?.currentYearId) return;
     const res = await fetch(`${BASE}/api/setup/terms?academicYearId=${summary.currentYearId}`, { headers: authH() });
+    if (handleUnauthorized('admin', res)) return;
     if (res.ok) setTerms(await res.json());
   };
 
   /* ── Fetch periods ───────────────────────────────────────────────── */
   const fetchPeriods = async () => {
     const res = await fetch(`${BASE}/api/setup/periods`, { headers: authH() });
+    if (handleUnauthorized('admin', res)) return;
     if (res.ok) setPeriods(await res.json());
   };
 
@@ -160,6 +165,7 @@ const SchoolSetupPage = () => {
   const fetchSubjects = async () => {
     if (!summary?.currentYearId) return;
     const res = await fetch(`${BASE}/api/setup/subjects?academicYearId=${summary.currentYearId}`, { headers: authH() });
+    if (handleUnauthorized('admin', res)) return;
     if (res.ok) setSubjects(await res.json());
   };
 
@@ -167,6 +173,7 @@ const SchoolSetupPage = () => {
   const fetchClasses = async () => {
     if (!summary?.currentYearId) return;
     const res = await fetch(`${BASE}/api/setup/classes?academicYearId=${summary.currentYearId}`, { headers: authH() });
+    if (handleUnauthorized('admin', res)) return;
     if (res.ok) setClasses(await res.json());
   };
 
@@ -176,6 +183,7 @@ const SchoolSetupPage = () => {
     if (grade)  url += `grade=${grade}&`;
     if (stream) url += `stream=${stream}`;
     const res = await fetch(url, { headers: authH() });
+    if (handleUnauthorized('admin', res)) return;
     if (res.ok) setNationalSubjects(await res.json());
   };
 
@@ -213,6 +221,7 @@ const SchoolSetupPage = () => {
         method: 'POST', headers: json(),
         body: JSON.stringify({ year: parseInt(newYear) }),
       });
+      if (handleUnauthorized('admin', res)) return;
       const data = await res.json();
       setLoading(false);
       if (res.ok) { toast(`Academic year ${newYear} created`); fetchYears(); fetchSummary(); }
@@ -301,6 +310,7 @@ const SchoolSetupPage = () => {
         }),
       });
       setSaving(false);
+      if (handleUnauthorized('admin', res)) return;
       if (res.ok) { toast(`Term ${termNumber} saved`); fetchTerms(); fetchSummary(); }
       else { const e = await res.json(); toast(e.message || 'Failed', 'error'); }
     };
@@ -421,6 +431,7 @@ const SchoolSetupPage = () => {
         method: 'PUT', headers: json(), body: JSON.stringify({ periods: rows }),
       });
       setSaving(false);
+      if (handleUnauthorized('admin', res)) return;
       if (res.ok) { toast('Periods saved'); fetchPeriods(); fetchSummary(); }
       else { const e = await res.json(); toast(e.message || 'Failed', 'error'); }
     };
@@ -542,12 +553,14 @@ const SchoolSetupPage = () => {
         method: 'POST', headers: json(), body: JSON.stringify(payload),
       });
       setAdding(false);
+      if (handleUnauthorized('admin', res)) return;
       if (res.ok) { toast(`${selected.length} subject(s) added`); setSelected([]); fetchSubjects(); fetchSummary(); }
       else { const e = await res.json(); toast(e.message || 'Failed', 'error'); }
     };
 
     const handleRemove = async (id) => {
       const res = await fetch(`${BASE}/api/setup/subjects/${id}`, { method: 'DELETE', headers: authH() });
+      if (handleUnauthorized('admin', res)) return;
       if (res.ok) { toast('Subject removed'); fetchSubjects(); fetchSummary(); }
       else toast('Failed to remove', 'error');
     };
@@ -714,12 +727,14 @@ const SchoolSetupPage = () => {
         }),
       });
       setAdding(false);
+      if (handleUnauthorized('admin', res)) return;
       if (res.ok) { toast(`Class ${grade}${letter} created`); fetchClasses(); fetchSummary(); }
       else { const e = await res.json(); toast(e.message || 'Failed', 'error'); }
     };
 
     const handleRemove = async (id, name) => {
       const res = await fetch(`${BASE}/api/setup/classes/${id}`, { method: 'DELETE', headers: authH() });
+      if (handleUnauthorized('admin', res)) return;
       if (res.ok) { toast(`Class ${name} removed`); fetchClasses(); fetchSummary(); }
       else toast('Failed to remove', 'error');
     };

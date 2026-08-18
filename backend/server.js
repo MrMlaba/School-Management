@@ -68,6 +68,19 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' }));
 
+// ─── Readiness gate ───────────────────────────────────────────────────────────
+// app.listen() below happens before ensureTables() finishes, so the port
+// (which Railway needs bound quickly) opens immediately. Without this gate,
+// requests landing in that window would 500 with a raw "relation/column does
+// not exist" error instead of a clear, retryable "starting up" response —
+// this is exactly what caused the audit_logs outage referenced near
+// ensureTables()'s definition further down.
+let dbReady = false;
+app.use((req, res, next) => {
+  if (!dbReady) return res.status(503).json({ message: 'Server is starting up, please retry shortly' });
+  next();
+});
+
 // ─── Rate limiters ────────────────────────────────────────────────────────────
 const studentLoginLimiter     = rateLimit({ windowMs: 15*60*1000, max: 15, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { success: false, message: 'Too many login attempts. Try again in 15 minutes.' } });
 const teacherLoginLimiter     = rateLimit({ windowMs: 15*60*1000, max: 10, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { success: false, message: 'Too many login attempts. Try again in 15 minutes.' } });
@@ -75,6 +88,19 @@ const schoolAdminLoginLimiter = rateLimit({ windowMs: 30*60*1000, max:  8, skipS
 const systemAdminLoginLimiter = rateLimit({ windowMs: 60*60*1000, max:  5, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { success: false, message: 'Too many login attempts. Try again in 60 minutes.' } });
 const applicantLookupLimiter  = rateLimit({ windowMs: 15*60*1000, max: 20, standardHeaders: true, legacyHeaders: false, message: { success: false, message: 'Too many lookup attempts. Try again in 15 minutes.' } });
 const parentLoginLimiter      = rateLimit({ windowMs: 15*60*1000, max: 10, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { success: false, message: 'Too many login attempts. Try again in 15 minutes.' } });
+
+// Baseline cap for everything under /api — the limiters above are much
+// tighter and specific to login/lookup endpoints; this just stops a single
+// client (script, scraper, retry loop) from hammering the rest of the API,
+// which previously had no ceiling at all.
+const generalApiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many requests. Please slow down and try again shortly.' },
+});
+app.use('/api', generalApiLimiter);
 
 app.use('/api/system/login', systemAdminLoginLimiter);
 app.use('/api/applicant-applications', applicantLookupLimiter);
@@ -975,57 +1001,6 @@ function toApp(row) {
 function generateReferenceCode() {
   return crypto.randomBytes(6).toString('hex').toUpperCase();
 }
-
-// ─── School Admin Login ───────────────────────────────────────────────────────
-async function handleSchoolAdminLogin(req, res) {
-  const { username, password } = req.body;
-  if (!username || !password)
-    return res.status(400).json({ success: false, message: 'Username and password required' });
-  try {
-    const { rows } = await pool.query(
-      `SELECT sa.id, sa.username, sa.name, sa.password_hash, sa.is_active, sa.temp_password_flag,
-              s.name AS school, s.id AS school_id
-       FROM school_admins sa JOIN schools s ON s.id = sa.school_id
-       WHERE sa.username = $1`,
-      [username]
-    );
-    const admin = rows[0];
-    if (!admin)            return res.status(401).json({ success: false, message: 'Invalid credentials' });
-    if (!admin.is_active)  return res.status(403).json({ success: false, message: 'Account suspended. Contact system admin.' });
-    const valid = await bcrypt.compare(password, admin.password_hash);
-    if (!valid)            return res.status(401).json({ success: false, message: 'Invalid credentials' });
-    await pool.query('UPDATE school_admins SET last_login = NOW() WHERE id = $1', [admin.id]);
-    await logAudit(pool, { actor: admin.username, actorRole: 'school_admin', action: 'LOGIN', target: null, school: admin.school, schoolId: admin.school_id });
-    const token = jwt.sign(
-      { id: admin.id, username: admin.username, name: admin.name, school: admin.school, schoolId: admin.school_id },
-      SCHOOL_JWT_SECRET,
-      { expiresIn: TOKEN_EXPIRY }
-    );
-    return res.json({ success: true, token, school: admin.school, name: admin.name, tempPasswordFlag: admin.temp_password_flag });
-  } catch (err) {
-    console.error('admin-login error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-}
-
-// ─── School Admin: Change Password ───────────────────────────────────────────
-app.post('/api/admin/change-password', requireSchoolAdmin, async (req, res) => {
-  const { currentPassword, newPassword } = req.body;
-  if (!newPassword || newPassword.length < 8)
-    return res.status(400).json({ success: false, message: 'New password must be at least 8 characters' });
-  try {
-    const { rows } = await pool.query('SELECT password_hash FROM school_admins WHERE id = $1', [req.admin.id]);
-    const valid = await bcrypt.compare(currentPassword, rows[0].password_hash);
-    if (!valid) return res.status(401).json({ success: false, message: 'Current password is incorrect' });
-    const newHash = await bcrypt.hash(newPassword, 10);
-    await pool.query('UPDATE school_admins SET password_hash = $1, temp_password_flag = false WHERE id = $2', [newHash, req.admin.id]);
-    await logAudit(pool, { actor: req.admin.username, actorRole: 'school_admin', action: 'CHANGE_PASSWORD', target: req.admin.username, school: req.admin.school });
-    res.json({ success: true, message: 'Password updated successfully' });
-  } catch (err) {
-    console.error('change-password error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
 
 // ─── Schools (public) ─────────────────────────────────────────────────────────
 app.get('/api/schools', async (req, res) => {
@@ -2197,10 +2172,17 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Server error' });
 });
 
-// Listen immediately — Railway needs fast response
+// Listen immediately — Railway needs fast response. Requests are held off
+// by the readiness gate above until ensureTables() below resolves.
 app.listen(PORT, '0.0.0.0', () => console.log(`Backend running on http://localhost:${PORT}`));
 
-// Run table check after — non-blocking
-ensureTables().catch(err => {
-  console.error('Table check failed (non-fatal):', err.message);
-});
+// Run table check after — non-blocking for the port bind, but the app won't
+// serve real traffic until this finishes (or logs why it never will).
+ensureTables()
+  .then(() => {
+    dbReady = true;
+    console.log('✅ Tables verified — accepting traffic');
+  })
+  .catch(err => {
+    console.error('❌ Table check failed — requests will keep 503ing until this is resolved:', err.message);
+  });

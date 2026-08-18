@@ -10,6 +10,7 @@ import SystemLayout, {
   FONT, TEAL, BORDER, CARD, INK, INK_SOFT, INK_FAINT,
 } from '../../components/system/SystemLayout';
 import API_BASE from '../../config';
+import { handleUnauthorized } from '../../utils/authGuard';
 
 const token = () => sessionStorage.getItem('systemToken');
 const authH = () => ({ Authorization: `Bearer ${token()}` });
@@ -54,6 +55,7 @@ export default function SystemSchoolTimetable() {
     (async () => {
       setLoading(true);
       const r = await fetch(`${BASE}/setup/classes`, { headers: authH() });
+      if (handleUnauthorized('system', r)) return;
       if (r.ok) setClasses(await r.json());
       setLoading(false);
     })();
@@ -62,6 +64,7 @@ export default function SystemSchoolTimetable() {
   const loadTimetable = async cls => {
     setSelClass(cls); setTtData(null); setTtLoad(true);
     const r = await fetch(`${BASE}/timetable/${cls.id}`, { headers: authH() });
+    if (handleUnauthorized('system', r)) return;
     if (r.ok) setTtData(await r.json());
     else toast('Failed to load timetable', 'error');
     setTtLoad(false);
@@ -81,6 +84,7 @@ export default function SystemSchoolTimetable() {
     setForm(f => ({ ...f, teacherId: tid }));
     if (!tid) return setTBusy([]);
     const r = await fetch(`${BASE}/timetable/teacher-availability?teacherId=${tid}`, { headers: authH() });
+    if (handleUnauthorized('system', r)) return;
     if (r.ok) setTBusy(await r.json());
   };
 
@@ -91,7 +95,8 @@ export default function SystemSchoolTimetable() {
     if (!form.subjectId || !form.teacherId) return setClash('Select both subject and teacher.');
     setSaving(true); setClash('');
     if (slotDlg?.existing) {
-      await fetch(`${BASE}/timetable/${slotDlg.existing.id}`, { method: 'DELETE', headers: authH() });
+      const delRes = await fetch(`${BASE}/timetable/${slotDlg.existing.id}`, { method: 'DELETE', headers: authH() });
+      if (handleUnauthorized('system', delRes)) return;
     }
     const res = await fetch(`${BASE}/timetable`, {
       method: 'POST', headers: jsonH(),
@@ -100,6 +105,7 @@ export default function SystemSchoolTimetable() {
         teacherId: form.teacherId, periodId: slotDlg.periodId, dayOfWeek: slotDlg.day,
       }),
     });
+    if (handleUnauthorized('system', res)) return;
     const d = await res.json();
     setSaving(false);
     if (res.ok) { toast(`${d.subjectName} assigned`); setSlotDlg(null); loadTimetable(selClass); }
@@ -107,7 +113,8 @@ export default function SystemSchoolTimetable() {
   };
 
   const removeSlot = async slot => {
-    await fetch(`${BASE}/timetable/${slot.id}`, { method: 'DELETE', headers: authH() });
+    const r = await fetch(`${BASE}/timetable/${slot.id}`, { method: 'DELETE', headers: authH() });
+    if (handleUnauthorized('system', r)) return;
     toast('Slot cleared'); loadTimetable(selClass);
   };
 

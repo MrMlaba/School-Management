@@ -1,4 +1,5 @@
 ﻿import API_BASE from '../config';
+import { handleUnauthorized } from '../utils/authGuard';
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -154,6 +155,7 @@ export default function TeacherGradebook() {
     try {
       const token = sessionStorage.getItem('teacherToken');
       const res = await fetch(`${BASE}/api/teacher/marks-table?classId=${classId}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (handleUnauthorized('teacher', res)) return;
       if (!res.ok) throw new Error('Failed to load');
       const json = await res.json();
       setData(json);
@@ -178,6 +180,7 @@ export default function TeacherGradebook() {
       try {
         const token = sessionStorage.getItem('teacherToken');
         const res = await fetch(`${BASE}/api/teacher/dashboard`, { headers: { Authorization: `Bearer ${token}` } });
+        if (handleUnauthorized('teacher', res)) return;
         if (!res.ok) return;
         const d = await res.json();
         if (!mounted) return;
@@ -214,6 +217,7 @@ export default function TeacherGradebook() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ studentId, marksObtained: value })
       });
+      if (handleUnauthorized('teacher', res)) return;
       if (!res.ok) throw new Error('Failed to save');
       await load();
       setEditing({});
@@ -230,6 +234,7 @@ export default function TeacherGradebook() {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ studentId, marksObtained: value })
       });
+      if (handleUnauthorized('teacher', res)) return;
       if (!res.ok) throw new Error('Failed to save');
       await load();
     } catch (err) { console.error(err); }
@@ -250,7 +255,8 @@ export default function TeacherGradebook() {
           }));
         });
       });
-      await Promise.all(promises);
+      const results = await Promise.all(promises);
+      if (handleUnauthorized('teacher', results)) return;
       await load();
     } catch (err) { console.error(err); }
     finally { setSavingAll(false); }
@@ -270,6 +276,7 @@ export default function TeacherGradebook() {
       const res = await fetch(`${BASE}/api/teacher/assignments/${assignmentId}/import`, {
         method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd
       });
+      if (handleUnauthorized('teacher', res)) return;
       if (!res.ok) throw new Error('Import failed');
       await load();
     } catch (err) { console.error(err); }

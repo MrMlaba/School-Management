@@ -9,6 +9,7 @@ import SystemLayout, { FONT, BLUE, BORDER, INK, INK_SOFT, INK_FAINT } from '../.
 import LedgerSheet from '../../components/system/LedgerSheet';
 import { core } from '../../theme/tokens';
 import API_BASE from '../../config';
+import { handleUnauthorized } from '../../utils/authGuard';
 
 const API   = API_BASE;
 const token = () => sessionStorage.getItem('systemToken');
@@ -63,8 +64,8 @@ const SystemTicketsPage = () => {
     setLoading(true);
     const qs = filter ? `?status=${filter}` : '';
     fetch(`${API}/api/system/support-tickets${qs}`, { headers: hdr() })
-      .then(r => r.json())
-      .then(d => setTickets(Array.isArray(d) ? d : []))
+      .then(r => { if (handleUnauthorized('system', r)) return null; return r.json(); })
+      .then(d => { if (d) setTickets(Array.isArray(d) ? d : []); })
       .catch(() => setTickets([]))
       .finally(() => setLoading(false));
   }, [filter]);
@@ -76,6 +77,7 @@ const SystemTicketsPage = () => {
     setSelected({ id });
     try {
       const res = await fetch(`${API}/api/system/support-tickets/${id}`, { headers: hdr() });
+      if (handleUnauthorized('system', res)) return;
       const data = await res.json();
       if (res.ok) setSelected(data);
       else { notify(data.message || 'Failed to load ticket', 'error'); setSelected(null); }
@@ -94,6 +96,7 @@ const SystemTicketsPage = () => {
       const res = await fetch(`${API}/api/system/support-tickets/${selected.id}/reply`, {
         method: 'POST', headers: hdr(), body: JSON.stringify({ message: reply.trim() }),
       });
+      if (handleUnauthorized('system', res)) return;
       if (res.ok) {
         setReply('');
         openTicket(selected.id);
@@ -112,6 +115,7 @@ const SystemTicketsPage = () => {
       const res = await fetch(`${API}/api/system/support-tickets/${selected.id}`, {
         method: 'PATCH', headers: hdr(), body: JSON.stringify(fields),
       });
+      if (handleUnauthorized('system', res)) return;
       if (res.ok) {
         setSelected(prev => ({ ...prev, ...fields }));
         load();

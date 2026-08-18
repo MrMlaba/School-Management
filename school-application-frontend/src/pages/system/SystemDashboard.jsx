@@ -17,6 +17,7 @@ import MenuBookRoundedIcon      from '@mui/icons-material/MenuBookRounded';
 import FamilyRestroomRoundedIcon from '@mui/icons-material/FamilyRestroomRounded';
 import SystemLayout, { FONT, TEAL, BORDER, BG, SIDEBAR, CARD, INK, INK_SOFT, INK_FAINT } from '../../components/system/SystemLayout';
 import API_BASE from '../../config';
+import { handleUnauthorized } from '../../utils/authGuard';
 
 const token = () => sessionStorage.getItem('systemToken');
 
@@ -86,6 +87,7 @@ const AiPanel = () => {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
         body: JSON.stringify({ message: msg, history: next }),
       });
+      if (handleUnauthorized('system', r)) return;
       const d = await r.json();
       setHistory(h => [...h, { role: 'assistant', content: d.reply || d.error || 'No response.' }]);
     } catch {
@@ -534,11 +536,13 @@ const SystemDashboard = () => {
     setLoading(true);
     const h = { Authorization: `Bearer ${token()}` };
     const [sR, schR] = await Promise.allSettled([
-      fetch(`${API_BASE}/api/system/stats`,   { headers: h }).then(r => r.json()),
-      fetch(`${API_BASE}/api/system/schools`, { headers: h }).then(r => r.json()),
+      fetch(`${API_BASE}/api/system/stats`,   { headers: h }),
+      fetch(`${API_BASE}/api/system/schools`, { headers: h }),
     ]);
-    if (sR.status   === 'fulfilled') setStats(sR.value);
-    if (schR.status === 'fulfilled') setSchools(Array.isArray(schR.value) ? schR.value : []);
+    const fulfilled = [sR, schR].filter(r => r.status === 'fulfilled').map(r => r.value);
+    if (handleUnauthorized('system', fulfilled)) return;
+    if (sR.status   === 'fulfilled') setStats(await sR.value.json());
+    if (schR.status === 'fulfilled') { const d = await schR.value.json(); setSchools(Array.isArray(d) ? d : []); }
     setLoading(false);
   }, []);
 
@@ -549,8 +553,8 @@ const SystemDashboard = () => {
     fetch(`${API_BASE}/api/system/schools/${schoolId}/report`, {
       headers: { Authorization: `Bearer ${token()}` },
     })
-      .then(r => r.json())
-      .then(d => setReport(d))
+      .then(r => { if (handleUnauthorized('system', r)) return null; return r.json(); })
+      .then(d => { if (d) setReport(d); })
       .catch(() => setReport(null))
       .finally(() => setRepLoad(false));
   }, [schoolId]);

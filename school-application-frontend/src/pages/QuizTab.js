@@ -26,6 +26,7 @@ import CheckCircleIcon    from '@mui/icons-material/CheckCircle';
 import PendingIcon        from '@mui/icons-material/Pending';
 import LockIcon           from '@mui/icons-material/Lock';
 import SchoolIcon         from '@mui/icons-material/School';
+import { handleUnauthorized } from '../utils/authGuard';
 
 const C = {
   brand:     '#1A3557',
@@ -119,17 +120,20 @@ export default function QuizTab({ onGoToMaterials }) {
   const fetchQuizzes = useCallback(async () => {
     setLoading(true);
     const res = await fetch(`${BASE}/api/teacher/quizzes`, { headers: authH() });
+    if (handleUnauthorized('teacher', res)) return;
     if (res.ok) setQuizzes(await res.json());
     setLoading(false);
   }, []);
 
   const fetchMaterials = useCallback(async () => {
     const res = await fetch(`${BASE}/api/teacher/materials`, { headers: authH() });
+    if (handleUnauthorized('teacher', res)) return;
     if (res.ok) setMaterials(await res.json());
   }, []);
 
   const fetchSlots = useCallback(async () => {
     const res = await fetch(`${BASE}/api/teacher/timetable`, { headers: authH() });
+    if (handleUnauthorized('teacher', res)) return;
     if (res.ok) {
       const d = await res.json();
       setSlots(d.slots || []);
@@ -155,6 +159,7 @@ export default function QuizTab({ onGoToMaterials }) {
     setGenerating(true);
     try {
       const res = await fetch(`${BASE}/api/teacher/quizzes/generate`, { method: 'POST', headers: jsonH(), body: JSON.stringify(genConfig) });
+      if (handleUnauthorized('teacher', res)) return;
       const d   = await res.json();
       if (!res.ok) { toast(d.message || 'Generation failed', 'error'); setGenerating(false); return; }
       setReviewData(d);
@@ -181,6 +186,7 @@ export default function QuizTab({ onGoToMaterials }) {
           questions:         reviewData.questions,
         }),
       });
+      if (handleUnauthorized('teacher', res)) return;
       const d = await res.json();
       if (res.ok) {
         toast('Quiz saved as draft — publish when ready');
@@ -203,6 +209,7 @@ export default function QuizTab({ onGoToMaterials }) {
         method: 'PATCH', headers: jsonH(),
         body: JSON.stringify({ closesAt: closesAt || null }),
       });
+      if (handleUnauthorized('teacher', res)) return;
       if (res.ok) {
         toast('Quiz is now live for students!');
         setPublishDialog(null);
@@ -219,6 +226,7 @@ export default function QuizTab({ onGoToMaterials }) {
   /* ── Close quiz ── */
   const handleClose = async (quizId) => {
     const res = await fetch(`${BASE}/api/teacher/quizzes/${quizId}/close`, { method: 'PATCH', headers: jsonH() });
+    if (handleUnauthorized('teacher', res)) return;
     if (res.ok) { toast('Quiz closed'); fetchQuizzes(); }
     else toast('Failed to close quiz', 'error');
   };
@@ -227,6 +235,7 @@ export default function QuizTab({ onGoToMaterials }) {
   const handleDelete = async (quizId) => {
     if (!window.confirm('Delete this quiz? All student results will be lost.')) return;
     const res = await fetch(`${BASE}/api/teacher/quizzes/${quizId}`, { method: 'DELETE', headers: authH() });
+    if (handleUnauthorized('teacher', res)) return;
     if (res.ok) { toast('Quiz deleted'); fetchQuizzes(); }
     else toast('Failed to delete', 'error');
   };
@@ -237,6 +246,7 @@ export default function QuizTab({ onGoToMaterials }) {
     setResultsData(null);
     setView('results');
     const res = await fetch(`${BASE}/api/teacher/quizzes/${quizId}/results`, { headers: authH() });
+    if (handleUnauthorized('teacher', res)) return;
     if (res.ok) setResultsData(await res.json());
     setResultsLoading(false);
   };

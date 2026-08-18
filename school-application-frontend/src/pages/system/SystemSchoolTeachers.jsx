@@ -12,6 +12,7 @@ import SystemLayout, {
   FONT, TEAL, BORDER, CARD, INK, INK_SOFT, INK_FAINT,
 } from '../../components/system/SystemLayout';
 import API_BASE from '../../config';
+import { handleUnauthorized } from '../../utils/authGuard';
 
 const token = () => sessionStorage.getItem('systemToken');
 const authH = () => ({ Authorization: `Bearer ${token()}` });
@@ -51,13 +52,14 @@ export default function SystemSchoolTeachers() {
   useEffect(() => {
     if (!schoolId) return;
     fetch(`${BASE}/setup/national-subjects`, { headers: authH() })
-      .then(r => r.ok ? r.json() : []).then(setAllNatSubs).catch(() => {});
+      .then(r => { if (handleUnauthorized('system', r)) return []; return r.ok ? r.json() : []; }).then(setAllNatSubs).catch(() => {});
   }, [schoolId, BASE]);
 
   const fetchTeachers = useCallback(async () => {
     if (!schoolId) return;
     setLoading(true);
     const res = await fetch(`${BASE}/teachers`, { headers: authH() });
+    if (handleUnauthorized('system', res)) return;
     if (res.ok) {
       const data = await res.json();
       setTeachers(data);
@@ -106,6 +108,7 @@ export default function SystemSchoolTeachers() {
     const isEdit = panelMode === 'edit';
     const url = isEdit ? `${BASE}/teachers/${selected.id}` : `${BASE}/teachers`;
     const res = await fetch(url, { method: isEdit ? 'PATCH' : 'POST', headers: jsonH(), body: JSON.stringify(form) });
+    if (handleUnauthorized('system', res)) return;
     const d = await res.json();
     if (res.ok) {
       await fetch(`${BASE}/teachers/${d.id}/subjects`, {
@@ -126,6 +129,7 @@ export default function SystemSchoolTeachers() {
 
   const handleDeactivate = async id => {
     const res = await fetch(`${BASE}/teachers/${id}`, { method: 'DELETE', headers: authH() });
+    if (handleUnauthorized('system', res)) return;
     if (res.ok) { toast('Teacher deactivated'); fetchTeachers(); setPanelMode(null); setSelected(null); }
     else toast('Failed to deactivate', 'error');
   };

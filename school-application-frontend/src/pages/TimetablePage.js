@@ -15,6 +15,7 @@ import PeopleAltIcon     from '@mui/icons-material/PeopleAlt';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import SchoolIcon        from '@mui/icons-material/School';
 import WarningAmberIcon  from '@mui/icons-material/WarningAmber';
+import { handleUnauthorized } from '../utils/authGuard';
 
 /* ─── Tokens ─────────────────────────────────────────────────── */
 const C = {
@@ -100,7 +101,7 @@ const TeachersTab = () => {
   /* ── Load national subjects once ─────────────────────────── */
   useEffect(() => {
     fetch(`${BASE}/api/setup/national-subjects`, { headers: authH() })
-      .then(r => r.ok ? r.json() : [])
+      .then(r => { if (handleUnauthorized('admin', r)) return []; return r.ok ? r.json() : []; })
       .then(setAllNatSubjects)
       .catch(() => {});
   }, []);
@@ -108,6 +109,7 @@ const TeachersTab = () => {
   const fetch_ = useCallback(async () => {
     setLoading(true);
     const res = await fetch(`${BASE}/api/management/teachers`, { headers: authH() });
+    if (handleUnauthorized('admin', res)) return;
     if (res.ok) setTeachers(await res.json());
     setLoading(false);
   }, []);
@@ -158,6 +160,7 @@ const TeachersTab = () => {
     const url    = editing ? `${BASE}/api/management/teachers/${editing.id}` : `${BASE}/api/management/teachers`;
     const method = editing ? 'PATCH' : 'POST';
     const res    = await fetch(url, { method, headers: jsonH(), body: JSON.stringify(form) });
+    if (handleUnauthorized('admin', res)) return;
     const data   = await res.json();
     if (res.ok) {
       await fetch(`${BASE}/api/management/teachers/${data.id}/subjects`, {
@@ -175,6 +178,7 @@ const TeachersTab = () => {
 
   const handleDeactivate = async (id) => {
     const res = await fetch(`${BASE}/api/management/teachers/${id}`, { method: 'DELETE', headers: authH() });
+    if (handleUnauthorized('admin', res)) return;
     if (res.ok) { toast('Teacher deactivated'); fetch_(); }
     else toast('Failed', 'error');
   };
@@ -393,6 +397,7 @@ const TimetableGrid = ({ classId, onBack }) => {
     setLoading(true);
     try {
       const res = await fetch(`${BASE}/api/management/timetable/${classId}`, { headers: authH() });
+      if (handleUnauthorized('admin', res)) return;
       if (res.ok) setData(await res.json());
     } catch { /* handled below */ }
     setLoading(false);
@@ -415,6 +420,7 @@ const TimetableGrid = ({ classId, onBack }) => {
     if (!teacherId) return setTeacherBusy([]);
     try {
       const res = await fetch(`${BASE}/api/management/timetable/teacher-availability?teacherId=${teacherId}`, { headers: authH() });
+      if (handleUnauthorized('admin', res)) return;
       if (res.ok) setTeacherBusy(await res.json());
     } catch { /* non-critical */ }
   };
@@ -427,12 +433,15 @@ const TimetableGrid = ({ classId, onBack }) => {
       return setClash('Please select both a subject and a teacher.');
     setSaving(true); setClash('');
     try {
-      if (slotDialog?.existing)
-        await fetch(`${BASE}/api/management/timetable/${slotDialog.existing.id}`, { method:'DELETE', headers: authH() });
+      if (slotDialog?.existing) {
+        const delRes = await fetch(`${BASE}/api/management/timetable/${slotDialog.existing.id}`, { method:'DELETE', headers: authH() });
+        if (handleUnauthorized('admin', delRes)) return;
+      }
       const res = await fetch(`${BASE}/api/management/timetable`, {
         method: 'POST', headers: jsonH(),
         body: JSON.stringify({ classId, subjectId: parseInt(form.subjectId), teacherId: parseInt(form.teacherId), periodId: slotDialog.periodId, dayOfWeek: slotDialog.dayOfWeek }),
       });
+      if (handleUnauthorized('admin', res)) return;
       const d = await res.json();
       if (res.ok) { toast(`${d.subjectName} assigned`); setSlotDialog(null); fetchData(); }
       else setClash(d.message || 'Failed to assign');
@@ -442,7 +451,8 @@ const TimetableGrid = ({ classId, onBack }) => {
 
   const handleRemoveSlot = async (slot) => {
     try {
-      await fetch(`${BASE}/api/management/timetable/${slot.id}`, { method:'DELETE', headers: authH() });
+      const res = await fetch(`${BASE}/api/management/timetable/${slot.id}`, { method:'DELETE', headers: authH() });
+      if (handleUnauthorized('admin', res)) return;
       toast('Slot cleared'); fetchData();
     } catch { toast('Failed to remove slot','error'); }
   };
@@ -450,7 +460,8 @@ const TimetableGrid = ({ classId, onBack }) => {
   const handleClearAll = async () => {
     if (!window.confirm('Clear the entire timetable for this class?')) return;
     try {
-      await fetch(`${BASE}/api/management/timetable/class/${classId}/clear`, { method:'DELETE', headers: authH() });
+      const res = await fetch(`${BASE}/api/management/timetable/class/${classId}/clear`, { method:'DELETE', headers: authH() });
+      if (handleUnauthorized('admin', res)) return;
       toast('Timetable cleared'); fetchData();
     } catch { toast('Failed','error'); }
   };
@@ -644,6 +655,7 @@ const TimetableTab = () => {
       setLoading(true);
       try {
         const res = await fetch(`${BASE}/api/setup/classes`, { headers: authH() });
+        if (handleUnauthorized('admin', res)) return;
         if (res.ok) setClasses(await res.json());
       } catch { /* handled in UI */ }
       setLoading(false);

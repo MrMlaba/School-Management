@@ -10,6 +10,7 @@ import MasterDetailShell from '../../components/system/MasterDetailShell';
 import RecordField from '../../components/system/RecordField';
 import { core } from '../../theme/tokens';
 import API_BASE from '../../config';
+import { handleUnauthorized } from '../../utils/authGuard';
 
 const API   = API_BASE;
 const token = () => sessionStorage.getItem('systemToken');
@@ -44,8 +45,8 @@ const SystemTeamPage = () => {
   const load = useCallback(() => {
     setLoading(true);
     fetch(`${API}/api/system/team`, { headers: hdr() })
-      .then(r => r.json())
-      .then(d => setTeam(Array.isArray(d) ? d : []))
+      .then(r => { if (handleUnauthorized('system', r)) return null; return r.json(); })
+      .then(d => { if (d) setTeam(Array.isArray(d) ? d : []); })
       .catch(() => setTeam([]))
       .finally(() => setLoading(false));
   }, []);
@@ -62,6 +63,7 @@ const SystemTeamPage = () => {
     setSaving(true);
     try {
       const res = await fetch(`${API}/api/system/team`, { method: 'POST', headers: hdr(), body: JSON.stringify(createForm) });
+      if (handleUnauthorized('system', res)) return;
       const data = await res.json();
       if (res.ok) { notify('Team member added.'); setIsNew(false); load(); }
       else notify(data.error || 'Failed to add team member.', 'error');
@@ -72,6 +74,7 @@ const SystemTeamPage = () => {
   const handleReset = async () => {
     try {
       const res = await fetch(`${API}/api/system/team/${selected.id}/reset-password`, { method: 'PATCH', headers: hdr() });
+      if (handleUnauthorized('system', res)) return;
       const data = await res.json();
       if (res.ok) setResetResult(data);
       else notify(data.error || 'Reset failed.', 'error');
@@ -81,6 +84,7 @@ const SystemTeamPage = () => {
   const handleToggle = async () => {
     try {
       const res = await fetch(`${API}/api/system/team/${selected.id}/toggle-active`, { method: 'PATCH', headers: hdr() });
+      if (handleUnauthorized('system', res)) return;
       const data = await res.json();
       if (res.ok) { notify(`${selected.username} ${data.isActive ? 'reactivated' : 'suspended'}.`); load(); setSelected(m => ({ ...m, is_active: data.isActive })); }
       else notify(data.error || 'Failed.', 'error');
@@ -90,6 +94,7 @@ const SystemTeamPage = () => {
   const handleDelete = async () => {
     try {
       const res = await fetch(`${API}/api/system/team/${selected.id}`, { method: 'DELETE', headers: hdr() });
+      if (handleUnauthorized('system', res)) return;
       const data = await res.json();
       if (res.ok) { notify(`${selected.username} removed.`); setConfirmDelete(false); setSelected(null); load(); }
       else notify(data.error || 'Failed.', 'error');

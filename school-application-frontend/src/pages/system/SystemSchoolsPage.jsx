@@ -10,6 +10,7 @@ import MasterDetailShell from '../../components/system/MasterDetailShell';
 import RecordField from '../../components/system/RecordField';
 import { core } from '../../theme/tokens';
 import API_BASE from '../../config';
+import { handleUnauthorized } from '../../utils/authGuard';
 
 const API   = API_BASE;
 const token = () => sessionStorage.getItem('systemToken');
@@ -146,8 +147,8 @@ const SystemSchoolsPage = () => {
   const loadSchools = useCallback(() => {
     setLoading(true);
     fetch(`${API}/api/system/schools`, { headers: hdr() })
-      .then(r => r.json())
-      .then(data => setSchools(Array.isArray(data) ? data : data.schools || data.data || []))
+      .then(r => { if (handleUnauthorized('system', r)) return null; return r.json(); })
+      .then(data => { if (data) setSchools(Array.isArray(data) ? data : data.schools || data.data || []); })
       .catch(() => setSchools([]))
       .finally(() => setLoading(false));
   }, []);
@@ -167,7 +168,8 @@ const SystemSchoolsPage = () => {
   const selectSchool = (school) => {
     setSelected(school); setIsNew(false); populateForm(school);
     fetch(`${API}/api/system/schools/${school.id}/admins`, { headers: hdr() })
-      .then(r => r.json()).then(d => setAdmins(Array.isArray(d) ? d : [])).catch(() => setAdmins([]));
+      .then(r => { if (handleUnauthorized('system', r)) return null; return r.json(); })
+      .then(d => { if (d) setAdmins(Array.isArray(d) ? d : []); }).catch(() => setAdmins([]));
   };
 
   const startNew = () => { setSelected(null); setIsNew(true); setForm(EMPTY_FORM); setAdmins([]); };
@@ -187,6 +189,7 @@ const SystemSchoolsPage = () => {
       const url = selected ? `${API}/api/system/schools/${selected.id}` : `${API}/api/system/schools`;
       const method = selected ? 'PATCH' : 'POST';
       const res = await fetch(url, { method, headers: jsonHdr(), body: JSON.stringify(body) });
+      if (handleUnauthorized('system', res)) return;
       const data = await res.json();
       if (res.ok) {
         notify(selected ? 'School updated.' : 'School created.');
@@ -206,6 +209,7 @@ const SystemSchoolsPage = () => {
       const res = await fetch(`${API}/api/system/schools/${selected.id}`, {
         method: 'PATCH', headers: jsonHdr(), body: JSON.stringify({ isActive: !selected.is_active }),
       });
+      if (handleUnauthorized('system', res)) return;
       if (res.ok) { notify(`${selected.name} ${selected.is_active ? 'deactivated' : 'activated'}.`); loadSchools(); setSelected(s => ({ ...s, is_active: !s.is_active })); }
     } catch { notify('Network error.', 'error'); }
   };

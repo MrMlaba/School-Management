@@ -13,6 +13,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DownloadIcon from '@mui/icons-material/Download';
+import { handleUnauthorized } from '../utils/authGuard';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
@@ -198,8 +199,8 @@ const AdminPage = () => {
     fetch(`${API_BASE}/api/applications`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then(res => res.json())
-      .then(data => setApplications(Array.isArray(data) ? data : []))
+      .then(res => { if (handleUnauthorized('admin', res)) return null; return res.json(); })
+      .then(data => { if (data) setApplications(Array.isArray(data) ? data : []); })
       .finally(() => setLoading(false));
   };
 
@@ -277,6 +278,7 @@ const AdminPage = () => {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status, comment }),
       });
+      if (handleUnauthorized('admin', res)) return;
       if (dialogOpen) { setDialogOpen(false); setSelectedApp(null); }
       if (!silent) await fetchApplications();
       if (!silent && res.ok)  setSnackbar({ open: true, message: `Application ${status}`, severity: 'success' });
@@ -324,6 +326,7 @@ const AdminPage = () => {
           }
         );
       }
+      if (handleUnauthorized('admin', res)) return;
       const data = await res.json();
       if (data.success) {
         const count = data.deleted ?? 1;
@@ -359,6 +362,7 @@ const AdminPage = () => {
         `${API_BASE}/api/documents/${doc.filename}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      if (handleUnauthorized('admin', res)) return;
       if (!res.ok) throw new Error('Failed');
       const blob = await res.blob();
       setDocPreviewUrl(URL.createObjectURL(blob));
@@ -381,6 +385,7 @@ const AdminPage = () => {
         `${API_BASE}/api/documents/${filename}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      if (handleUnauthorized('admin', res)) return;
       if (!res.ok) throw new Error('Failed');
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
