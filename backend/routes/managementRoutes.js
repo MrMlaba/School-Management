@@ -75,6 +75,52 @@ function gradeWhere(paramIndex) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  APPLICATION PERIOD — the school proposes a date range here; whether that
+//  actually takes effect (applications_enabled) is a system-admin-only
+//  switch (see systemRoutes.js), set per what the school requests. Kept
+//  read-only here so the school can see whether their request has been
+//  turned on, without being able to flip it themselves.
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.get('/application-period', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT application_open_from AS "applicationOpenFrom",
+              application_open_until AS "applicationOpenUntil",
+              applications_enabled AS "applicationsEnabled"
+       FROM schools WHERE id = $1`,
+      [req.admin.schoolId]
+    );
+    if (!rows.length) return res.status(404).json({ message: 'School not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('[GET application-period]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.patch('/application-period', async (req, res) => {
+  const { from, until } = req.body || {};
+  if (from && until && new Date(from) > new Date(until))
+    return res.status(400).json({ message: 'Start date must be before the end date' });
+  try {
+    const { rows } = await pool.query(
+      `UPDATE schools SET application_open_from = $1, application_open_until = $2
+       WHERE id = $3
+       RETURNING application_open_from AS "applicationOpenFrom",
+                 application_open_until AS "applicationOpenUntil",
+                 applications_enabled AS "applicationsEnabled"`,
+      [from || null, until || null, req.admin.schoolId]
+    );
+    if (!rows.length) return res.status(404).json({ message: 'School not found' });
+    res.json({ success: true, ...rows[0] });
+  } catch (err) {
+    console.error('[PATCH application-period]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  EXISTING ROUTES (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 

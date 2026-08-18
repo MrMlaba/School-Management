@@ -537,6 +537,8 @@ router.get('/schools', requireSystemAdmin, async (req, res) => {
          s.id, s.name, s.location, s.phone, s.email, s.principal,
          s.grades, s.streams, s.is_active, s.created_at, s.image_id, s.logo_id,
          s.created_by, s.updated_by, s.updated_at,
+         s.about, s.programs, s.sports,
+         s.applications_enabled, s.application_open_from, s.application_open_until,
          COUNT(DISTINCT sa.id) AS admin_count,
          COUNT(DISTINCT a.id)                                               AS application_count,
          COUNT(DISTINCT a.id)                                               AS total_applications,
@@ -641,7 +643,11 @@ router.post('/schools', requireSystemAdmin, async (req, res) => {
 // PATCH /api/system/schools/:schoolId - Update school
 router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
   const { schoolId } = req.params;
-  const { name, location, phone, email, principal, grades, streams, about, programs, sports, imageBase64, logoBase64, isActive } = req.body;
+  const {
+    name, location, phone, email, principal, grades, streams, about, programs, sports,
+    imageBase64, logoBase64, isActive,
+    applicationsEnabled, applicationOpenFrom, applicationOpenUntil,
+  } = req.body;
 
   try {
     const updateFields = [];
@@ -687,6 +693,18 @@ router.patch('/schools/:schoolId', requireSystemAdmin, async (req, res) => {
     if (sports !== undefined && sports !== null) {
       updateFields.push(`sports = $${paramIndex++}`);
       values.push(JSON.stringify(sports));
+    }
+    if (applicationsEnabled !== undefined) {
+      updateFields.push(`applications_enabled = $${paramIndex++}`);
+      values.push(!!applicationsEnabled);
+    }
+    if (applicationOpenFrom !== undefined) {
+      updateFields.push(`application_open_from = $${paramIndex++}`);
+      values.push(applicationOpenFrom || null);
+    }
+    if (applicationOpenUntil !== undefined) {
+      updateFields.push(`application_open_until = $${paramIndex++}`);
+      values.push(applicationOpenUntil || null);
     }
     if (isActive !== undefined) {
       updateFields.push(`is_active = $${paramIndex++}`);

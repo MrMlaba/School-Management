@@ -7,6 +7,7 @@ import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
 import EastIcon from '@mui/icons-material/East';
+import LockClockOutlinedIcon from '@mui/icons-material/LockClockOutlined';
 import { useNavigate } from 'react-router-dom';
 
 const DISPLAY_FONT = "'Cormorant Garamond', Georgia, serif";
@@ -15,6 +16,9 @@ const BODY_FONT    = "'Outfit', sans-serif";
 const SchoolCard = ({ school }) => {
   const [hovered, setHovered] = useState(false);
   const navigate = useNavigate();
+  // applications_open defaults to true server-side when unset, so undefined
+  // (e.g. a stale cached response) is treated as open, not closed.
+  const isClosed = school.applications_open === false;
 
   return (
     <Card
@@ -93,6 +97,23 @@ const SchoolCard = ({ school }) => {
         <LocationOnOutlinedIcon sx={{ fontSize: 16, color: '#e8c06a' }} />
       </Box>
 
+      {/* Closed-for-applications ribbon — always visible, not just on hover,
+          since it's status a visitor needs before they even click in. */}
+      {isClosed && (
+        <Box sx={{
+          position: 'absolute', top: 14, left: 14,
+          display: 'flex', alignItems: 'center', gap: 0.5,
+          px: 1.1, py: 0.5, borderRadius: '2px',
+          bgcolor: 'rgba(20,20,25,0.75)', border: '1px solid rgba(255,255,255,0.25)',
+          backdropFilter: 'blur(4px)',
+        }}>
+          <LockClockOutlinedIcon sx={{ fontSize: 13, color: 'rgba(255,255,255,0.75)' }} />
+          <Typography sx={{ fontFamily: BODY_FONT, fontWeight: 600, fontSize: '0.66rem', color: 'rgba(255,255,255,0.85)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            Applications Closed
+          </Typography>
+        </Box>
+      )}
+
       {/* Content always visible at bottom */}
       <Box
         sx={{
@@ -167,27 +188,33 @@ const SchoolCard = ({ school }) => {
             </Box>
           )}
 
-          <Button
-            variant="contained"
-            size="small"
-            endIcon={<EastIcon sx={{ fontSize: '14px !important' }} />}
-            onClick={(e) => { e.stopPropagation(); navigate('/apply?school=' + encodeURIComponent(school.name)); }}
-            sx={{
-              fontFamily: BODY_FONT,
-              fontWeight: 600,
-              fontSize: '0.78rem',
-              textTransform: 'none',
-              px: 2.5,
-              py: 0.8,
-              borderRadius: '2px',
-              bgcolor: '#e8a020',
-              color: '#0a0e1a',
-              '&:hover': { bgcolor: '#f0b030' },
-              boxShadow: 'none',
-            }}
-          >
-            Apply to this school
-          </Button>
+          {isClosed ? (
+            <Typography sx={{ fontFamily: BODY_FONT, fontSize: '0.78rem', color: 'rgba(255,255,255,0.55)', fontStyle: 'italic' }}>
+              Not accepting applications right now
+            </Typography>
+          ) : (
+            <Button
+              variant="contained"
+              size="small"
+              endIcon={<EastIcon sx={{ fontSize: '14px !important' }} />}
+              onClick={(e) => { e.stopPropagation(); navigate('/apply?school=' + encodeURIComponent(school.name)); }}
+              sx={{
+                fontFamily: BODY_FONT,
+                fontWeight: 600,
+                fontSize: '0.78rem',
+                textTransform: 'none',
+                px: 2.5,
+                py: 0.8,
+                borderRadius: '2px',
+                bgcolor: '#e8a020',
+                color: '#0a0e1a',
+                '&:hover': { bgcolor: '#f0b030' },
+                boxShadow: 'none',
+              }}
+            >
+              Apply to this school
+            </Button>
+          )}
         </Box>
       </Box>
     </Card>

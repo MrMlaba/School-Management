@@ -167,6 +167,91 @@ const StatCard = ({ icon, label, value, color = 'primary.main', bg = '#eff6ff', 
 );
 
 /* ═══════════════════════════════════════════════════════════════════════ */
+// ── Application Period — school admin proposes a window; the system admin's
+// applications_enabled switch (shown here read-only) is what actually turns
+// it on, per SystemSchoolsPage.jsx. ─────────────────────────────────────────
+const ApplicationPeriodPanel = () => {
+  const [data, setData]     = useState(null);
+  const [from, setFrom]     = useState('');
+  const [until, setUntil]   = useState('');
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg]       = useState('');
+
+  const load = () => {
+    const token = sessionStorage.getItem('adminToken');
+    fetch(`${API_BASE}/api/management/application-period`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => { if (handleUnauthorized('admin', r)) return null; return r.json(); })
+      .then(d => {
+        if (!d) return;
+        setData(d);
+        setFrom(d.applicationOpenFrom ? d.applicationOpenFrom.slice(0, 10) : '');
+        setUntil(d.applicationOpenUntil ? d.applicationOpenUntil.slice(0, 10) : '');
+      });
+  };
+
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const save = async () => {
+    if (from && until && from > until) { setMsg('Start date must be before the end date.'); return; }
+    setSaving(true); setMsg('');
+    const token = sessionStorage.getItem('adminToken');
+    try {
+      const res = await fetch(`${API_BASE}/api/management/application-period`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ from: from || null, until: until || null }),
+      });
+      if (handleUnauthorized('admin', res)) return;
+      const d = await res.json();
+      if (res.ok) { setData(d); setMsg('Saved — let your system administrator know so they can switch it live.'); }
+      else setMsg(d.message || 'Failed to save.');
+    } finally { setSaving(false); }
+  };
+
+  if (!data) return null;
+  const enabled = data.applicationsEnabled;
+
+  return (
+    <Box sx={{
+      background: T.white, border: `1px solid ${T.border}`, borderRadius: '8px',
+      p: '12px 18px', mb: 2.5, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+    }}>
+      <Box sx={{ minWidth: 200 }}>
+        <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', color: T.text, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+          Application Period
+        </Typography>
+        <Typography sx={{ fontSize: '0.76rem', color: T.muted, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+          Propose your window — your system administrator switches it live.
+        </Typography>
+      </Box>
+      <TextField label="From" type="date" size="small" value={from} onChange={e => setFrom(e.target.value)}
+        InputLabelProps={{ shrink: true }} sx={{ '& .MuiInputBase-root': { fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.85rem' } }} />
+      <TextField label="Until" type="date" size="small" value={until} onChange={e => setUntil(e.target.value)}
+        InputLabelProps={{ shrink: true }} sx={{ '& .MuiInputBase-root': { fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '0.85rem' } }} />
+      <Button
+        variant="contained" size="small" onClick={save} disabled={saving}
+        sx={{ background: T.brand, fontFamily: "'IBM Plex Sans', sans-serif", textTransform: 'none', fontWeight: 700, boxShadow: 'none', '&:hover': { background: '#122740', boxShadow: 'none' } }}
+      >
+        {saving ? 'Saving…' : 'Save'}
+      </Button>
+      <Chip
+        label={enabled ? 'Live — accepting applications' : 'Not live yet'}
+        size="small"
+        sx={{
+          fontWeight: 700, fontSize: '0.7rem', fontFamily: "'IBM Plex Sans', sans-serif",
+          bgcolor: enabled ? '#DCFCE7' : '#FEF3C7', color: enabled ? '#166534' : '#92400E',
+        }}
+      />
+      {msg && (
+        <Typography sx={{ width: '100%', fontSize: '0.78rem', color: T.brand, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+          {msg}
+        </Typography>
+      )}
+    </Box>
+  );
+};
+
 const AdminPage = () => {
   const [applications, setApplications]             = useState([]);
   const [loading, setLoading]                       = useState(false);
@@ -584,6 +669,8 @@ const AdminPage = () => {
               </Button>
             </Stack>
           </Box>
+
+          <ApplicationPeriodPanel />
 
           {/* ── Toolbar ─────────────────────────────────────────────────── */}
           <Box sx={{

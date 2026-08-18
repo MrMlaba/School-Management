@@ -26,6 +26,7 @@ const EMPTY_FORM = {
   imageBase64: null, logoBase64: null,
   grades:  [...ALL_GRADES],
   streams: [...ALL_STREAMS],
+  applicationsEnabled: true, applicationOpenFrom: '', applicationOpenUntil: '',
 };
 
 const fmt = (d) => d ? new Date(d).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
@@ -283,6 +284,9 @@ const SystemSchoolsPage = () => {
     streams: Array.isArray(school.streams) ? school.streams : (typeof school.streams === 'string' ? JSON.parse(school.streams || '[]') : [...ALL_STREAMS]),
     programs: asList(school.programs),
     sports: asList(school.sports),
+    applicationsEnabled: school.applications_enabled !== false,
+    applicationOpenFrom: school.application_open_from ? school.application_open_from.slice(0, 10) : '',
+    applicationOpenUntil: school.application_open_until ? school.application_open_until.slice(0, 10) : '',
   });
 
   const selectSchool = (school) => {
@@ -305,6 +309,9 @@ const SystemSchoolsPage = () => {
       about: form.about || null,
       grades: form.grades, streams: form.streams,
       programs: form.programs, sports: form.sports,
+      applicationsEnabled: form.applicationsEnabled,
+      applicationOpenFrom: form.applicationOpenFrom || null,
+      applicationOpenUntil: form.applicationOpenUntil || null,
       imageBase64: form.imageBase64 || null, logoBase64: form.logoBase64 || null,
     };
     try {
@@ -425,6 +432,32 @@ const SystemSchoolsPage = () => {
                     <TagInput label="" helper="Codes offered at this school." values={form.sports} onChange={v => setForm(p => ({ ...p, sports: v }))} />
                   </RecordField>
                   <RecordField label="Gallery"><GalleryManager schoolId={selected?.id} /></RecordField>
+
+                  <Divider />
+                  <Typography sx={{ fontFamily: FONT, fontWeight: 700, fontSize: '0.78rem', color: INK, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Applications
+                  </Typography>
+                  <RecordField label="Accepting Applications">
+                    <FormControlLabel
+                      control={
+                        <Checkbox checked={form.applicationsEnabled}
+                          onChange={e => setForm(p => ({ ...p, applicationsEnabled: e.target.checked }))}
+                          sx={{ color: '#cbd5e1', '&.Mui-checked': { color: core.accent } }} />
+                      }
+                      label={<Typography sx={{ fontFamily: FONT, fontSize: '0.82rem', color: INK_SOFT }}>{form.applicationsEnabled ? 'On — students can apply' : 'Off — school will show but "Apply" is blocked'}</Typography>}
+                    />
+                  </RecordField>
+                  <RecordField label="Proposed Window">
+                    <Stack direction="row" spacing={1.5}>
+                      <TextField label="From" type="date" size="small" sx={fieldSx} InputLabelProps={{ shrink: true }}
+                        value={form.applicationOpenFrom} onChange={e => setForm(p => ({ ...p, applicationOpenFrom: e.target.value }))} />
+                      <TextField label="Until" type="date" size="small" sx={fieldSx} InputLabelProps={{ shrink: true }}
+                        value={form.applicationOpenUntil} onChange={e => setForm(p => ({ ...p, applicationOpenUntil: e.target.value }))} />
+                    </Stack>
+                    <Typography sx={{ fontFamily: FONT, fontSize: '0.7rem', color: INK_FAINT, mt: 0.5 }}>
+                      Usually set by the school itself from their Applications page — override here if needed. Leave blank for no date limit (the toggle above still applies).
+                    </Typography>
+                  </RecordField>
 
                   {selected && (
                     <>

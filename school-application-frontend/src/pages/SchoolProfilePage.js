@@ -119,6 +119,15 @@ export default function SchoolProfilePage() {
   const programs = Array.isArray(school.programs) ? school.programs : [];
   const sports   = Array.isArray(school.sports) ? school.sports : [];
   const gallery  = Array.isArray(school.gallery) ? school.gallery : [];
+  const isClosed = school.applications_open === false;
+  const fmtDate  = (d) => d ? new Date(d).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+  const windowText = school.application_open_from && school.application_open_until
+    ? `${fmtDate(school.application_open_from)} – ${fmtDate(school.application_open_until)}`
+    : school.application_open_until
+    ? `Closes ${fmtDate(school.application_open_until)}`
+    : school.application_open_from
+    ? `Opens ${fmtDate(school.application_open_from)}`
+    : null;
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#080f1a' }}>
@@ -165,9 +174,22 @@ export default function SchoolProfilePage() {
         {/* Name + quick facts */}
         <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, px: { xs: 3, md: 6 }, pb: { xs: 4, md: 6 } }}>
           <Container maxWidth="lg" disableGutters>
-            <Typography sx={{ fontFamily: BODY_FONT, fontSize: '0.72rem', color: GOLD_LIGHT, letterSpacing: '0.15em', textTransform: 'uppercase', mb: 1 }}>
-              Partner Institution
-            </Typography>
+            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1 }}>
+              <Typography sx={{ fontFamily: BODY_FONT, fontSize: '0.72rem', color: GOLD_LIGHT, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+                Partner Institution
+              </Typography>
+              <Chip
+                label={isClosed ? 'Applications Closed' : 'Applications Open'}
+                size="small"
+                sx={{
+                  fontFamily: BODY_FONT, fontWeight: 700, fontSize: '0.66rem', letterSpacing: '0.04em',
+                  height: 22, borderRadius: '3px',
+                  bgcolor: isClosed ? 'rgba(220,38,38,0.18)' : 'rgba(34,197,94,0.18)',
+                  border: `1px solid ${isClosed ? 'rgba(248,113,113,0.4)' : 'rgba(74,222,128,0.4)'}`,
+                  color: isClosed ? '#fca5a5' : '#86efac',
+                }}
+              />
+            </Stack>
             <Typography sx={{
               fontFamily: DISPLAY_FONT, fontWeight: 700,
               fontSize: { xs: '2.4rem', md: '3.6rem' },
@@ -283,19 +305,39 @@ export default function SchoolProfilePage() {
                 </Box>
               )}
 
-              <Button
-                fullWidth
-                variant="contained"
-                endIcon={<EastIcon />}
-                onClick={() => navigate('/apply?school=' + encodeURIComponent(school.name))}
-                sx={{
-                  fontFamily: BODY_FONT, fontWeight: 700, fontSize: '0.92rem', textTransform: 'none',
-                  bgcolor: GOLD, color: '#0a0e1a', mt: 3, py: 1.3, borderRadius: '6px',
-                  boxShadow: 'none', '&:hover': { bgcolor: '#f0b030', boxShadow: 'none' },
-                }}
-              >
-                Apply to this School
-              </Button>
+              {isClosed ? (
+                <Box sx={{ mt: 3, p: 1.75, borderRadius: '6px', bgcolor: 'rgba(220,38,38,0.1)', border: '1px solid rgba(248,113,113,0.3)' }}>
+                  <Typography sx={{ fontFamily: BODY_FONT, fontWeight: 600, fontSize: '0.85rem', color: '#fca5a5' }}>
+                    Not accepting applications right now
+                  </Typography>
+                  {windowText && (
+                    <Typography sx={{ fontFamily: BODY_FONT, fontSize: '0.78rem', color: 'rgba(255,255,255,0.5)', mt: 0.5 }}>
+                      {windowText}
+                    </Typography>
+                  )}
+                </Box>
+              ) : (
+                <>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    endIcon={<EastIcon />}
+                    onClick={() => navigate('/apply?school=' + encodeURIComponent(school.name))}
+                    sx={{
+                      fontFamily: BODY_FONT, fontWeight: 700, fontSize: '0.92rem', textTransform: 'none',
+                      bgcolor: GOLD, color: '#0a0e1a', mt: 3, py: 1.3, borderRadius: '6px',
+                      boxShadow: 'none', '&:hover': { bgcolor: '#f0b030', boxShadow: 'none' },
+                    }}
+                  >
+                    Apply to this School
+                  </Button>
+                  {windowText && (
+                    <Typography sx={{ fontFamily: BODY_FONT, fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', mt: 1, textAlign: 'center' }}>
+                      Accepting applications: {windowText}
+                    </Typography>
+                  )}
+                </>
+              )}
             </Box>
           </Grid>
         </Grid>

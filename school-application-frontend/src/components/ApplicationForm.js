@@ -578,6 +578,16 @@ const ApplicationForm = () => {
 
           {preselectedSchool ? (
             /* Single-school mode — locked display */
+            availableSchools.find(s => s.name === preselectedSchool)?.applications_open === false ? (
+              <Box sx={{ px: 2, py: 1.5, bgcolor: '#FEF2F2', border: '1.5px solid #FECACA', borderRadius: '4px' }}>
+                <Typography sx={{ fontFamily: BODY, fontWeight: 700, fontSize: '0.9rem', color: '#991B1B' }}>
+                  {preselectedSchool} is not accepting applications right now
+                </Typography>
+                <Typography sx={{ fontFamily: BODY, fontSize: '0.78rem', color: '#B91C1C', mt: 0.5 }}>
+                  This school's application window has closed. You can still apply to other schools that are currently open.
+                </Typography>
+              </Box>
+            ) : (
             <Box sx={{
               display: 'flex', alignItems: 'center', gap: 1.5,
               px: 2, py: 1.25,
@@ -599,6 +609,7 @@ const ApplicationForm = () => {
                 </Typography>
               </Box>
             </Box>
+            )
           ) : (
             /* Multi-school mode — dropdown */
             <>
@@ -611,15 +622,20 @@ const ApplicationForm = () => {
                 >
                   {schoolsLoading
                     ? <MenuItem disabled><CircularProgress size={16} sx={{ mr:1 }} /> Loading…</MenuItem>
-                    : availableSchools.map(s => (
-                      <MenuItem key={s.id} value={s.name} sx={{ display:'flex', alignItems:'center', gap:1.5 }}>
-                        <img src={s.image} alt={s.name} style={{ width:30,height:30,borderRadius:'50%',objectFit:'cover',flexShrink:0 }} />
-                        <Box>
-                          <Typography sx={{ fontFamily:BODY, fontSize:'0.875rem', fontWeight:600, color:C.text }}>{s.name}</Typography>
-                          {s.location && <Typography sx={{ fontFamily:BODY, fontSize:'0.72rem', color:C.textMuted }}>{s.location}</Typography>}
-                        </Box>
-                      </MenuItem>
-                    ))}
+                    : availableSchools.map(s => {
+                      const closed = s.applications_open === false;
+                      return (
+                        <MenuItem key={s.id} value={s.name} disabled={closed} sx={{ display:'flex', alignItems:'center', gap:1.5, opacity: closed ? 0.55 : 1 }}>
+                          <img src={s.image} alt={s.name} style={{ width:30,height:30,borderRadius:'50%',objectFit:'cover',flexShrink:0 }} />
+                          <Box>
+                            <Typography sx={{ fontFamily:BODY, fontSize:'0.875rem', fontWeight:600, color:C.text }}>{s.name}</Typography>
+                            <Typography sx={{ fontFamily:BODY, fontSize:'0.72rem', color: closed ? '#DC2626' : C.textMuted }}>
+                              {closed ? 'Applications closed' : s.location}
+                            </Typography>
+                          </Box>
+                        </MenuItem>
+                      );
+                    })}
                 </Select>
               </FormControl>
               <FieldError msg={errors.schools} />

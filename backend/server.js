@@ -957,6 +957,16 @@ function generateReferenceCode() {
 }
 
 // ─── Schools (public) ─────────────────────────────────────────────────────────
+// Shared "is this school currently accepting applications" expression —
+// used by both public school endpoints below, and re-checked server-side in
+// POST /api/applications so a closed school can never be bypassed by the
+// client sending a stale/forged value.
+const APPLICATIONS_OPEN_SQL = `(
+  applications_enabled
+  AND (application_open_from IS NULL OR CURRENT_DATE >= application_open_from)
+  AND (application_open_until IS NULL OR CURRENT_DATE <= application_open_until)
+)`;
+
 app.get('/api/schools', async (req, res) => {
   try {
     const baseUrl = process.env.API_BASE || `${req.protocol}://${req.get('host')}`;
@@ -964,6 +974,8 @@ app.get('/api/schools', async (req, res) => {
       `SELECT
         id, name, location, phone, email, principal, grades, streams, is_active, created_at, image_id,
         application_form_required, application_form_originalname,
+        application_open_from, application_open_until,
+        ${APPLICATIONS_OPEN_SQL} AS applications_open,
         CASE
           WHEN image_id IS NOT NULL THEN $1 || '/api/system/schools/' || id || '/image?v=' || image_id
           ELSE NULL
@@ -996,6 +1008,8 @@ app.get('/api/schools/:id', async (req, res) => {
         id, name, location, phone, email, principal, grades, streams, is_active, created_at,
         about, programs, sports, image_id, logo_id,
         application_form_required, application_form_originalname,
+        application_open_from, application_open_until,
+        ${APPLICATIONS_OPEN_SQL} AS applications_open,
         CASE
           WHEN image_id IS NOT NULL THEN $1 || '/api/system/schools/' || id || '/image?v=' || image_id
           ELSE NULL
@@ -1070,6 +1084,27 @@ app.post('/api/applications', upload.array('documents', 10), async (req, res) =>
   }
   if (!Array.isArray(schools) || schools.length === 0)
     return res.status(400).json({ success: false, message: 'At least one school must be selected' });
+
+  // Re-check applications are actually open server-side — never trust the
+  // client on this. Rejects the whole submission (not a partial one) so the
+  // applicant can deselect the closed school(s) and resubmit knowingly,
+  // rather than silently losing part of their application.
+  try {
+    const { rows: closedRows } = await pool.query(
+      `SELECT name FROM schools WHERE name = ANY($1::text[]) AND NOT ${APPLICATIONS_OPEN_SQL}`,
+      [schools]
+    );
+    if (closedRows.length) {
+      return res.status(400).json({
+        success: false,
+        message: `Applications are currently closed for: ${closedRows.map(r => r.name).join(', ')}. Please deselect ${closedRows.length > 1 ? 'these schools' : 'this school'} and try again.`,
+      });
+    }
+  } catch (err) {
+    console.error('POST /api/applications applyability check error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+
   const documents     = req.files || [];
   const documentTypes = req.body.documentTypes ? JSON.parse(req.body.documentTypes) : [];
   for (let i = 0; i < documents.length; i++) {
