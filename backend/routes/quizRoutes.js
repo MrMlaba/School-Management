@@ -95,8 +95,11 @@ async function callGroq({ system, user }) {
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${KEY}` },
+    // llama-3.1-8b-instant was retired from Groq's catalog (2026-08) — replaced
+    // with openai/gpt-oss-20b, capped to low reasoning effort so it spends its
+    // token budget on the actual JSON output, not hidden reasoning tokens.
     body: JSON.stringify({
-      model: 'llama-3.1-8b-instant', max_tokens: 3000, temperature: temp,
+      model: 'openai/gpt-oss-20b', max_tokens: 3000, temperature: temp, reasoning_effort: 'low',
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
     }),
   });

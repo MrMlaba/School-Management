@@ -894,10 +894,14 @@ Answer concisely. If asked about specific schools or students, explain you only 
       { role: 'user', content: message },
     ];
 
+    // llama-3.3-70b-versatile was retired from Groq's catalog (2026-08) — replaced
+    // with openai/gpt-oss-120b. That model reasons before answering, so without
+    // reasoning_effort capped low it can spend the entire max_tokens budget on
+    // hidden reasoning and return empty content for a quick Q&A widget like this.
     const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
-      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages, max_tokens: 400, temperature: 0.5 }),
+      body: JSON.stringify({ model: 'openai/gpt-oss-120b', messages, max_tokens: 400, temperature: 0.5, reasoning_effort: 'low' }),
     });
 
     if (!groqRes.ok) {
