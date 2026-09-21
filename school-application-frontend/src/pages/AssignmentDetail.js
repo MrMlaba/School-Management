@@ -165,7 +165,7 @@ export default function AssignmentDetail() {
         fetch(`${BASE}/api/student/assignments/${id}/files`,      { headers }),
       ]);
 
-      if (aRes.status === 401 || sRes.status === 401) {
+      if (aRes.status === 401 || sRes.status === 401 || fRes.status === 401) {
         sessionStorage.removeItem('studentToken');
         navigate('/student-login');
         return;
@@ -199,6 +199,7 @@ export default function AssignmentDetail() {
     setOpeningFile(true);
     try {
       const res = await fetch(`${BASE}/api/documents/${filename}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.status === 401) { sessionStorage.removeItem('studentToken'); navigate('/student-login'); return; }
       if (!res.ok) { setError('Could not open this file.'); return; }
       const blob = await res.blob();
       window.open(URL.createObjectURL(blob), '_blank');
@@ -227,6 +228,7 @@ export default function AssignmentDetail() {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (res.status === 401) { sessionStorage.removeItem('studentToken'); navigate('/student-login'); return; }
       if (res.ok) {
         setSubmission(null);
         setResubmitMode(false);
@@ -265,6 +267,9 @@ export default function AssignmentDetail() {
         setUploadProgress(0);
         setResubmitMode(false);
         loadData(); // refresh submission state from server
+      } else if (xhr.status === 401) {
+        sessionStorage.removeItem('studentToken');
+        navigate('/student-login');
       } else {
         try { setError(JSON.parse(xhr.responseText).message || 'Submission failed.'); }
         catch { setError('Submission failed. Please try again.'); }

@@ -272,12 +272,12 @@ router.get('/reports/attendance', async (req, res) => {
     if (!students.length)
       return res.json({ class: cls[0], students: [], dateRange: { startDate, endDate } });
 
+    const studentIds = students.map(s => s.id);
+    const params = [schoolId, studentIds];
     let dateFilter = '';
-    const params = [schoolId];
     if (startDate) { params.push(startDate); dateFilter += ` AND a.date >= $${params.length}`; }
     if (endDate)   { params.push(endDate);   dateFilter += ` AND a.date <= $${params.length}`; }
 
-    const studentIds = students.map(s => s.id);
     const { rows: attRows } = await pool.query(
       `SELECT a.student_id AS "studentId",
               COUNT(*) FILTER (WHERE a.status = 'present') AS present,
@@ -289,7 +289,7 @@ router.get('/reports/attendance', async (req, res) => {
          AND  a.student_id = ANY($2::int[])
          ${dateFilter}
        GROUP  BY a.student_id`,
-      [schoolId, studentIds, ...params.slice(1)]
+      params
     );
 
     const attMap = {};

@@ -423,6 +423,7 @@ const OverviewSection = () => {
    STUDENTS
 ═══════════════════════════════════════════════════════════════ */
 const StudentsSection = () => {
+  const navigate = useNavigate();
   const [enrolled,    setEnrolled]    = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [search,      setSearch]      = useState('');
@@ -442,9 +443,10 @@ const StudentsSection = () => {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     const res = await fetch(`${BASE}/api/management/enrolled-students`, {headers:authH()});
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) setEnrolled(await res.json());
     setLoading(false);
-  }, []);
+  }, [navigate]);
   useEffect(()=>{fetchAll();},[fetchAll]);
 
   // Keep the detail panel in sync with fresh data; default-select the first row on landing.
@@ -485,6 +487,7 @@ const StudentsSection = () => {
               setSaving(true);
               try{
                 const res = await fetch(`${BASE}/api/management/students/generate-credentials`, { method: 'POST', headers: authH() });
+                if (redirectOn401([res], navigate)) return;
                 const d = await res.json();
                 if(res.ok){ setBulkDialog(d); toast(`Generated ${d.generated} credentials`); fetchAll(); }
                 else toast(d.message||'Failed','error');
@@ -634,6 +637,7 @@ const StudentsSection = () => {
             setSaving(true);
             try{
               const res = await fetch(`${BASE}/api/management/students/${credDialogStudent.id}/set-credentials`, { method:'POST', headers: jsonH(), body: JSON.stringify(studentCred.password?{password:studentCred.password}:{}) });
+              if (redirectOn401([res], navigate)) return;
               const d = await res.json();
               if(res.ok){ toast('Credentials set'); setCredDialogStudent(null); fetchAll(); }
               else toast(d.message||'Failed','error');
@@ -675,6 +679,7 @@ const StudentsSection = () => {
                 setSaving(true);
                 try{
                   const res = await fetch(`${BASE}/api/management/parents/${parentCredDialog.id}/reset-password`, { method:'POST', headers: authH() });
+                  if (redirectOn401([res], navigate)) return;
                   const d = await res.json();
                   if(res.ok){ setParentCredResult(d); }
                   else toast(d.message||'Failed','error');
@@ -751,6 +756,7 @@ const StudentsSection = () => {
                   `${BASE}/api/management/students/${resetStudentDialog.id}/reset-password`,
                   {method:'POST', headers:authH()}
                 );
+                if (redirectOn401([res], navigate)) return;
                 const d = await res.json();
                 if (res.ok) {
                   setResetStudentResult(d);  // show the temp password
@@ -820,6 +826,7 @@ const StudentsSection = () => {
    TEACHERS  (read-only view — management is done by System Admin)
 ═══════════════════════════════════════════════════════════════ */
 const TeachersSection = () => {
+  const navigate = useNavigate();
   const [teachers,           setTeachers]           = useState([]);
   const [loading,            setLoading]            = useState(true);
   const [selected,           setSelected]           = useState(null);
@@ -835,13 +842,14 @@ const TeachersSection = () => {
   const fetch_ = useCallback(async () => {
     setLoading(true);
     const res = await fetch(`${BASE}/api/management/teachers`, {headers:authH()});
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) {
       const data = await res.json();
       setTeachers(data);
       if (!selected && data.length > 0) setSelected(data[0]);
     }
     setLoading(false);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [navigate]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>{fetch_();},[fetch_]);
 
   const handleSetCred = async () => {
@@ -850,6 +858,7 @@ const TeachersSection = () => {
     const res = await fetch(`${BASE}/api/management/teachers/${credDialog.id}/set-credentials`, {
       method:'POST', headers:jsonH(), body:JSON.stringify(cred),
     });
+    if (redirectOn401([res], navigate)) return;
     const d = await res.json();
     setSaving(false);
     if (res.ok) { toast('Credentials set — teacher can now log in'); setCredDialog(null); fetch_(); }
@@ -1049,6 +1058,7 @@ const TeachersSection = () => {
               setSaving(true);
               try {
                 const res=await fetch(`${BASE}/api/management/teachers/${resetTeacherDialog.id}/reset-password`,{method:'POST',headers:authH()});
+                if (redirectOn401([res], navigate)) return;
                 const d=await res.json();
                 if(res.ok){setResetTeacherResult(d);}
                 else{toast(d.message||'Failed to reset','error');setResetTeacherDialog(null);}
@@ -1100,6 +1110,7 @@ const TeachersSection = () => {
    TIMETABLE
 ═══════════════════════════════════════════════════════════════ */
 const TimetableSection = () => {
+  const navigate = useNavigate();
   const [classes, setClasses]  = useState([]);
   const [selClass,setSelClass] = useState(null);
   const [ttData,  setTtData]   = useState(null);
@@ -1110,14 +1121,16 @@ const TimetableSection = () => {
     (async()=>{
       setLoading(true);
       const res=await fetch(`${BASE}/api/setup/classes`,{headers:authH()});
+      if (redirectOn401([res], navigate)) return;
       if(res.ok)setClasses(await res.json());
       setLoading(false);
     })();
-  },[]);
+  },[navigate]);
 
   const loadTimetable=async(cls)=>{
     setSelClass(cls);setTtData(null);setTtLoad(true);
     const res=await fetch(`${BASE}/api/management/timetable/${cls.id}`,{headers:authH()});
+    if (redirectOn401([res], navigate)) return;
     if(res.ok)setTtData(await res.json());
     setTtLoad(false);
   };
@@ -1219,6 +1232,7 @@ const TimetableSection = () => {
    SCHOOL SETUP
 ═══════════════════════════════════════════════════════════════ */
 const SetupSection = () => {
+  const navigate = useNavigate();
   const [step,    setStep]    = useState('year');
   const [summary, setSummary] = useState(null);
   const [years,   setYears]   = useState([]);
@@ -1232,17 +1246,18 @@ const SetupSection = () => {
 
   const fetchSummary=useCallback(async()=>{
     const res=await fetch(`${BASE}/api/setup/summary`,{headers:authH()});
+    if (redirectOn401([res], navigate)) return;
     if(res.ok)setSummary(await res.json());
-  },[]);
+  },[navigate]);
 
   useEffect(()=>{fetchSummary();fetchYears();fetchPeriods();},[fetchSummary]);
   useEffect(()=>{ if(summary?.currentYearId){fetchTerms();fetchSubjects();fetchClasses();} },[summary?.currentYearId]);
 
-  const fetchYears   =async()=>{const r=await fetch(`${BASE}/api/setup/academic-years`,{headers:authH()});if(r.ok)setYears(await r.json());};
-  const fetchTerms   =async()=>{if(!summary?.currentYearId)return;const r=await fetch(`${BASE}/api/setup/terms?academicYearId=${summary.currentYearId}`,{headers:authH()});if(r.ok)setTerms(await r.json());};
-  const fetchPeriods =async()=>{const r=await fetch(`${BASE}/api/setup/periods`,{headers:authH()});if(r.ok)setPeriods(await r.json());};
-  const fetchSubjects=async()=>{if(!summary?.currentYearId)return;const r=await fetch(`${BASE}/api/setup/subjects?academicYearId=${summary.currentYearId}`,{headers:authH()});if(r.ok)setSubjects(await r.json());};
-  const fetchClasses =async()=>{if(!summary?.currentYearId)return;const r=await fetch(`${BASE}/api/setup/classes?academicYearId=${summary.currentYearId}`,{headers:authH()});if(r.ok)setClasses(await r.json());};
+  const fetchYears   =async()=>{const r=await fetch(`${BASE}/api/setup/academic-years`,{headers:authH()});if (redirectOn401([r], navigate)) return;if(r.ok)setYears(await r.json());};
+  const fetchTerms   =async()=>{if(!summary?.currentYearId)return;const r=await fetch(`${BASE}/api/setup/terms?academicYearId=${summary.currentYearId}`,{headers:authH()});if (redirectOn401([r], navigate)) return;if(r.ok)setTerms(await r.json());};
+  const fetchPeriods =async()=>{const r=await fetch(`${BASE}/api/setup/periods`,{headers:authH()});if (redirectOn401([r], navigate)) return;if(r.ok)setPeriods(await r.json());};
+  const fetchSubjects=async()=>{if(!summary?.currentYearId)return;const r=await fetch(`${BASE}/api/setup/subjects?academicYearId=${summary.currentYearId}`,{headers:authH()});if (redirectOn401([r], navigate)) return;if(r.ok)setSubjects(await r.json());};
+  const fetchClasses =async()=>{if(!summary?.currentYearId)return;const r=await fetch(`${BASE}/api/setup/classes?academicYearId=${summary.currentYearId}`,{headers:authH()});if (redirectOn401([r], navigate)) return;if(r.ok)setClasses(await r.json());};
 
   const isDone={year:!!summary?.hasCurrentYear,terms:summary?.terms>=4,periods:summary?.periods>0,subjects:summary?.subjects>0,classes:summary?.classes>0};
   const STEPS=[{key:'year',label:'Academic Year'},{key:'terms',label:'Terms'},{key:'periods',label:'Periods'},{key:'subjects',label:'Subjects'},{key:'classes',label:'Classes'}];
@@ -1254,6 +1269,7 @@ const SetupSection = () => {
     setSaving(true);
     const r=await fetch(`${BASE}/api/setup/academic-years`,{method:'POST',headers:jsonH(),body:JSON.stringify({year:parseInt(newYear)})});
     setSaving(false);
+    if (redirectOn401([r], navigate)) return;
     if(r.ok){toast(`Year ${newYear} set`);fetchYears();fetchSummary();}
     else{const e=await r.json();toast(e.message||'Failed','error');}
   };
@@ -1267,6 +1283,7 @@ const SetupSection = () => {
     setSaving(true);
     const r=await fetch(`${BASE}/api/setup/terms`,{method:'POST',headers:jsonH(),body:JSON.stringify({academicYearId:summary.currentYearId,termNumber:n,startDate:d.s,endDate:d.e})});
     setSaving(false);
+    if (redirectOn401([r], navigate)) return;
     if(r.ok){toast(`Term ${n} saved`);fetchTerms();fetchSummary();}
     else{const e=await r.json();toast(e.message||'Failed','error');}
   };
@@ -1290,6 +1307,7 @@ const SetupSection = () => {
     setSaving(true);
     const r=await fetch(`${BASE}/api/setup/periods`,{method:'PUT',headers:jsonH(),body:JSON.stringify({periods:pRows})});
     setSaving(false);
+    if (redirectOn401([r], navigate)) return;
     if(r.ok){toast('Periods saved');fetchPeriods();fetchSummary();}
     else{const e=await r.json();toast(e.message||'Failed','error');}
   };
@@ -1304,6 +1322,7 @@ const SetupSection = () => {
       let url=`${BASE}/api/setup/national-subjects?grade=${addGrade}`;
       if(parseInt(addGrade)>=10&&addStream)url+=`&stream=${addStream}`;
       const r=await fetch(url,{headers:authH()});
+      if (redirectOn401([r], navigate)) return;
       if(r.ok)setNatSubs(await r.json());
     })();
   },[addGrade,addStream]);
@@ -1318,12 +1337,14 @@ const SetupSection = () => {
     const payload=selNat.map(id=>({academicYearId:summary.currentYearId,nationalSubjectId:id,grade:parseInt(addGrade),stream:parseInt(addGrade)>=10?addStream||null:null}));
     const r=await fetch(`${BASE}/api/setup/subjects`,{method:'POST',headers:jsonH(),body:JSON.stringify(payload)});
     setSaving(false);
+    if (redirectOn401([r], navigate)) return;
     if(r.ok){toast(`${selNat.length} subject(s) added`);setSelNat([]);fetchSubjects();fetchSummary();}
     else{const e=await r.json();toast(e.message||'Failed','error');}
   };
 
   const removeSubject=async(id)=>{
-    await fetch(`${BASE}/api/setup/subjects/${id}`,{method:'DELETE',headers:authH()});
+    const r = await fetch(`${BASE}/api/setup/subjects/${id}`,{method:'DELETE',headers:authH()});
+    if (redirectOn401([r], navigate)) return;
     toast('Subject removed');fetchSubjects();fetchSummary();
   };
 
@@ -1336,12 +1357,14 @@ const SetupSection = () => {
     setSaving(true);
     const r=await fetch(`${BASE}/api/setup/classes`,{method:'POST',headers:jsonH(),body:JSON.stringify({academicYearId:summary.currentYearId,grade:parseInt(clsForm.grade),stream:parseInt(clsForm.grade)>=10?clsForm.stream:null,letter:clsForm.letter,capacity:clsForm.capacity})});
     setSaving(false);
+    if (redirectOn401([r], navigate)) return;
     if(r.ok){toast(`Class ${clsForm.grade}${clsForm.letter} created`);fetchClasses();fetchSummary();}
     else{const e=await r.json();toast(e.message||'Failed','error');}
   };
 
   const removeClass=async(id,name)=>{
-    await fetch(`${BASE}/api/setup/classes/${id}`,{method:'DELETE',headers:authH()});
+    const r = await fetch(`${BASE}/api/setup/classes/${id}`,{method:'DELETE',headers:authH()});
+    if (redirectOn401([r], navigate)) return;
     toast(`Class ${name} removed`);fetchClasses();fetchSummary();
   };
 
@@ -1526,6 +1549,7 @@ const SetupSection = () => {
 };
 
 const EventsSection = () => {
+  const navigate = useNavigate();
   const [events,  setEvents]  = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialog,  setDialog]  = useState(false);
@@ -1551,9 +1575,10 @@ const EventsSection = () => {
   const fetch_ = useCallback(async () => {
     setLoading(true);
     const res = await fetch(`${BASE}/api/management/events?month=${month}`, {headers:authH()});
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) setEvents(await res.json());
     setLoading(false);
-  }, [month]);
+  }, [month, navigate]);
   useEffect(()=>{fetch_();},[fetch_]);
  
   const openAdd  = () => { setEditing(null); setForm(EF); setDialog(true); };
@@ -1576,15 +1601,17 @@ const EventsSection = () => {
     const url    = editing ? `${BASE}/api/management/events/${editing.id}` : `${BASE}/api/management/events`;
     const method = editing ? 'PATCH' : 'POST';
     const res = await fetch(url, {method, headers:jsonH(), body:JSON.stringify(form)});
+    if (redirectOn401([res], navigate)) return;
     const d = await res.json();
     setSaving(false);
     if (res.ok) { toast(editing?'Event updated':'Event created'); setDialog(false); fetch_(); }
     else toast(d.message||'Failed','error');
   };
- 
+
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this event?')) return;
-    await fetch(`${BASE}/api/management/events/${id}`, {method:'DELETE', headers:authH()});
+    const res = await fetch(`${BASE}/api/management/events/${id}`, {method:'DELETE', headers:authH()});
+    if (redirectOn401([res], navigate)) return;
     toast('Event deleted'); fetch_();
   };
  
@@ -1704,6 +1731,7 @@ const EventsSection = () => {
    ANNOUNCEMENTS SECTION
 ═══════════════════════════════════════════════════════════════ */
 const AnnouncementsSection = () => {
+  const navigate = useNavigate();
   const [items,   setItems]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialog,  setDialog]  = useState(false);
@@ -1718,9 +1746,10 @@ const AnnouncementsSection = () => {
   const fetch_ = useCallback(async () => {
     setLoading(true);
     const res = await fetch(`${BASE}/api/management/announcements`, {headers:authH()});
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) setItems(await res.json());
     setLoading(false);
-  }, []);
+  }, [navigate]);
   useEffect(()=>{fetch_();},[fetch_]);
  
   const openAdd  = () => { setEditing(null); setForm(EF); setDialog(true); };
@@ -1732,23 +1761,26 @@ const AnnouncementsSection = () => {
     const url    = editing ? `${BASE}/api/management/announcements/${editing.id}` : `${BASE}/api/management/announcements`;
     const method = editing ? 'PATCH' : 'POST';
     const res = await fetch(url, {method, headers:jsonH(), body:JSON.stringify(form)});
+    if (redirectOn401([res], navigate)) return;
     const d = await res.json();
     setSaving(false);
     if (res.ok) { toast(editing?'Updated':'Created'); setDialog(false); fetch_(); }
     else toast(d.message||'Failed','error');
   };
- 
+
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this announcement?')) return;
-    await fetch(`${BASE}/api/management/announcements/${id}`, {method:'DELETE',headers:authH()});
+    const res = await fetch(`${BASE}/api/management/announcements/${id}`, {method:'DELETE',headers:authH()});
+    if (redirectOn401([res], navigate)) return;
     toast('Deleted'); fetch_();
   };
- 
+
   const togglePin = async (a) => {
-    await fetch(`${BASE}/api/management/announcements/${a.id}`, {
+    const res = await fetch(`${BASE}/api/management/announcements/${a.id}`, {
       method:'PATCH', headers:jsonH(),
       body: JSON.stringify({isPinned:!a.isPinned}),
     });
+    if (redirectOn401([res], navigate)) return;
     fetch_();
   };
  
@@ -1855,6 +1887,7 @@ const AnnouncementsSection = () => {
    REPORTS SECTION
 ═══════════════════════════════════════════════════════════════ */
 const ReportsSection = () => {
+  const navigate = useNavigate();
   const [tab,        setTab]       = useState('attendance');
   const [classes,    setClasses]   = useState([]);
   const [terms,      setTerms]     = useState([]);
@@ -1870,16 +1903,18 @@ const ReportsSection = () => {
  
   const loadTerms = useCallback(async () => {
     const t = await fetch(`${BASE}/api/setup/terms`, {headers:authH()});
+    if (redirectOn401([t], navigate)) return;
     if (t.ok) setTerms(await t.json());
-  }, []);
+  }, [navigate]);
 
   useEffect(()=>{
     (async()=>{
       const c = await fetch(`${BASE}/api/management/reports/classes`, {headers:authH()});
+      if (redirectOn401([c], navigate)) return;
       if(c.ok) setClasses(await c.json());
       await loadTerms();
     })();
-  },[loadTerms]);
+  },[loadTerms, navigate]);
 
   const toggleTermRelease = async (term) => {
     const released = !(term.reports_released || term.reportsReleased);
@@ -1887,6 +1922,7 @@ const ReportsSection = () => {
       const res = await fetch(`${BASE}/api/setup/terms/${term.id}/release-reports`, {
         method: 'PATCH', headers: jsonH(), body: JSON.stringify({ released }),
       });
+      if (redirectOn401([res], navigate)) return;
       if (res.ok) { toast(released ? 'Reports released to students' : 'Reports un-released'); loadTerms(); }
       else { const d = await res.json(); toast(d.message || 'Failed to update', 'error'); }
     } catch { toast('Network error', 'error'); }
@@ -1904,17 +1940,19 @@ const ReportsSection = () => {
       if (selTerm) url+=`&termId=${selTerm}`;
     }
     const res = await fetch(url, {headers:authH()});
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) setReport(await res.json());
     else toast('Failed to generate report','error');
     setLoading(false);
   };
- 
+
   // Open individual student PDF in new tab
   const openStudentPDF = async (studentId) => {
     setPdfLoading(studentId);
     const termParam = selTerm ? `?termId=${selTerm}` : '';
     const url = `${BASE}/api/management/reports/student/${studentId}/pdf${termParam}`;
     const res = await fetch(url, {headers:authH()});
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) {
       const blob = await res.blob();
       window.open(URL.createObjectURL(blob), '_blank');
@@ -1923,7 +1961,7 @@ const ReportsSection = () => {
     }
     setPdfLoading(null);
   };
- 
+
   // Open full class PDF in new tab
   const openClassPDF = async () => {
     if (!selClass) return toast('Select a class first','error');
@@ -1931,6 +1969,7 @@ const ReportsSection = () => {
     const termParam = selTerm ? `?termId=${selTerm}` : '';
     const url = `${BASE}/api/management/reports/class/${selClass}/pdf${termParam}`;
     const res = await fetch(url, {headers:authH()});
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) {
       const blob = await res.blob();
       window.open(URL.createObjectURL(blob), '_blank');
@@ -2255,6 +2294,7 @@ const PRIORITY_COLORS = {
 };
 
 const SupportSection = () => {
+  const navigate = useNavigate();
   const [tickets, setTickets]   = useState([]);
   const [loading, setLoading]   = useState(true);
   const [newOpen, setNewOpen]   = useState(false);
@@ -2271,14 +2311,16 @@ const SupportSection = () => {
   const load = useCallback(() => {
     setLoading(true);
     fetch(`${BASE}/api/management/support-tickets`, { headers: authH() })
-      .then(r => r.json()).then(d => setTickets(Array.isArray(d) ? d : [])).catch(() => setTickets([])).finally(() => setLoading(false));
-  }, []);
+      .then(r => { if (redirectOn401([r], navigate)) return []; return r.json(); })
+      .then(d => setTickets(Array.isArray(d) ? d : [])).catch(() => setTickets([])).finally(() => setLoading(false));
+  }, [navigate]);
   useEffect(() => { load(); }, [load]);
 
   const openTicket = async (id) => {
     setDetailLoading(true); setSelected({ id });
     try {
       const res = await fetch(`${BASE}/api/management/support-tickets/${id}`, { headers: authH() });
+      if (redirectOn401([res], navigate)) return;
       const d = await res.json();
       if (res.ok) setSelected(d); else { toast(d.message || 'Failed to load ticket', 'error'); setSelected(null); }
     } catch { toast('Network error', 'error'); setSelected(null); }
@@ -2290,6 +2332,7 @@ const SupportSection = () => {
     setSaving(true);
     try {
       const res = await fetch(`${BASE}/api/management/support-tickets`, { method: 'POST', headers: jsonH(), body: JSON.stringify(newForm) });
+      if (redirectOn401([res], navigate)) return;
       const d = await res.json();
       if (res.ok) { toast('Ticket submitted'); setNewOpen(false); setNewForm({ subject: '', description: '', priority: 'normal' }); load(); }
       else toast(d.message || 'Failed to submit ticket', 'error');
@@ -2302,6 +2345,7 @@ const SupportSection = () => {
     setSaving(true);
     try {
       const res = await fetch(`${BASE}/api/management/support-tickets/${selected.id}/reply`, { method: 'POST', headers: jsonH(), body: JSON.stringify({ message: reply.trim() }) });
+      if (redirectOn401([res], navigate)) return;
       if (res.ok) { setReply(''); openTicket(selected.id); load(); }
       else { const d = await res.json(); toast(d.message || 'Failed to send reply', 'error'); }
     } catch { toast('Network error', 'error'); }

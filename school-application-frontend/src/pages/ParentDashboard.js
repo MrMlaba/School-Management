@@ -45,13 +45,16 @@ const ParentDashboard = () => {
         fetch(`${BASE}/api/parent/children/${id}/attendance`, { headers: authH() }),
         fetch(`${BASE}/api/parent/children/${id}/results`,    { headers: authH() }),
       ]);
+      if (attRes.status === 401 || resRes.status === 401) {
+        sessionStorage.removeItem('parentToken'); navigate('/parent-login'); return;
+      }
       const attendance = attRes.ok ? await attRes.json() : { records: [], summary: {} };
       const results    = resRes.ok ? await resRes.json()  : [];
       setChildData(prev => ({ ...prev, [id]: { loading: false, attendance, results } }));
     } catch {
       setChildData(prev => ({ ...prev, [id]: { loading: false, attendance: null, results: [] } }));
     }
-  }, [childData]);
+  }, [childData, navigate]);
 
   const handleLogout = () => {
     ['parentToken', 'parentFirstName', 'parentLastName'].forEach(k => sessionStorage.removeItem(k));

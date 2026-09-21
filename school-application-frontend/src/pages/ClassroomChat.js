@@ -45,6 +45,8 @@ export default function ClassroomChat() {
   const navigate    = useNavigate();
   const numGrade    = parseInt((classId||'').replace(/[^0-9]/g,'')) || 0;
   const myId        = getMyId();
+  const numGradeRef = useRef(numGrade);
+  numGradeRef.current = numGrade;
 
   const [msgs,     setMsgs]     = useState([]);
   const [text,     setText]     = useState('');
@@ -62,11 +64,13 @@ export default function ClassroomChat() {
 
   /* ── Fetch / poll ── */
   const fetchMsgs = useCallback(async () => {
+    const requestedGrade = numGrade;
     try {
       const res = await fetch(`${BASE}/api/student/chat/${numGrade}`, { headers:authH() });
-      if (res.status===401) { navigate('/student-login'); return; }
+      if (res.status===401) { sessionStorage.removeItem('studentToken'); navigate('/student-login'); return; }
       if (!res.ok) return;
       const data = await res.json();
+      if (requestedGrade !== numGradeRef.current) return; // stale response from a room we've since navigated away from
       setMsgs(data);
       const maxId = data.length ? Math.max(...data.map(m=>m.id)) : 0;
       if (maxId > lastIdRef.current) {
@@ -101,7 +105,12 @@ export default function ClassroomChat() {
       const res = await fetch(`${BASE}/api/student/chat/${numGrade}`, {
         method:'POST', headers:jsonH(), body:JSON.stringify(body),
       });
-      if (!res.ok) { const e=await res.json(); setError(e.message||'Failed'); setSending(false); return; }
+      if (res.status===401) { sessionStorage.removeItem('studentToken'); navigate('/student-login'); return; }
+      if (!res.ok) {
+        let msg = 'Failed';
+        try { msg = (await res.json()).message || msg; } catch {}
+        setError(msg); setSending(false); return;
+      }
       const msg = await res.json();
       setMsgs(prev => [...prev, msg]);
       lastIdRef.current = msg.id;
@@ -110,7 +119,7 @@ export default function ClassroomChat() {
       inputRef.current?.focus();
     } catch { setError('Network error — try again'); }
     setSending(false);
-  }, [text, sending, numGrade, replyTo]);
+  }, [text, sending, numGrade, replyTo, navigate]);
 
   const handleKey = (e) => { if (e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); } };
 

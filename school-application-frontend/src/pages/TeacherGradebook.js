@@ -202,6 +202,13 @@ export default function TeacherGradebook() {
     setEditing({ studentId, assignmentId, value: current ?? '' });
   };
 
+  const isMarkInRange = (assignmentId, value) => {
+    const num = Number(value);
+    if (Number.isNaN(num) || num < 0) return false;
+    const total = data?.assignments?.find(a => String(a.id) === String(assignmentId))?.totalMarks;
+    return !total || num <= Number(total);
+  };
+
   const updateDraft = (studentId, assignmentId, value) => {
     setDrafts(d => ({ ...d, [studentId]: { ...d[studentId], [assignmentId]: value } }));
   };
@@ -210,6 +217,7 @@ export default function TeacherGradebook() {
     const token = sessionStorage.getItem('teacherToken');
     const { studentId, assignmentId, value } = editing;
     if (!studentId || !assignmentId) return;
+    if (!isMarkInRange(assignmentId, value)) { console.error(`Mark ${value} is out of range`); return; }
     setLoading(true);
     try {
       const res = await fetch(`${BASE}/api/teacher/assignments/${assignmentId}/submissions/create`, {
@@ -229,6 +237,7 @@ export default function TeacherGradebook() {
     const token = sessionStorage.getItem('teacherToken');
     const value = drafts?.[studentId]?.[assignmentId];
     if (value === undefined) return;
+    if (!isMarkInRange(assignmentId, value)) { console.error(`Mark ${value} is out of range`); return; }
     try {
       const res = await fetch(`${BASE}/api/teacher/assignments/${assignmentId}/submissions/create`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -249,6 +258,7 @@ export default function TeacherGradebook() {
       Object.entries(drafts).forEach(([studentId, assigns]) => {
         Object.entries(assigns).forEach(([assignmentId, val]) => {
           if (val === '' || val == null) return;
+          if (!isMarkInRange(assignmentId, val)) { console.error(`Mark ${val} is out of range for assignment ${assignmentId}`); return; }
           promises.push(fetch(`${BASE}/api/teacher/assignments/${assignmentId}/submissions/create`, {
             method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             body: JSON.stringify({ studentId: Number(studentId), marksObtained: val })

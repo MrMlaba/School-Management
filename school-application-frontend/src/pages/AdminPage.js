@@ -186,7 +186,8 @@ const ApplicationPeriodPanel = () => {
         setData(d);
         setFrom(d.applicationOpenFrom ? d.applicationOpenFrom.slice(0, 10) : '');
         setUntil(d.applicationOpenUntil ? d.applicationOpenUntil.slice(0, 10) : '');
-      });
+      })
+      .catch(() => setMsg('Network error loading application period.'));
   };
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -286,6 +287,7 @@ const AdminPage = () => {
     })
       .then(res => { if (handleUnauthorized('admin', res)) return null; return res.json(); })
       .then(data => { if (data) setApplications(Array.isArray(data) ? data : []); })
+      .catch(() => setApplications([]))
       .finally(() => setLoading(false));
   };
 

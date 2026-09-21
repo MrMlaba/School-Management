@@ -121,6 +121,9 @@ router.put('/teachers/:id/subjects', async (req, res) => {
   if (!Array.isArray(subjectIds))
     return res.status(400).json({ message: 'subjectIds array is required' });
 
+  const { rows: teacherRow } = await pool.query('SELECT id FROM teachers WHERE id = $1 AND school_id = $2', [teacherId, schoolId]);
+  if (!teacherRow.length) return res.status(404).json({ message: 'Teacher not found' });
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -140,8 +143,8 @@ router.put('/teachers/:id/subjects', async (req, res) => {
       `SELECT ts.national_subject_id AS id, ns.name
        FROM teacher_subjects ts
        JOIN national_subjects ns ON ns.id = ts.national_subject_id
-       WHERE ts.teacher_id = $1 ORDER BY ns.name`,
-      [teacherId]
+       WHERE ts.teacher_id = $1 AND ts.school_id = $2 ORDER BY ns.name`,
+      [teacherId, schoolId]
     );
     res.json(rows);
   } catch (err) {
@@ -289,6 +292,16 @@ router.post('/timetable', async (req, res) => {
     );
     if (!cls.length) return res.status(404).json({ message: 'Class not found' });
 
+    const { rows: teacherRow } = await pool.query(
+      'SELECT id FROM teachers WHERE id = $1 AND school_id = $2', [teacherId, schoolId]
+    );
+    if (!teacherRow.length) return res.status(404).json({ message: 'Teacher not found' });
+
+    const { rows: subjectRow } = await pool.query(
+      'SELECT id FROM school_subjects WHERE id = $1 AND school_id = $2', [subjectId, schoolId]
+    );
+    if (!subjectRow.length) return res.status(404).json({ message: 'Subject not found' });
+
     // Clash A: class already has a subject at this slot
     const { rows: classClash } = await pool.query(
       `SELECT ss.name AS subject FROM timetable_slots ts
@@ -302,15 +315,15 @@ router.post('/timetable', async (req, res) => {
         type: 'CLASS_CLASH',
       });
 
-    // Clash B: teacher already assigned anywhere at this slot (across ALL grades)
+    // Clash B: teacher already assigned anywhere at this slot (across ALL grades, same school)
     const { rows: teacherClash } = await pool.query(
       `SELECT ss.name AS subject, c.name AS class, t.first_name, t.last_name
        FROM timetable_slots ts
        JOIN school_subjects ss ON ss.id = ts.subject_id
        JOIN classes          c  ON c.id  = ts.class_id
        JOIN teachers         t  ON t.id  = ts.teacher_id
-       WHERE ts.teacher_id = $1 AND ts.period_id = $2 AND ts.day_of_week = $3`,
-      [teacherId, periodId, dayOfWeek]
+       WHERE ts.teacher_id = $1 AND ts.period_id = $2 AND ts.day_of_week = $3 AND ts.school_id = $4`,
+      [teacherId, periodId, dayOfWeek, schoolId]
     );
     if (teacherClash.length) {
       const tc = teacherClash[0];

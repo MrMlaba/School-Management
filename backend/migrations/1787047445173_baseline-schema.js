@@ -339,17 +339,27 @@ export const up = async (pgm) => {
   // dedicated sequence; the exact format of existing numbers can't be
   // recovered, but new ones will look like STU00100001.
   await pgm.db.query(`CREATE SEQUENCE IF NOT EXISTS student_number_seq`);
-  await pgm.db.query(`
-    CREATE OR REPLACE FUNCTION generate_student_number(p_school_id INTEGER)
-    RETURNS TEXT AS $$
-    DECLARE
-      v_num BIGINT;
-    BEGIN
-      v_num := nextval('student_number_seq');
-      RETURN 'STU' || LPAD(p_school_id::TEXT, 3, '0') || LPAD(v_num::TEXT, 6, '0');
-    END;
-    $$ LANGUAGE plpgsql
-  `);
+  try {
+    // CREATE OR REPLACE can't change a function's return type — a DB whose
+    // generate_student_number predates this migration (a different local
+    // dev DB, or a pre-migration manual setup) has it with some other
+    // signature, and REPLACE alone would abort the whole migration. Drop it
+    // first so this is idempotent regardless of what shape it was in.
+    await pgm.db.query(`DROP FUNCTION IF EXISTS generate_student_number(INTEGER)`);
+    await pgm.db.query(`
+      CREATE FUNCTION generate_student_number(p_school_id INTEGER)
+      RETURNS TEXT AS $$
+      DECLARE
+        v_num BIGINT;
+      BEGIN
+        v_num := nextval('student_number_seq');
+        RETURN 'STU' || LPAD(p_school_id::TEXT, 3, '0') || LPAD(v_num::TEXT, 6, '0');
+      END;
+      $$ LANGUAGE plpgsql
+    `);
+  } catch (err) {
+    console.warn('Migration note (generate_student_number):', err.message);
+  }
 
   await pgm.db.query(`
     CREATE TABLE IF NOT EXISTS announcements (

@@ -98,8 +98,8 @@ router.post('/chat/:grade', async (req, res) => {
     let replyToSender = null, replyToPreview = null;
     if (replyToId) {
       const { rows: orig } = await pool.query(
-        'SELECT sender_name, message FROM chat_messages WHERE id = $1',
-        [replyToId]
+        'SELECT sender_name, message FROM chat_messages WHERE id = $1 AND school_id = $2 AND grade = $3',
+        [replyToId, info.schoolId, numGrade]
       );
       if (orig.length) {
         replyToSender  = orig[0].sender_name;
@@ -141,6 +141,14 @@ router.post('/chat/:grade/react', async (req, res) => {
   if (!messageId || !emoji) return res.status(400).json({ message: 'messageId and emoji required' });
 
   try {
+    const info = await getStudentInfo(studentId);
+    if (!info) return res.status(404).json({ message: 'Student not found' });
+    const { rows: msg } = await pool.query(
+      'SELECT 1 FROM chat_messages WHERE id = $1 AND school_id = $2 AND grade = $3',
+      [messageId, info.schoolId, info.grade]
+    );
+    if (!msg.length) return res.status(404).json({ message: 'Message not found' });
+
     // Check if this student already reacted with this emoji
     const { rows: existing } = await pool.query(
       'SELECT 1 FROM chat_reactions WHERE message_id=$1 AND student_id=$2 AND emoji=$3',

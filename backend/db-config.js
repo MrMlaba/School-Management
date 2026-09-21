@@ -17,9 +17,12 @@ const dbConfig = process.env.DATABASE_URL
       user:     process.env.PGUSER,
       password: process.env.PGPASSWORD,
       connectionTimeoutMillis: 2000,
-      ssl: {
-        rejectUnauthorized: false, // required for Render/Railway-hosted Postgres
-      },
+      // A local Postgres install doesn't speak SSL by default; forcing it
+      // here made the app unable to ever connect to localhost. Still forced
+      // for any real (non-localhost) host, e.g. Render/Railway-hosted Postgres.
+      ssl: ['localhost', '127.0.0.1'].includes(process.env.PGHOST)
+        ? false
+        : { rejectUnauthorized: false },
     };
 
 module.exports = dbConfig;

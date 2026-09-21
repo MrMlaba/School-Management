@@ -641,7 +641,10 @@ router.post('/assignments', async (req, res) => {
     return res.status(400).json({ message: 'classId, subjectId, title and dueDate are required' });
 
   try {
-    const { rows: cls } = await pool.query('SELECT academic_year_id FROM classes WHERE id = $1', [classId]);
+    const { rows: cls } = await pool.query('SELECT academic_year_id FROM classes WHERE id = $1 AND school_id = $2', [classId, schoolId]);
+    if (!cls.length) return res.status(404).json({ message: 'Class not found' });
+    const { rows: subj } = await pool.query('SELECT id FROM school_subjects WHERE id = $1 AND school_id = $2', [subjectId, schoolId]);
+    if (!subj.length) return res.status(404).json({ message: 'Subject not found' });
     const { rows } = await pool.query(
       `INSERT INTO assignments (school_id, class_id, subject_id, teacher_id, title, description, due_date, total_marks, academic_year_id, term_id, weight)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
@@ -672,11 +675,15 @@ router.post('/assignments', async (req, res) => {
 // existing Files dialog, not this route.
 router.patch('/assignments/:id', async (req, res) => {
   const teacherId = req.teacher.id;
+  const schoolId  = req.teacher.schoolId;
   const { classId, subjectId, title, description, dueDate, totalMarks, termId, weight } = req.body;
   if (!classId || !subjectId || !title || !dueDate)
     return res.status(400).json({ message: 'classId, subjectId, title and dueDate are required' });
   try {
-    const { rows: cls } = await pool.query('SELECT academic_year_id FROM classes WHERE id = $1', [classId]);
+    const { rows: cls } = await pool.query('SELECT academic_year_id FROM classes WHERE id = $1 AND school_id = $2', [classId, schoolId]);
+    if (!cls.length) return res.status(404).json({ message: 'Class not found' });
+    const { rows: subj } = await pool.query('SELECT id FROM school_subjects WHERE id = $1 AND school_id = $2', [subjectId, schoolId]);
+    if (!subj.length) return res.status(404).json({ message: 'Subject not found' });
     const { rows } = await pool.query(
       `UPDATE assignments SET class_id=$1, subject_id=$2, title=$3, description=$4, due_date=$5,
               total_marks=$6, academic_year_id=$7, term_id=$8, weight=$9
@@ -730,6 +737,8 @@ router.post('/assignments/:assignmentId/submissions/:submissionId/grade', async 
     if (!asg.length) return res.status(403).json({ message: 'Assignment not found or not yours' });
     const total = parseFloat(asg[0].total_marks) || 100;
     const marks = parseFloat(marksObtained);
+    if (Number.isNaN(marks) || marks < 0 || marks > total)
+      return res.status(400).json({ message: `Marks must be between 0 and ${total}` });
     const pct   = ((marks / total) * 100).toFixed(2);
     await ensureSupportTables();
     const { rowCount } = await pool.query(
@@ -747,6 +756,7 @@ router.post('/assignments/:assignmentId/submissions/:submissionId/grade', async 
 
 router.post('/assignments/:assignmentId/submissions/create', async (req, res) => {
   const teacherId    = req.teacher.id;
+  const schoolId     = req.teacher.schoolId;
   const { assignmentId } = req.params;
   const { studentId, marksObtained } = req.body;
   if (!studentId) return res.status(400).json({ message: 'studentId is required' });
@@ -754,9 +764,13 @@ router.post('/assignments/:assignmentId/submissions/create', async (req, res) =>
     await ensureSupportTables();
     const { rows: asg } = await pool.query('SELECT id, total_marks FROM assignments WHERE id = $1 AND teacher_id = $2', [assignmentId, teacherId]);
     if (!asg.length) return res.status(403).json({ message: 'Assignment not found or not yours' });
+    const { rows: stu } = await pool.query('SELECT id FROM enrolled_students WHERE id = $1 AND school_id = $2', [studentId, schoolId]);
+    if (!stu.length) return res.status(404).json({ message: 'Student not found' });
     const total = parseFloat(asg[0].total_marks) || 100;
+    const marks = (marksObtained === undefined || marksObtained === null || marksObtained === '') ? null : parseFloat(marksObtained);
+    if (marks !== null && (Number.isNaN(marks) || marks < 0 || marks > total))
+      return res.status(400).json({ message: `Marks must be between 0 and ${total}` });
     const { rows: existing } = await pool.query('SELECT id FROM assignment_submissions WHERE assignment_id = $1 AND student_id = $2', [assignmentId, studentId]);
-    const marks = (marksObtained === undefined || marksObtained === null) ? null : parseFloat(marksObtained);
     const pct   = marks !== null ? ((marks / total) * 100).toFixed(2) : null;
     if (existing.length) {
       await pool.query('UPDATE assignment_submissions SET marks_obtained = $1, percentage = $2, graded_at = NOW(), graded_by = $3 WHERE id = $4', [marks, pct, teacherId, existing[0].id]);
@@ -816,6 +830,7 @@ router.get('/assignments/:id/export', async (req, res) => {
 
 router.post('/assignments/:id/import', memoryUpload.single('file'), async (req, res) => {
   const teacherId    = req.teacher.id;
+  const schoolId     = req.teacher.schoolId;
   const { id: assignmentId } = req.params;
   if (!req.file) return res.status(400).json({ message: 'CSV file is required' });
   try {
@@ -837,7 +852,7 @@ router.post('/assignments/:id/import', memoryUpload.single('file'), async (req, 
       let studentId = null;
       if (studentIdIdx >= 0) studentId = parseInt(cols[studentIdIdx], 10);
       if (!studentId && studentNumberIdx >= 0) {
-        const { rows: srows } = await pool.query('SELECT id FROM enrolled_students WHERE student_number = $1 LIMIT 1', [cols[studentNumberIdx]]);
+        const { rows: srows } = await pool.query('SELECT id FROM enrolled_students WHERE student_number = $1 AND school_id = $2 LIMIT 1', [cols[studentNumberIdx], schoolId]);
         if (srows.length) studentId = srows[0].id;
       }
       if (!studentId) continue;
@@ -859,10 +874,13 @@ router.post('/assignments/:id/import', memoryUpload.single('file'), async (req, 
 });
 
 router.post('/assignments/:id/submit', uploadSubmissionFile.single('file'), async (req, res) => {
+  const teacherId = req.teacher.id;
   const { id: assignmentId } = req.params;
   const { studentId } = req.body;
   if (!req.file) return res.status(400).json({ message: 'File is required' });
   try {
+    const { rows: asg } = await pool.query('SELECT id FROM assignments WHERE id = $1 AND teacher_id = $2', [assignmentId, teacherId]);
+    if (!asg.length) return res.status(403).json({ message: 'Assignment not found or not yours' });
     await ensureSupportTables();
     const filename = await saveFileToDb(req.file);
     const { rows } = await pool.query(
@@ -939,7 +957,10 @@ router.post('/exams', async (req, res) => {
     return res.status(400).json({ message: 'classId, subjectId, title and examDate are required' });
   try {
     await ensureSupportTables();
-    const { rows: cls } = await pool.query('SELECT academic_year_id FROM classes WHERE id = $1', [classId]);
+    const { rows: cls } = await pool.query('SELECT academic_year_id FROM classes WHERE id = $1 AND school_id = $2', [classId, schoolId]);
+    if (!cls.length) return res.status(404).json({ message: 'Class not found' });
+    const { rows: subj } = await pool.query('SELECT id FROM school_subjects WHERE id = $1 AND school_id = $2', [subjectId, schoolId]);
+    if (!subj.length) return res.status(404).json({ message: 'Subject not found' });
     const { rows } = await pool.query(
       `INSERT INTO exams (school_id, class_id, subject_id, teacher_id, title, exam_date, total_marks, type, academic_year_id, term_id, weight)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
@@ -955,11 +976,15 @@ router.post('/exams', async (req, res) => {
 
 router.patch('/exams/:id', async (req, res) => {
   const teacherId = req.teacher.id;
+  const schoolId  = req.teacher.schoolId;
   const { classId, subjectId, title, examDate, totalMarks, type, termId, weight } = req.body;
   if (!classId || !subjectId || !title || !examDate)
     return res.status(400).json({ message: 'classId, subjectId, title and examDate are required' });
   try {
-    const { rows: cls } = await pool.query('SELECT academic_year_id FROM classes WHERE id = $1', [classId]);
+    const { rows: cls } = await pool.query('SELECT academic_year_id FROM classes WHERE id = $1 AND school_id = $2', [classId, schoolId]);
+    if (!cls.length) return res.status(404).json({ message: 'Class not found' });
+    const { rows: subj } = await pool.query('SELECT id FROM school_subjects WHERE id = $1 AND school_id = $2', [subjectId, schoolId]);
+    if (!subj.length) return res.status(404).json({ message: 'Subject not found' });
     const { rows } = await pool.query(
       `UPDATE exams SET class_id=$1, subject_id=$2, title=$3, exam_date=$4, total_marks=$5, type=$6,
               academic_year_id=$7, term_id=$8, weight=$9
@@ -1141,11 +1166,19 @@ router.post('/exams/:examId/results', async (req, res) => {
     const { rows: exam } = await pool.query('SELECT total_marks FROM exams WHERE id = $1 AND teacher_id = $2', [examId, teacherId]);
     if (!exam.length) return res.status(403).json({ message: 'Exam not found or not yours' });
     const totalMarks = exam[0].total_marks || 100;
+    for (const r of results) {
+      if (r.marksObtained === '' || r.marksObtained === null) continue;
+      const marks = parseFloat(r.marksObtained);
+      if (Number.isNaN(marks) || marks < 0 || marks > totalMarks)
+        return res.status(400).json({ message: `Marks for student ${r.studentId} must be between 0 and ${totalMarks}` });
+    }
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       for (const r of results) {
         if (r.marksObtained === '' || r.marksObtained === null) continue;
+        const { rows: stu } = await client.query('SELECT id FROM enrolled_students WHERE id = $1 AND school_id = $2', [r.studentId, schoolId]);
+        if (!stu.length) continue;
         const marks = parseFloat(r.marksObtained);
         const pct   = ((marks / totalMarks) * 100).toFixed(2);
         await client.query(

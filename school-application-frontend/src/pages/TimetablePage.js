@@ -108,10 +108,15 @@ const TeachersTab = () => {
 
   const fetch_ = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`${BASE}/api/management/teachers`, { headers: authH() });
-    if (handleUnauthorized('admin', res)) return;
-    if (res.ok) setTeachers(await res.json());
-    setLoading(false);
+    try {
+      const res = await fetch(`${BASE}/api/management/teachers`, { headers: authH() });
+      if (handleUnauthorized('admin', res)) return;
+      if (res.ok) setTeachers(await res.json());
+    } catch {
+      toast('Network error loading teachers', 'error');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetch_(); }, [fetch_]);

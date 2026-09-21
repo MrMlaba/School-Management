@@ -70,7 +70,7 @@ const jsonH = () => ({ 'Content-Type': 'application/json', ...authH() });
 const redirectOn401 = (responses, navigate) => {
   if (responses.some(r => r.status === 401)) {
     ['teacherToken', 'teacherFirstName', 'teacherLastName', 'teacherSchool'].forEach(k => sessionStorage.removeItem(k));
-    navigate('/teacher-login');
+    if (navigate) navigate('/teacher-login'); else window.location.href = '/teacher-login';
     return true;
   }
   return false;
@@ -186,7 +186,7 @@ const MarksTableView = () => {
     (async () => {
       try {
         const res = await fetch(`${BASE}/api/teacher/marks-table?${params}`, { headers: authH() });
-        if (res.status === 401) { window.location.href = '/teacher-login'; return; }
+        if (res.status === 401) { redirectOn401([res]); return; }
         if (res.status === 404) { setData({ assignments: [], students: [], terms: [] }); setLoading(false); return; }
         if (!res.ok) { console.error('Failed loading marks table', res.status); setData(null); setLoading(false); return; }
         const d = await res.json(); setData(d);
@@ -720,6 +720,7 @@ const TimetableTab = () => {
    ATTENDANCE TAB
 ══════════════════════════════════════════════════════════════════════ */
 const AttendanceTab = ({ initSlotId }) => {
+  const navigate = useNavigate();
   const [mySlots, setMySlots] = useState([]);
   const [slotId,  setSlotId]  = useState(initSlotId || '');
   const [date,    setDate]    = useState(new Date().toLocaleDateString('en-CA'));
@@ -733,13 +734,14 @@ const AttendanceTab = ({ initSlotId }) => {
   useEffect(() => {
     (async () => {
       const res = await fetch(`${BASE}/api/teacher/timetable`, { headers: authH() });
+      if (redirectOn401([res], navigate)) return;
       if (res.ok) {
         const d = await res.json();
         const seen = new Set();
         setMySlots((d.slots || []).filter(s => { const k=`${s.subjectName}-${s.className}`; if(seen.has(k))return false; seen.add(k);return true; }));
       }
     })();
-  }, []);
+  }, [navigate]);
 
   useEffect(() => { if (slotId && date) loadAttendance(); }, [slotId, date]);
 
@@ -747,6 +749,7 @@ const AttendanceTab = ({ initSlotId }) => {
     if (!slotId || !date) return;
     setLoading(true);
     const res = await fetch(`${BASE}/api/teacher/attendance?slotId=${slotId}&date=${date}`, { headers: authH() });
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) {
       const d = await res.json();
       setAttData(d);
@@ -762,6 +765,7 @@ const AttendanceTab = ({ initSlotId }) => {
     setSaving(true);
     const res = await fetch(`${BASE}/api/teacher/attendance`, { method:'POST', headers:jsonH(), body:JSON.stringify({ slotId, date, records }) });
     setSaving(false);
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) toast('Attendance saved');
     else { const e = await res.json(); toast(e.message||'Failed','error'); }
   };
@@ -839,6 +843,7 @@ const AttendanceTab = ({ initSlotId }) => {
    report mark comes from assignments vs. exams. Must add up to 100%.
 ══════════════════════════════════════════════════════════════════════ */
 const TermWeightsDialog = ({ open, onClose, toast }) => {
+  const navigate = useNavigate();
   const [classes,  setClasses]  = useState([]);
   const [terms,    setTerms]    = useState([]);
   const [selClass, setSelClass] = useState('');
@@ -886,6 +891,7 @@ const TermWeightsDialog = ({ open, onClose, toast }) => {
       body: JSON.stringify({ classId: selClass, subjectId: w.subjectId, termId: selTerm, assignmentWeight: w.assignmentWeight, examWeight: w.examWeight }),
     });
     setSaving(s => ({ ...s, [w.subjectId]: false }));
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) toast(`Weights saved for ${w.subjectName}`);
     else { const e = await res.json(); toast(e.message || 'Failed to save weights', 'error'); }
   };
@@ -944,6 +950,7 @@ const TermWeightsDialog = ({ open, onClose, toast }) => {
    ASSIGNMENTS TAB  — now has two views: List  |  Marks Table
 ══════════════════════════════════════════════════════════════════════ */
 const AssignmentsTab = () => {
+  const navigate = useNavigate();
   const [view,       setView]       = useState('list');   // 'list' | 'marks'
   const [assignments, setAssignments] = useState([]);
   const [dialog,      setDialog]      = useState(false);
@@ -973,10 +980,11 @@ const AssignmentsTab = () => {
       fetch(`${BASE}/api/teacher/timetable`,   { headers:authH() }),
       fetch(`${BASE}/api/teacher/terms`,       { headers:authH() }),
     ]);
+    if (redirectOn401([aRes, tRes, termsRes], navigate)) return;
     if (aRes.ok)    setAssignments(await aRes.json());
     if (tRes.ok)    { const d=await tRes.json(); setSlots(d.slots || []); }
     if (termsRes.ok) setTerms(await termsRes.json());
-  }, []);
+  }, [navigate]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -1010,6 +1018,7 @@ const AssignmentsTab = () => {
         res = await fetch(`${BASE}/api/teacher/assignments`, { method:'POST', headers:jsonH(), body:JSON.stringify(payload) });
       }
       setSaving(false);
+      if (redirectOn401([res], navigate)) return;
       if (res.ok) { toast(editingId?'Assignment updated':'Assignment created'); setDialog(false); setEditingId(null); setFile(null); setForm(EMPTY); setBudget(null); fetchAll(); }
       else { const e=await res.json(); toast(e.message||'Failed','error'); }
     } catch { setSaving(false); toast('Failed to save assignment','error'); }
@@ -1030,26 +1039,33 @@ const AssignmentsTab = () => {
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this assignment?')) return;
     const res = await fetch(`${BASE}/api/teacher/assignments/${id}`, { method:'DELETE', headers:authH() });
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) { toast('Assignment deleted'); fetchAll(); } else toast('Failed','error');
   };
 
   const openFiles = async (a) => {
     setFilesDialog(a); setAssignFiles([]);
     const res = await fetch(`${BASE}/api/teacher/assignments/${a.id}/files`, { headers:authH() });
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) setAssignFiles(await res.json());
   };
 
   const openSubmissions = async (a) => {
     setSubmissionsDialog(a); setLoadingSubs(true);
     const res = await fetch(`${BASE}/api/teacher/assignments/${a.id}/submissions`, { headers:authH() });
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) setSubmissions(await res.json()); else setSubmissions([]);
     setLoadingSubs(false);
   };
 
   const handleGrade = async (submissionId, marks) => {
     if (marks===''||marks===null) return toast('Enter mark','error');
+    const total = submissionsDialog?.totalMarks;
+    if (total && Number(marks) > Number(total)) return toast(`Mark cannot exceed ${total}`,'error');
+    if (Number(marks) < 0) return toast('Mark cannot be negative','error');
     setGrading(g=>({...g,[submissionId]:true}));
     const res = await fetch(`${BASE}/api/teacher/assignments/${submissionsDialog.id}/submissions/${submissionId}/grade`, { method:'POST', headers:jsonH(), body:JSON.stringify({ marksObtained:marks }) });
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) { toast('Graded'); await openSubmissions(submissionsDialog); }
     else { const e=await res.json(); toast(e.message||'Failed','error'); }
     setGrading(g=>({...g,[submissionId]:false}));
@@ -1450,6 +1466,7 @@ const ExamMarksTableView = () => {
    EXAMS TAB
 ══════════════════════════════════════════════════════════════════════ */
 const ExamsTab = () => {
+  const navigate = useNavigate();
   const [exams,         setExams]         = useState([]);
   const [slots,         setSlots]         = useState([]);
   const [terms,         setTerms]         = useState([]);
@@ -1473,10 +1490,11 @@ const ExamsTab = () => {
       fetch(`${BASE}/api/teacher/timetable`, { headers:authH() }),
       fetch(`${BASE}/api/teacher/terms`,     { headers:authH() }),
     ]);
+    if (redirectOn401([eRes, tRes, termsRes], navigate)) return;
     if (eRes.ok)    setExams(await eRes.json());
     if (tRes.ok)    { const d=await tRes.json(); setSlots(d.slots || []); }
     if (termsRes.ok) setTerms(await termsRes.json());
-  }, []);
+  }, [navigate]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -1498,6 +1516,7 @@ const ExamsTab = () => {
     const method = editingId ? 'PATCH' : 'POST';
     const res = await fetch(url, { method, headers:jsonH(), body:JSON.stringify(form) });
     setSaving(false);
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) { toast(editingId?'Assessment updated':'Assessment created'); setDialog(false); setEditingId(null); setBudget(null); fetchAll(); }
     else { const e=await res.json(); toast(e.message||'Failed','error'); }
   };
@@ -1517,6 +1536,7 @@ const ExamsTab = () => {
     const warn = parseInt(exam.resultsCaptured,10) > 0 ? ` This will also delete ${exam.resultsCaptured} captured result(s).` : '';
     if (!window.confirm(`Delete "${exam.title}"?${warn}`)) return;
     const res = await fetch(`${BASE}/api/teacher/exams/${exam.id}`, { method:'DELETE', headers:authH() });
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) { toast('Assessment deleted'); fetchAll(); }
     else { const e=await res.json(); toast(e.message||'Failed to delete','error'); }
   };
@@ -1524,6 +1544,7 @@ const ExamsTab = () => {
   const openResults = async (exam) => {
     setResultsDialog(exam);
     const res = await fetch(`${BASE}/api/teacher/exams/${exam.id}/results`, { headers:authH() });
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) setResultsData(await res.json());
   };
 
@@ -1532,9 +1553,17 @@ const ExamsTab = () => {
 
   const handleSaveResults = async () => {
     if (!resultsData) return;
+    const total = resultsDialog?.totalMarks;
+    const outOfRange = resultsData.students.find(s => {
+      if (s.marksObtained === '' || s.marksObtained === null || s.marksObtained === undefined) return false;
+      const n = Number(s.marksObtained);
+      return Number.isNaN(n) || n < 0 || (total && n > Number(total));
+    });
+    if (outOfRange) return toast(`Marks must be between 0 and ${total ?? 'the total'}`, 'error');
     setSaving(true);
     const res = await fetch(`${BASE}/api/teacher/exams/${resultsDialog.id}/results`, { method:'POST', headers:jsonH(), body:JSON.stringify({ results:resultsData.students.map(s=>({ studentId:s.id, marksObtained:s.marksObtained })) }) });
     setSaving(false);
+    if (redirectOn401([res], navigate)) return;
     if (res.ok) { toast('Results saved'); setResultsDialog(null); setResultsData(null); fetchAll(); }
     else { const e=await res.json(); toast(e.message||'Failed','error'); }
   };
@@ -1724,6 +1753,7 @@ const ExamsTab = () => {
                               try {
                                 const tok = sessionStorage.getItem('teacherToken');
                                 const res = await fetch(`${BASE}/api/exams/upload`, { method: 'POST', headers: { Authorization: `Bearer ${tok}` }, body: fd });
+                                if (redirectOn401([res], navigate)) return;
                                 if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.message||'Upload failed'); }
                                 setSnack({ open:true, msg:'Scan uploaded', sev:'success' });
                               } catch (err) { console.error(err); setSnack({ open:true, msg:err.message||'Upload failed', sev:'error' }); }
@@ -1759,6 +1789,7 @@ const ExamsTab = () => {
    STUDENTS TAB
 ══════════════════════════════════════════════════════════════════════ */
 const StudentsTab = ({ initClassId }) => {
+  const navigate = useNavigate();
   const [classes,  setClasses]  = useState([]);
   const [classId,  setClassId]  = useState(initClassId || '');
   const [classInfo,setClassInfo]= useState(null);
@@ -1768,19 +1799,21 @@ const StudentsTab = ({ initClassId }) => {
   useEffect(() => {
     (async () => {
       const res = await fetch(`${BASE}/api/teacher/dashboard`, { headers:authH() });
+      if (redirectOn401([res], navigate)) return;
       if (res.ok) { const d=await res.json(); setClasses(d.myClasses||[]); }
     })();
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     if (!classId) return;
     (async () => {
       setLoading(true); setStudents([]); setClassInfo(null);
       const res = await fetch(`${BASE}/api/teacher/classes/${classId}/students`, { headers:authH() });
+      if (redirectOn401([res], navigate)) return;
       if (res.ok) { const d=await res.json(); setClassInfo(d.class); setStudents(d.students||[]); }
       setLoading(false);
     })();
-  }, [classId]);
+  }, [classId, navigate]);
 
   return (
     <Card>

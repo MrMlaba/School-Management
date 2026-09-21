@@ -340,14 +340,16 @@ router.get('/setup/subjects', async (req, res) => {
 router.post('/setup/subjects', async (req, res) => {
   const payload = Array.isArray(req.body) ? req.body : [req.body];
   if (!payload.length) return res.status(400).json({ message: 'At least one subject is required' });
+  for (const item of payload) {
+    if (!item.academicYearId || !item.nationalSubjectId || !item.grade)
+      return res.status(400).json({ message: 'academicYearId, nationalSubjectId and grade are required' });
+  }
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const inserted = [];
     for (const item of payload) {
       const { academicYearId, nationalSubjectId, grade, stream } = item;
-      if (!academicYearId || !nationalSubjectId || !grade)
-        return res.status(400).json({ message: 'academicYearId, nationalSubjectId and grade are required' });
       const { rows: ns } = await client.query(
         'SELECT name, code FROM national_subjects WHERE id = $1', [nationalSubjectId]
       );
@@ -467,19 +469,23 @@ router.get('/setup/classes', async (req, res) => {
 
 router.post('/setup/classes', async (req, res) => {
   const payload = Array.isArray(req.body) ? req.body : [req.body];
+  for (const item of payload) {
+    const { academicYearId, grade, letter, stream } = item;
+    if (!academicYearId || !grade || !letter)
+      return res.status(400).json({ message: 'academicYearId, grade and letter are required' });
+    const gr = parseInt(grade);
+    if (gr >= 10 && !stream)
+      return res.status(400).json({ message: `Grade ${gr} requires a stream (Physics/Commerce/Humanities)` });
+    if (gr < 10 && stream)
+      return res.status(400).json({ message: `Grade ${gr} does not use streams` });
+  }
   const client  = await pool.connect();
   try {
     await client.query('BEGIN');
     const created = [];
     for (const item of payload) {
       const { academicYearId, grade, letter, stream, capacity } = item;
-      if (!academicYearId || !grade || !letter)
-        return res.status(400).json({ message: 'academicYearId, grade and letter are required' });
       const gr = parseInt(grade);
-      if (gr >= 10 && !stream)
-        return res.status(400).json({ message: `Grade ${gr} requires a stream (Physics/Commerce/Humanities)` });
-      if (gr < 10 && stream)
-        return res.status(400).json({ message: `Grade ${gr} does not use streams` });
       // Streamed grades can have the same letter across different streams
       // (10A Physics and 10A Commerce are different classes), so the stream
       // is part of the class's identity, not just metadata on it.
@@ -650,6 +656,8 @@ router.put('/teachers/:id/subjects', async (req, res) => {
   const { subjectIds } = req.body;
   if (!Array.isArray(subjectIds))
     return res.status(400).json({ message: 'subjectIds array is required' });
+  const { rows: teacherRow } = await pool.query('SELECT id FROM teachers WHERE id = $1 AND school_id = $2', [req.params.id, sid(req)]);
+  if (!teacherRow.length) return res.status(404).json({ message: 'Teacher not found' });
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -669,8 +677,8 @@ router.put('/teachers/:id/subjects', async (req, res) => {
       `SELECT ts.national_subject_id AS id, ns.name
        FROM teacher_subjects ts
        JOIN national_subjects ns ON ns.id = ts.national_subject_id
-       WHERE ts.teacher_id = $1 ORDER BY ns.name`,
-      [req.params.id]
+       WHERE ts.teacher_id = $1 AND ts.school_id = $2 ORDER BY ns.name`,
+      [req.params.id, sid(req)]
     );
     res.json(rows);
   } catch (err) {

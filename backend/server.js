@@ -279,7 +279,10 @@ function validateFile(file, expectedType) {
   return { valid: true };
 }
 
-// ─── Accept any valid token (school admin / student / teacher / system) ──────
+// ─── Accept any valid token (school admin / student / teacher / system / parent) ─
+// Tags req.actor.role by *which* secret verified — none of these JWTs carry
+// their own role claim, so this is the only place that knows the role of a
+// token that could belong to any of the five portals.
 const requireAnyAuth = (req, res, next) => {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer '))
@@ -288,25 +291,97 @@ const requireAnyAuth = (req, res, next) => {
   // These env vars are guaranteed set — the modules that own them
   // (auth.js, studentAuth.js, teacherRoutes.js, systemRoutes.js, parentAuth.js)
   // throw at require()-time, which happens before this handler can ever run.
-  const secrets = [
-    process.env.JWT_SECRET,
-    process.env.STUDENT_JWT_SECRET,
-    process.env.TEACHER_JWT_SECRET,
-    process.env.SYSTEM_JWT_SECRET,
-    process.env.PARENT_JWT_SECRET,
+  const roleSecrets = [
+    ['school_admin', process.env.JWT_SECRET],
+    ['student',      process.env.STUDENT_JWT_SECRET],
+    ['teacher',      process.env.TEACHER_JWT_SECRET],
+    ['system_admin', process.env.SYSTEM_JWT_SECRET],
+    ['parent',       process.env.PARENT_JWT_SECRET],
   ];
-  for (const secret of secrets) {
-    try { jwt.verify(token, secret); return next(); } catch {}
+  for (const [role, secret] of roleSecrets) {
+    try {
+      const payload = jwt.verify(token, secret);
+      req.actor = { role, ...payload };
+      return next();
+    } catch {}
   }
   return res.status(401).json({ message: 'Invalid or expired token' });
 };
 
 // ─── Serve uploaded documents ─────────────────────────────────────────────────
+// document_files is a flat blob store shared by several unrelated features
+// (applications, teacher materials, assignment submissions, exam scans) with
+// no owner/school column of its own, so filename alone used to be the only
+// "access control" — any of the 5 JWT roles could fetch any file by name.
+// This resolves which feature/school actually owns a filename and checks the
+// requester is entitled to it before returning the bytes.
+async function resolveDocumentOwner(filename) {
+  const app = await pool.query(
+    `SELECT school FROM applications, jsonb_array_elements(documents) doc
+     WHERE doc->>'filename' = $1 LIMIT 1`,
+    [filename]
+  );
+  if (app.rows.length) return { kind: 'application', school: app.rows[0].school };
+
+  const material = await pool.query(
+    'SELECT school_id FROM teacher_materials WHERE filename = $1 LIMIT 1',
+    [filename]
+  );
+  if (material.rows.length) return { kind: 'material', schoolId: material.rows[0].school_id };
+
+  const submission = await pool.query(
+    `SELECT a.school_id AS "schoolId", a.teacher_id AS "teacherId", s.student_id AS "studentId"
+     FROM assignment_submissions s JOIN assignments a ON a.id = s.assignment_id
+     WHERE s.filename = $1 LIMIT 1`,
+    [filename]
+  );
+  if (submission.rows.length) return { kind: 'submission', ...submission.rows[0] };
+
+  const examScan = await pool.query(
+    `SELECT ass.school_id AS "schoolId", es.student_id AS "studentId"
+     FROM exam_submissions es JOIN assessments ass ON ass.id = es.assessment_id
+     WHERE es.filename = $1 LIMIT 1`,
+    [filename]
+  );
+  if (examScan.rows.length) return { kind: 'exam_scan', ...examScan.rows[0] };
+
+  return null;
+}
+
+function actorCanAccessDocument(actor, owner) {
+  if (actor.role === 'system_admin') return true;
+  switch (owner.kind) {
+    case 'application':
+      return actor.role === 'school_admin' && actor.school === owner.school;
+    case 'material':
+      return actor.schoolId === owner.schoolId;
+    case 'submission':
+      return (
+        (actor.role === 'student' && actor.id === owner.studentId) ||
+        (actor.role === 'teacher' && actor.id === owner.teacherId) ||
+        (actor.role === 'school_admin' && actor.schoolId === owner.schoolId)
+      );
+    case 'exam_scan':
+      return (
+        (actor.role === 'student' && actor.id === owner.studentId) ||
+        (actor.role === 'teacher' && actor.schoolId === owner.schoolId) ||
+        (actor.role === 'school_admin' && actor.schoolId === owner.schoolId)
+      );
+    default:
+      return false;
+  }
+}
+
 app.get('/api/documents/:filename', requireAnyAuth, async (req, res) => {
   const filename = path.basename(req.params.filename);
   if (!filename || !/^[a-zA-Z0-9_.-]+$/.test(filename))
     return res.status(400).json({ success: false, message: 'Invalid filename' });
   try {
+    const owner = await resolveDocumentOwner(filename);
+    if (!owner) return res.status(404).json({ success: false, message: 'File not found' });
+    if (!actorCanAccessDocument(req.actor, owner))
+      return res.status(403).json({ success: false, message: 'Not authorized to access this file' });
+
     // Documents are stored as binary data in Postgres — see document_files.
     const { rows } = await pool.query(
       'SELECT data, mimetype, original_name FROM document_files WHERE filename = $1',
@@ -621,6 +696,8 @@ app.post('/api/assignments/:id/submit', requireStudent, upload.single('file'), a
   const v = validateFile(req.file, 'additional');
   if (!v.valid) return res.status(400).json({ success: false, message: v.error });
   try {
+    const { rows: asg } = await pool.query('SELECT id FROM assignments WHERE id = $1 AND school_id = $2', [assignmentId, req.student.schoolId]);
+    if (!asg.length) return res.status(404).json({ success: false, message: 'Assignment not found' });
     const ext      = path.extname(req.file.originalname).toLowerCase();
     const filename = crypto.randomBytes(16).toString('hex') + ext;
     await pool.query(
@@ -827,10 +904,15 @@ app.post('/api/marks', requireTeacher, async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      const schoolId = req.teacher.schoolId || req.teacher.school_id || req.teacher.school;
       for (const m of marks) {
         const assessmentId = m.assessmentId || m.assessment_id;
         const studentId    = m.studentId    || m.student_id;
         if (!assessmentId || !studentId) throw new Error('assessmentId and studentId required');
+        const { rows: aRows } = await client.query('SELECT id FROM assessments WHERE id = $1 AND school_id = $2', [assessmentId, schoolId]);
+        if (!aRows.length) throw new Error(`Assessment ${assessmentId} not found`);
+        const { rows: sRows } = await client.query('SELECT id FROM enrolled_students WHERE id = $1 AND school_id = $2', [studentId, schoolId]);
+        if (!sRows.length) throw new Error(`Student ${studentId} not found`);
         const existing = await client.query(
           'SELECT score FROM marks WHERE assessment_id = $1 AND student_id = $2',
           [assessmentId, studentId]
@@ -1226,6 +1308,8 @@ app.put('/api/applications/:id', upload.array('documents', 10), async (req, res)
   try {
     const existing = await pool.query('SELECT * FROM applications WHERE id = $1', [id]);
     if (!existing.rows.length) return res.status(404).json({ success: false, message: 'Application not found' });
+    if (existing.rows[0].national_id !== nationalId)
+      return res.status(403).json({ success: false, message: 'National ID does not match this application' });
     if (!['pending', 'rejected'].includes(existing.rows[0].status))
       return res.status(403).json({ success: false, message: 'Only pending or rejected applications can be edited' });
     const newFiles      = req.files || [];
