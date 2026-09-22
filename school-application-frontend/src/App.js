@@ -2,7 +2,6 @@ import React, { useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Box } from '@mui/material';
-import useMediaQuery from '@mui/material/useMediaQuery';
 import { core, fontFamily } from './theme/tokens';
 
 // ── Public pages ──────────────────────────────────────────────

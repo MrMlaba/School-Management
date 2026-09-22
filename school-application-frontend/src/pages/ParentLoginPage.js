@@ -1,4 +1,4 @@
-﻿// src/pages/ParentLoginPage.js — Parent Portal Login
+// src/pages/ParentLoginPage.js — Parent Portal Login
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {

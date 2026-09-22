@@ -1,4 +1,4 @@
-﻿import API_BASE from '../config';
+import API_BASE from '../config';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -27,6 +27,7 @@ import TableChartIcon     from '@mui/icons-material/TableChart';
 import ListAltIcon        from '@mui/icons-material/ListAlt';
 import QuizIcon from '@mui/icons-material/Quiz';
 import ArticleIcon from '@mui/icons-material/Article';
+import TuneIcon from '@mui/icons-material/Tune';
 import QuizTab  from './QuizTab';
 import MaterialsTab from './MaterialsTab';
 import SchoolLogoHeader from '../components/SchoolLogoHeader';
@@ -743,9 +744,7 @@ const AttendanceTab = ({ initSlotId }) => {
     })();
   }, [navigate]);
 
-  useEffect(() => { if (slotId && date) loadAttendance(); }, [slotId, date]);
-
-  const loadAttendance = async () => {
+  const loadAttendance = useCallback(async () => {
     if (!slotId || !date) return;
     setLoading(true);
     const res = await fetch(`${BASE}/api/teacher/attendance?slotId=${slotId}&date=${date}`, { headers: authH() });
@@ -756,7 +755,9 @@ const AttendanceTab = ({ initSlotId }) => {
       setRecords(d.students.map(s => ({ studentId:s.id, status:s.status, note:s.note||'' })));
     }
     setLoading(false);
-  };
+  }, [slotId, date, navigate]);
+
+  useEffect(() => { loadAttendance(); }, [loadAttendance]);
 
   const updateRecord = (studentId, field, value) =>
     setRecords(r => r.map(rec => rec.studentId===studentId ? {...rec,[field]:value} : rec));
@@ -956,6 +957,7 @@ const AssignmentsTab = () => {
   const [dialog,      setDialog]      = useState(false);
   const [editingId,   setEditingId]   = useState(null);
   const [saving,      setSaving]      = useState(false);
+  const [weightsOpen, setWeightsOpen] = useState(false);
   const [snack,       setSnack]       = useState({ open:false, msg:'', sev:'success' });
   const toast = (msg, sev='success') => setSnack({ open:true, msg, sev });
 
@@ -1094,6 +1096,10 @@ const AssignmentsTab = () => {
             </Box>
 
             <Box sx={{ display:'flex', gap:1 }}>
+              <Button variant="outlined" startIcon={<TuneIcon />} onClick={()=>setWeightsOpen(true)}
+                sx={{ textTransform:'none', fontWeight:700, borderRadius:'8px', borderColor:C.border, color:C.text, fontFamily:"'IBM Plex Sans', sans-serif" }}>
+                Term Weights
+              </Button>
               {view==='list' && (
                 <Button variant="contained" startIcon={<AddIcon />} onClick={()=>{ setForm(EMPTY); setEditingId(null); setFile(null); setBudget(null); setDialog(true); }}
                   sx={{ background:C.brand, textTransform:'none', fontWeight:700, boxShadow:'none', borderRadius:'8px', fontFamily:"'IBM Plex Sans', sans-serif" }}>
@@ -1316,6 +1322,8 @@ const AssignmentsTab = () => {
         <Divider />
         <DialogActions><Button onClick={()=>setSubmissionsDialog(null)} sx={{ textTransform:'none', color:C.muted }}>Close</Button></DialogActions>
       </Dialog>
+
+      <TermWeightsDialog open={weightsOpen} onClose={()=>setWeightsOpen(false)} toast={toast}/>
 
       <Snackbar open={snack.open} autoHideDuration={4000} onClose={()=>setSnack(s=>({...s,open:false}))} anchorOrigin={{ vertical:'bottom', horizontal:'right' }}>
         <Alert severity={snack.sev} onClose={()=>setSnack(s=>({...s,open:false}))} sx={{ fontFamily:"'IBM Plex Sans', sans-serif", fontWeight:600 }}>{snack.msg}</Alert>

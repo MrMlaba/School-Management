@@ -1,4 +1,4 @@
-﻿import API_BASE from '../config';
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import {
   TextField, Button, MenuItem, FormControl, Select,
@@ -385,16 +385,16 @@ const ApplicationForm = () => {
 
   const vEmail  = v => !v ? 'Required.' : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? 'Invalid email.' : '';
   const vPhone  = v => { if (!v) return 'Required.'; const c = v.replace(/\D/g,''); return (c.length===10&&c.startsWith('0'))||(c.length===11&&c.startsWith('27')) ? '' : 'Use format: 082 123 4567 or 27821234567'; };
-  const vName   = v => !v ? 'Required.' : v.length<2 ? 'Min 2 characters.' : !/^[a-zA-Z\s\-'\.]+$/.test(v) ? 'Letters only.' : '';
+  const vName   = v => !v ? 'Required.' : v.length<2 ? 'Min 2 characters.' : !/^[a-zA-Z\s\-'.]+$/.test(v) ? 'Letters only.' : '';
 
   const sanitizeValue = (name, raw) => {
     if (typeof raw !== 'string') return raw;
     if (['phone', 'parentPhone', 'emergencyPhone'].includes(name))
-      return raw.replace(/[^\d\s\-\+\(\)]/g, '');
+      return raw.replace(/[^\d\s\-+()]/g, '');
     if (name === 'nationalId')
       return raw.replace(/\D/g, '').slice(0, 13);
     if (['firstName', 'lastName', 'parentName', 'emergencyContact'].includes(name))
-      return raw.replace(/[^a-zA-Z\s\-'\.]/g, '');
+      return raw.replace(/[^a-zA-Z\s\-'.]/g, '');
     return raw;
   };
   const vReq    = (v, f) => !v?.trim() ? `${f} is required.` : '';

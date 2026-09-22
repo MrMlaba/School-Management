@@ -1,4 +1,4 @@
-﻿import API_BASE from '../config';
+import API_BASE from '../config';
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -14,7 +14,6 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DownloadIcon from '@mui/icons-material/Download';
 import { handleUnauthorized } from '../utils/authGuard';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import RestoreIcon from '@mui/icons-material/Restore';
@@ -145,26 +144,6 @@ const professionalTheme = createTheme({
     MuiDialog: { styleOverrides: { paper: { borderRadius: 14 } } },
   },
 });
-
-/* ─── Stat card ──────────────────────────────────────────────────────── */
-const StatCard = ({ icon, label, value, color = 'primary.main', bg = '#eff6ff', subtitle }) => (
-  <Card sx={{ height: '100%' }}>
-    <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-      <Stack direction="row" alignItems="center" spacing={1.5}>
-        <Avatar variant="rounded" sx={{ bgcolor: bg, color, width: 44, height: 44, borderRadius: 2 }}>
-          {icon}
-        </Avatar>
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography variant="caption" sx={{ color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, fontSize: '0.68rem' }}>
-            {label}
-          </Typography>
-          <Typography variant="h5" sx={{ lineHeight: 1.2, mt: 0.25 }}>{value}</Typography>
-        </Box>
-      </Stack>
-      {subtitle && <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px dashed #e2e8f0' }}>{subtitle}</Box>}
-    </CardContent>
-  </Card>
-);
 
 /* ═══════════════════════════════════════════════════════════════════════ */
 // ── Application Period — school admin proposes a window; the system admin's
@@ -306,21 +285,6 @@ const AdminPage = () => {
 
   const filteredApps = applications.filter(app => app.status !== 'accepted' && matchesSearch(app));
 
-  const stats = useMemo(() => {
-    const total = applications.length;
-    const byGrade = {};
-    const byStatus = { pending: 0, approved: 0, rejected: 0 };
-    const bySubject = { Physics: 0, Commerce: 0, Humanities: 0 };
-    applications.forEach(app => {
-      byGrade[app.grade] = (byGrade[app.grade] || 0) + 1;
-      const k = (app.status || 'pending').toLowerCase();
-      byStatus[k] = (byStatus[k] || 0) + 1;
-      if (app.subject && Object.prototype.hasOwnProperty.call(bySubject, app.subject))
-        bySubject[app.subject] = (bySubject[app.subject] || 0) + 1;
-    });
-    return { total, byGrade, byStatus, bySubject };
-  }, [applications]);
-
   const groupedApplications = useMemo(() => {
     const grouped = {};
     filteredApps.forEach(app => {
@@ -337,7 +301,7 @@ const AdminPage = () => {
     if (filteredGrades.length === 0) { setSelectedGrade(null); return; }
     if (!selectedGrade || !filteredGrades.includes(selectedGrade))
       setSelectedGrade(filteredGrades[0]);
-  }, [filteredGrades]);
+  }, [filteredGrades, selectedGrade]);
 
   const selectedGradeApps = selectedGrade ? (groupedApplications[selectedGrade] || []) : [];
 

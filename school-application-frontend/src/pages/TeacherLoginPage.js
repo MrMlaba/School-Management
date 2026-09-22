@@ -1,4 +1,4 @@
-﻿import API_BASE from '../config';
+import API_BASE from '../config';
 // src/pages/TeacherLoginPage.js — Teacher Login
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';

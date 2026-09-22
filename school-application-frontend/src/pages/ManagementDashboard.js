@@ -1,5 +1,5 @@
-﻿import API_BASE from '../config';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import API_BASE from '../config';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Chip, Divider, Avatar, CircularProgress,
@@ -25,7 +25,6 @@ import AddIcon            from '@mui/icons-material/Add';
 import DeleteIcon         from '@mui/icons-material/Delete';
 import EditIcon           from '@mui/icons-material/Edit';
 import CheckCircleIcon    from '@mui/icons-material/CheckCircle';
-import WarningAmberIcon   from '@mui/icons-material/WarningAmber';
 import InfoOutlinedIcon   from '@mui/icons-material/InfoOutlined';
 import CloseIcon          from '@mui/icons-material/Close';
 import KeyIcon            from '@mui/icons-material/Key';
@@ -96,13 +95,29 @@ const GRADES  = [8,9,10,11,12];
 const STREAMS = ['Physics','Commerce','Humanities'];
 const LETTERS = ['A','B','C','D','E','F'];
 const TERMS   = [1,2,3,4];
+// Module scope, not component scope: a literal recreated inside the component
+// would get a new array reference every render, which either has to be left
+// out of an effect's deps (the lint warning) or — if added anyway — retriggers
+// that effect every render, since it never settles on an equal reference.
+const DEF_PERIODS = [
+  {periodNumber:1,name:'Period 1',timeStart:'07:30',timeEnd:'08:15',isBreak:false},
+  {periodNumber:2,name:'Period 2',timeStart:'08:15',timeEnd:'09:00',isBreak:false},
+  {periodNumber:3,name:'Period 3',timeStart:'09:00',timeEnd:'09:45',isBreak:false},
+  {periodNumber:4,name:'Morning Break',timeStart:'09:45',timeEnd:'10:05',isBreak:true},
+  {periodNumber:5,name:'Period 4',timeStart:'10:05',timeEnd:'10:50',isBreak:false},
+  {periodNumber:6,name:'Period 5',timeStart:'10:50',timeEnd:'11:35',isBreak:false},
+  {periodNumber:7,name:'Period 6',timeStart:'11:35',timeEnd:'12:20',isBreak:false},
+  {periodNumber:8,name:'Lunch',timeStart:'12:20',timeEnd:'13:00',isBreak:true},
+  {periodNumber:9,name:'Period 7',timeStart:'13:00',timeEnd:'13:45',isBreak:false},
+  {periodNumber:10,name:'Period 8',timeStart:'13:45',timeEnd:'14:30',isBreak:false},
+];
 
 const toast_ = (setSnack) => (msg, sev = 'success') => setSnack({ open: true, msg, sev });
 
 /* ═══════════════════════════════════════════════════════════════
    SHARED UI
 ═══════════════════════════════════════════════════════════════ */
-const Card_ = ({ children, sx = {} }) => (
+const SectionCard = ({ children, sx = {} }) => (
   <Box sx={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: '4px', p: 2.5, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', mb: 2.5, ...sx }}>
     {children}
   </Box>
@@ -125,7 +140,7 @@ const InfoBanner = ({ children, color = C.warn, bg = C.warnBg, border = '#FDE68A
   </Box>
 );
 
-const Snack_ = ({ snack, onClose }) => (
+const Toast = ({ snack, onClose }) => (
   <Snackbar open={snack.open} autoHideDuration={4000} onClose={onClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
     <Alert severity={snack.sev} onClose={onClose} sx={{ fontFamily: "'IBM Plex Sans', sans-serif", fontWeight: 600 }}>{snack.msg}</Alert>
   </Snackbar>
@@ -230,7 +245,7 @@ const OverviewSection = () => {
       }
     } finally { setLoading(false); }
   })();
-}, []);
+}, [navigate]);
 
   const StatCard = ({ label, value, icon, bg, color, border, sub }) => (
     <Tooltip title={sub || ''} disableHoverListener={!sub}>
@@ -266,7 +281,7 @@ const OverviewSection = () => {
             <StatCard label="Pending Enrollment" value={stats?.pendingEnrollment} sub="Awaiting physical arrival" icon={<HourglassTopIcon sx={{fontSize:15}}/>} bg="#f5f5f5" color="#5d5d5d" border="#dcdcdc"/>
           </Box>
 
-          <Card_ sx={{mb:0}}>
+          <SectionCard sx={{mb:0}}>
             <SectionHead title="Attendance This Week" subtitle="Daily present vs absent"/>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={attData} barSize={16} barGap={3}>
@@ -279,13 +294,13 @@ const OverviewSection = () => {
                 <Bar dataKey="absent"  fill={C.danger} radius={[4,4,0,0]} name="Absent" minPointSize={3}/>
               </BarChart>
             </ResponsiveContainer>
-          </Card_>
+          </SectionCard>
         </Box>
 
         {/* ── RIGHT: calendar + announcements + upcoming events (narrower) ── */}
         <Box sx={{flex:'1 1 300px',minWidth:280,maxWidth:380,display:'flex',flexDirection:'column',gap:2.5}}>
 
-          <Card_ sx={{mb:0}}>
+          <SectionCard sx={{mb:0}}>
             <Box sx={{display:'flex',justifyContent:'space-between',alignItems:'center',mb:1.5}}>
               <Typography sx={{fontWeight:700,fontSize:'0.75rem',color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>
                 {calDate.toLocaleDateString('en-US',{month:'long',year:'numeric'})}
@@ -310,10 +325,10 @@ const OverviewSection = () => {
                 return <Box key={i} sx={{textAlign:'center',py:'4px',borderRadius:'50%',fontSize:'0.66rem',fontFamily:"'IBM Plex Sans', sans-serif",fontWeight:isToday?800:400,background:isToday?C.brand:'transparent',color:isToday?C.white:d?C.text:'transparent','&:hover':d&&!isToday?{background:C.sidebarAct}:{}}}>{d||''}</Box>;
               })}
             </Box>
-          </Card_>
+          </SectionCard>
 
           {/* Announcements */}
-          <Card_ sx={{ mb: 0 }}>
+          <SectionCard sx={{ mb: 0 }}>
             <SectionHead title="Announcements" subtitle="Recent notices — all audiences shown"/>
             {announcements.length === 0 ? (
               <Typography sx={{ color: C.muted, fontSize:'0.77rem', fontFamily: "'IBM Plex Sans', sans-serif" }}>
@@ -348,10 +363,10 @@ const OverviewSection = () => {
                 );
               })
             )}
-          </Card_>
+          </SectionCard>
 
           {/* Upcoming Events */}
-          <Card_ sx={{ mb: 0 }}>
+          <SectionCard sx={{ mb: 0 }}>
             <SectionHead title="Upcoming Events" subtitle="This month's school calendar"/>
             {events.length === 0 ? (
               <Typography sx={{ color: C.muted, fontSize:'0.77rem', fontFamily: "'IBM Plex Sans', sans-serif" }}>
@@ -384,12 +399,12 @@ const OverviewSection = () => {
                   );
                 })
             )}
-          </Card_>
+          </SectionCard>
 
         </Box>
       </Box>
 
-      <Card_ sx={{mb:0}}>
+      <SectionCard sx={{mb:0}}>
         <SectionHead title="Recently Enrolled" subtitle="Students enrolled in the last 7 days"/>
         {recent.length===0 ? (
           <Typography sx={{color:C.muted,fontSize:'0.77rem',textAlign:'center',py:3,fontFamily:"'IBM Plex Sans', sans-serif"}}>No students enrolled in the last 7 days.</Typography>
@@ -415,7 +430,7 @@ const OverviewSection = () => {
             </Table>
           </TableContainer>
         )}
-      </Card_>
+      </SectionCard>
     </Box>
   );
 };
@@ -574,7 +589,7 @@ const StudentsSection = () => {
   if (loading) return <Box sx={{display:'flex',justifyContent:'center',py:8}}><CircularProgress sx={{color:C.brand}}/></Box>;
 
   return (
-    <Card_ sx={{mb:0,p:0,overflow:'hidden'}}>
+    <SectionCard sx={{mb:0,p:0,overflow:'hidden'}}>
       <Box sx={{p:2.5,pb:0}}>
         <SectionHead title="Enrolled Students" subtitle={`${enrolled.length} student${enrolled.length!==1?'s':''} currently enrolled`}/>
         <Box sx={{display:'flex',gap:2,mb:2,flexWrap:'wrap'}}>
@@ -961,8 +976,8 @@ const StudentsSection = () => {
         </DialogActions>
       </Dialog>
 
-      <Snack_ snack={snack} onClose={()=>setSnack(s=>({...s,open:false}))}/>
-    </Card_>
+      <Toast snack={snack} onClose={()=>setSnack(s=>({...s,open:false}))}/>
+    </SectionCard>
   );
 };
 
@@ -1014,7 +1029,7 @@ const TeachersSection = () => {
   if (loading) return <Box sx={{display:'flex',justifyContent:'center',py:8}}><CircularProgress sx={{color:C.brand}}/></Box>;
 
   return (
-    <Card_ sx={{mb:0,p:0,overflow:'hidden'}}>
+    <SectionCard sx={{mb:0,p:0,overflow:'hidden'}}>
       <Box sx={{p:2.5,pb:0}}>
         <SectionHead title="Teachers" subtitle="View teacher details — set login credentials here"
           action={
@@ -1245,8 +1260,8 @@ const TeachersSection = () => {
         </DialogActions>
       </Dialog>
 
-      <Snack_ snack={snack} onClose={()=>setSnack(s=>({...s,open:false}))}/>
-    </Card_>
+      <Toast snack={snack} onClose={()=>setSnack(s=>({...s,open:false}))}/>
+    </SectionCard>
   );
 };
 
@@ -1285,7 +1300,7 @@ const TimetableSection = () => {
   if(loading)return<Box sx={{display:'flex',justifyContent:'center',py:8}}><CircularProgress sx={{color:C.brand}}/></Box>;
 
   return(
-    <Card_ sx={{mb:0}}>
+    <SectionCard sx={{mb:0}}>
       <SectionHead title="Timetable" subtitle="View the class timetable created by the Service Provider"/>
       {!selClass?(
         <>
@@ -1368,7 +1383,7 @@ const TimetableSection = () => {
           )}
         </Box>
       )}
-    </Card_>
+    </SectionCard>
   );
 };
 
@@ -1394,14 +1409,15 @@ const SetupSection = () => {
     if(res.ok)setSummary(await res.json());
   },[navigate]);
 
-  useEffect(()=>{fetchSummary();fetchYears();fetchPeriods();},[fetchSummary]);
-  useEffect(()=>{ if(summary?.currentYearId){fetchTerms();fetchSubjects();fetchClasses();} },[summary?.currentYearId]);
+  const currentYearId = summary?.currentYearId;
+  const fetchYears   =useCallback(async()=>{const r=await fetch(`${BASE}/api/setup/academic-years`,{headers:authH()});if (redirectOn401([r], navigate)) return;if(r.ok)setYears(await r.json());},[navigate]);
+  const fetchTerms   =useCallback(async()=>{if(!currentYearId)return;const r=await fetch(`${BASE}/api/setup/terms?academicYearId=${currentYearId}`,{headers:authH()});if (redirectOn401([r], navigate)) return;if(r.ok)setTerms(await r.json());},[navigate,currentYearId]);
+  const fetchPeriods =useCallback(async()=>{const r=await fetch(`${BASE}/api/setup/periods`,{headers:authH()});if (redirectOn401([r], navigate)) return;if(r.ok)setPeriods(await r.json());},[navigate]);
+  const fetchSubjects=useCallback(async()=>{if(!currentYearId)return;const r=await fetch(`${BASE}/api/setup/subjects?academicYearId=${currentYearId}`,{headers:authH()});if (redirectOn401([r], navigate)) return;if(r.ok)setSubjects(await r.json());},[navigate,currentYearId]);
+  const fetchClasses =useCallback(async()=>{if(!currentYearId)return;const r=await fetch(`${BASE}/api/setup/classes?academicYearId=${currentYearId}`,{headers:authH()});if (redirectOn401([r], navigate)) return;if(r.ok)setClasses(await r.json());},[navigate,currentYearId]);
 
-  const fetchYears   =async()=>{const r=await fetch(`${BASE}/api/setup/academic-years`,{headers:authH()});if (redirectOn401([r], navigate)) return;if(r.ok)setYears(await r.json());};
-  const fetchTerms   =async()=>{if(!summary?.currentYearId)return;const r=await fetch(`${BASE}/api/setup/terms?academicYearId=${summary.currentYearId}`,{headers:authH()});if (redirectOn401([r], navigate)) return;if(r.ok)setTerms(await r.json());};
-  const fetchPeriods =async()=>{const r=await fetch(`${BASE}/api/setup/periods`,{headers:authH()});if (redirectOn401([r], navigate)) return;if(r.ok)setPeriods(await r.json());};
-  const fetchSubjects=async()=>{if(!summary?.currentYearId)return;const r=await fetch(`${BASE}/api/setup/subjects?academicYearId=${summary.currentYearId}`,{headers:authH()});if (redirectOn401([r], navigate)) return;if(r.ok)setSubjects(await r.json());};
-  const fetchClasses =async()=>{if(!summary?.currentYearId)return;const r=await fetch(`${BASE}/api/setup/classes?academicYearId=${summary.currentYearId}`,{headers:authH()});if (redirectOn401([r], navigate)) return;if(r.ok)setClasses(await r.json());};
+  useEffect(()=>{fetchSummary();fetchYears();fetchPeriods();},[fetchSummary,fetchYears,fetchPeriods]);
+  useEffect(()=>{ if(currentYearId){fetchTerms();fetchSubjects();fetchClasses();} },[currentYearId,fetchTerms,fetchSubjects,fetchClasses]);
 
   const isDone={year:!!summary?.hasCurrentYear,terms:summary?.terms>=4,periods:summary?.periods>0,subjects:summary?.subjects>0,classes:summary?.classes>0};
   const STEPS=[{key:'year',label:'Academic Year'},{key:'terms',label:'Terms'},{key:'periods',label:'Periods'},{key:'subjects',label:'Subjects'},{key:'classes',label:'Classes'}];
@@ -1432,18 +1448,6 @@ const SetupSection = () => {
     else{const e=await r.json();toast(e.message||'Failed','error');}
   };
 
-  const DEF_PERIODS=[
-    {periodNumber:1,name:'Period 1',timeStart:'07:30',timeEnd:'08:15',isBreak:false},
-    {periodNumber:2,name:'Period 2',timeStart:'08:15',timeEnd:'09:00',isBreak:false},
-    {periodNumber:3,name:'Period 3',timeStart:'09:00',timeEnd:'09:45',isBreak:false},
-    {periodNumber:4,name:'Morning Break',timeStart:'09:45',timeEnd:'10:05',isBreak:true},
-    {periodNumber:5,name:'Period 4',timeStart:'10:05',timeEnd:'10:50',isBreak:false},
-    {periodNumber:6,name:'Period 5',timeStart:'10:50',timeEnd:'11:35',isBreak:false},
-    {periodNumber:7,name:'Period 6',timeStart:'11:35',timeEnd:'12:20',isBreak:false},
-    {periodNumber:8,name:'Lunch',timeStart:'12:20',timeEnd:'13:00',isBreak:true},
-    {periodNumber:9,name:'Period 7',timeStart:'13:00',timeEnd:'13:45',isBreak:false},
-    {periodNumber:10,name:'Period 8',timeStart:'13:45',timeEnd:'14:30',isBreak:false},
-  ];
   const [pRows,setPRows]=useState([]);
   useEffect(()=>{if(periods.length>0)setPRows(periods.map(p=>({periodNumber:p.period_number,name:p.name,timeStart:p.time_start?.slice(0,5)||'',timeEnd:p.time_end?.slice(0,5)||'',isBreak:p.is_break})));else setPRows(DEF_PERIODS);},[periods]);
 
@@ -1513,7 +1517,7 @@ const SetupSection = () => {
   };
 
   return(
-    <Card_ sx={{mb:0}}>
+    <SectionCard sx={{mb:0}}>
       <SectionHead title="School Setup" subtitle={summary?.currentYear?`Academic Year ${summary.currentYear}`:'Configure your school structure'}/>
       <Box sx={{display:'flex',gap:1,mb:3,flexWrap:'wrap'}}>
         {STEPS.map(s=>(
@@ -1691,8 +1695,8 @@ const SetupSection = () => {
         </Box>
       )}
 
-      <Snack_ snack={snack} onClose={()=>setSnack(s=>({...s,open:false}))}/>
-    </Card_>
+      <Toast snack={snack} onClose={()=>setSnack(s=>({...s,open:false}))}/>
+    </SectionCard>
   );
 };
 
@@ -1773,7 +1777,7 @@ const EventsSection = () => {
   const fmtDate = d => new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
 
   return (
-    <Card_ sx={{mb:0,p:0,overflow:'hidden'}}>
+    <SectionCard sx={{mb:0,p:0,overflow:'hidden'}}>
       <Box sx={{p:2.5,pb:0}}>
         <SectionHead title="Events" subtitle={`Events for ${new Date(month+'-01').toLocaleDateString('en-US',{month:'long',year:'numeric'})}`}
           action={
@@ -1870,8 +1874,8 @@ const EventsSection = () => {
         </Box>
       </Box>
 
-      <Snack_ snack={snack} onClose={()=>setSnack(s=>({...s,open:false}))}/>
-    </Card_>
+      <Toast snack={snack} onClose={()=>setSnack(s=>({...s,open:false}))}/>
+    </SectionCard>
   );
 };
 
@@ -1937,7 +1941,7 @@ const AnnouncementsSection = () => {
   const fmtDate = d => new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
 
   return (
-    <Card_ sx={{mb:0,p:0,overflow:'hidden'}}>
+    <SectionCard sx={{mb:0,p:0,overflow:'hidden'}}>
       <Box sx={{p:2.5,pb:0}}>
         <SectionHead title="Announcements" subtitle="Post notices for teachers and students"
           action={
@@ -2027,8 +2031,8 @@ const AnnouncementsSection = () => {
         </Box>
       </Box>
 
-      <Snack_ snack={snack} onClose={()=>setSnack(s=>({...s,open:false}))}/>
-    </Card_>
+      <Toast snack={snack} onClose={()=>setSnack(s=>({...s,open:false}))}/>
+    </SectionCard>
   );
 };
 
@@ -2172,7 +2176,7 @@ const ReportsSection = () => {
   const getSymbol = (pct) => { if(pct===null)return'—'; if(pct>=80)return'7'; if(pct>=70)return'6'; if(pct>=60)return'5'; if(pct>=50)return'4'; if(pct>=40)return'3'; if(pct>=30)return'2'; return'1'; };
  
   return (
-    <Card_ sx={{mb:0}}>
+    <SectionCard sx={{mb:0}}>
       <SectionHead title="Reports" subtitle="Generate attendance and results reports — download as PDF or Excel"/>
  
       {/* Report type tabs */}
@@ -2421,8 +2425,8 @@ const ReportsSection = () => {
         </Box>
       )}
  
-      <Snack_ snack={snack} onClose={()=>setSnack(s=>({...s,open:false}))}/>
-    </Card_>
+      <Toast snack={snack} onClose={()=>setSnack(s=>({...s,open:false}))}/>
+    </SectionCard>
   );
 };
 
@@ -2504,7 +2508,7 @@ const SupportSection = () => {
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress sx={{ color: C.brand }} /></Box>;
 
   return (
-    <Card_ sx={{ p: 2.5 }}>
+    <SectionCard sx={{ p: 2.5 }}>
       <SectionHead title="Support" subtitle="Get help from your platform's IT support team"
         action={<Button size="small" variant="contained" startIcon={<AddIcon />} onClick={() => setNewOpen(true)}
           sx={{ background: C.brand, textTransform: 'none', fontWeight: 700, boxShadow: 'none', fontFamily: "'IBM Plex Sans', sans-serif" }}>
@@ -2602,8 +2606,8 @@ const SupportSection = () => {
         )}
       </Dialog>
 
-      <Snack_ snack={snack} onClose={() => setSnack(s => ({ ...s, open: false }))} />
-    </Card_>
+      <Toast snack={snack} onClose={() => setSnack(s => ({ ...s, open: false }))} />
+    </SectionCard>
   );
 };
 
@@ -2612,6 +2616,7 @@ const SupportSection = () => {
 ═══════════════════════════════════════════════════════════════ */
 const NAV = [
   {key:'overview',       label:'Dashboard',     icon:<DashboardIcon sx={{fontSize:19}}/>},
+  {key:'setup',          label:'School Setup',  icon:<SettingsIcon sx={{fontSize:19}}/>},
   {key:'students',       label:'Students',      icon:<PeopleAltIcon sx={{fontSize:19}}/>},
   {key:'teachers',       label:'Teachers',      icon:<SchoolIcon sx={{fontSize:19}}/>},
   {key:'timetable',      label:'Timetable',     icon:<CalendarMonthIcon sx={{fontSize:19}}/>},
@@ -2728,6 +2733,7 @@ const ManagementDashboard = () => {
       {/* ── Content ── */}
       <Box sx={{flex:1,minHeight:0,overflowY:'auto',p:2.5}}>
         {active==='overview'       && <OverviewSection/>}
+        {active==='setup'          && <SetupSection/>}
         {active==='students'       && <StudentsSection/>}
         {active==='teachers'       && <TeachersSection/>}
         {active==='timetable'      && <TimetableSection/>}

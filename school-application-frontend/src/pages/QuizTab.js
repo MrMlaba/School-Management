@@ -1,4 +1,4 @@
-﻿import API_BASE from '../config';
+import API_BASE from '../config';
 // QuizTab.js — AI Quiz Generator for TeacherDashboard
 // Import and render this inside TeacherDashboard.js:
 //
@@ -13,13 +13,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Button, TextField, MenuItem, CircularProgress,
-  Divider, Chip, IconButton, Tooltip, Dialog, DialogTitle,
+  Divider, Chip, IconButton, Dialog, DialogTitle,
   DialogContent, DialogActions, Snackbar, Alert, LinearProgress,
 } from '@mui/material';
-import AddIcon            from '@mui/icons-material/Add';
 import DeleteIcon         from '@mui/icons-material/Delete';
 import AutoFixHighIcon    from '@mui/icons-material/AutoFixHigh';
-import EditNoteIcon       from '@mui/icons-material/EditNote';
 import PublishIcon        from '@mui/icons-material/Publish';
 import BarChartIcon       from '@mui/icons-material/BarChart';
 import CheckCircleIcon    from '@mui/icons-material/CheckCircle';

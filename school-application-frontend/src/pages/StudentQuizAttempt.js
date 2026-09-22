@@ -1,4 +1,4 @@
-﻿// StudentQuizAttempt.js
+// StudentQuizAttempt.js
 // Route in App.js:
 //   import StudentQuizAttempt from './StudentQuizAttempt';
 //   <Route path="/student/quiz/:id" element={<StudentQuizAttempt />} />
@@ -10,13 +10,11 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Typography, Button, CircularProgress, LinearProgress, Tooltip, Alert } from '@mui/material';
+import { Box, Typography, Button, CircularProgress, LinearProgress, Alert } from '@mui/material';
 import CheckCircleIcon   from '@mui/icons-material/CheckCircle';
 import CancelIcon        from '@mui/icons-material/Cancel';
 import AccessTimeIcon    from '@mui/icons-material/AccessTime';
 import MenuBookIcon      from '@mui/icons-material/MenuBook';
-import ArrowBackIcon     from '@mui/icons-material/ArrowBack';
-import EmojiEventsIcon   from '@mui/icons-material/EmojiEvents';
 import LightbulbIcon     from '@mui/icons-material/Lightbulb';
 import API_BASE from '../config';
 import { handleUnauthorized } from '../utils/authGuard';

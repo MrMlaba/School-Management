@@ -1,4 +1,4 @@
-﻿// src/pages/LoginPage.js — Admin Login
+// src/pages/LoginPage.js — Admin Login
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {

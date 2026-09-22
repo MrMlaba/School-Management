@@ -1,4 +1,4 @@
-﻿import API_BASE from '../config';
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { Grid, Typography, CircularProgress, Box } from '@mui/material';
 import SchoolCard from './SchoolCard';

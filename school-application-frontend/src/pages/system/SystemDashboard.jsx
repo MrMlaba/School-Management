@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Chip, Tabs, Tab, TextField, CircularProgress } from '@mui/material';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
@@ -15,7 +14,7 @@ import TrendingUpRoundedIcon    from '@mui/icons-material/TrendingUpRounded';
 import PersonRoundedIcon        from '@mui/icons-material/PersonRounded';
 import MenuBookRoundedIcon      from '@mui/icons-material/MenuBookRounded';
 import FamilyRestroomRoundedIcon from '@mui/icons-material/FamilyRestroomRounded';
-import SystemLayout, { FONT, TEAL, BORDER, BG, SIDEBAR, CARD, INK, INK_SOFT, INK_FAINT } from '../../components/system/SystemLayout';
+import SystemLayout, { FONT, TEAL, BORDER, SIDEBAR, CARD, INK, INK_SOFT, INK_FAINT } from '../../components/system/SystemLayout';
 import API_BASE from '../../config';
 import { handleUnauthorized } from '../../utils/authGuard';
 

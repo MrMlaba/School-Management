@@ -1,19 +1,16 @@
-﻿import API_BASE from '../config';
+import API_BASE from '../config';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Button, Container, Chip, Divider,
   TextField, MenuItem, CircularProgress, Snackbar, Alert,
   Table, TableBody, TableCell, TableContainer, TableHead,
-  TableRow, Paper, IconButton, Tooltip, Dialog,
-  DialogTitle, DialogContent, DialogActions, Switch,
-  FormControlLabel,
+  TableRow, Paper, IconButton, Tooltip, Switch,
 } from '@mui/material';
 import AddIcon           from '@mui/icons-material/Add';
 import DeleteIcon        from '@mui/icons-material/Delete';
 import CheckCircleIcon   from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import SchoolIcon        from '@mui/icons-material/School';
 import AccessTimeIcon    from '@mui/icons-material/AccessTime';
 import MenuBookIcon      from '@mui/icons-material/MenuBook';
 import ClassIcon         from '@mui/icons-material/Class';
@@ -57,6 +54,22 @@ const GRADES  = [8, 9, 10, 11, 12];
 const STREAMS = ['Physics', 'Commerce', 'Humanities'];
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 const TERMS   = [1, 2, 3, 4];
+// Module scope, not component scope: a literal recreated inside a component
+// gets a new array reference every render, which either has to be left out
+// of an effect's deps (the lint warning) or — if added anyway — retriggers
+// that effect every render, since it never settles on an equal reference.
+const DEFAULT_PERIODS = [
+  { periodNumber: 1,  name: 'Period 1',      timeStart: '07:30', timeEnd: '08:15', isBreak: false },
+  { periodNumber: 2,  name: 'Period 2',      timeStart: '08:15', timeEnd: '09:00', isBreak: false },
+  { periodNumber: 3,  name: 'Period 3',      timeStart: '09:00', timeEnd: '09:45', isBreak: false },
+  { periodNumber: 4,  name: 'Morning Break', timeStart: '09:45', timeEnd: '10:05', isBreak: true  },
+  { periodNumber: 5,  name: 'Period 4',      timeStart: '10:05', timeEnd: '10:50', isBreak: false },
+  { periodNumber: 6,  name: 'Period 5',      timeStart: '10:50', timeEnd: '11:35', isBreak: false },
+  { periodNumber: 7,  name: 'Period 6',      timeStart: '11:35', timeEnd: '12:20', isBreak: false },
+  { periodNumber: 8,  name: 'Lunch',         timeStart: '12:20', timeEnd: '13:00', isBreak: true  },
+  { periodNumber: 9,  name: 'Period 7',      timeStart: '13:00', timeEnd: '13:45', isBreak: false },
+  { periodNumber: 10, name: 'Period 8',      timeStart: '13:45', timeEnd: '14:30', isBreak: false },
+];
 
 /* ─── Step indicator ────────────────────────────────────────────────── */
 const steps = [
@@ -124,9 +137,6 @@ const SchoolSetupPage = () => {
   const [classes,          setClasses]          = useState([]);
   const [nationalSubjects, setNationalSubjects] = useState([]);
 
-  // Loading
-  const [saving, setSaving] = useState(false);
-
   const toast = (message, severity = 'success') =>
     setSnackbar({ open: true, message, severity });
 
@@ -139,43 +149,45 @@ const SchoolSetupPage = () => {
 
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
+  const currentYearId = summary?.currentYearId;
+
   /* ── Fetch academic years ────────────────────────────────────────── */
-  const fetchYears = async () => {
+  const fetchYears = useCallback(async () => {
     const res = await fetch(`${BASE}/api/setup/academic-years`, { headers: authH() });
     if (handleUnauthorized('admin', res)) return;
     if (res.ok) setAcademicYears(await res.json());
-  };
+  }, []);
 
   /* ── Fetch terms ─────────────────────────────────────────────────── */
-  const fetchTerms = async () => {
-    if (!summary?.currentYearId) return;
-    const res = await fetch(`${BASE}/api/setup/terms?academicYearId=${summary.currentYearId}`, { headers: authH() });
+  const fetchTerms = useCallback(async () => {
+    if (!currentYearId) return;
+    const res = await fetch(`${BASE}/api/setup/terms?academicYearId=${currentYearId}`, { headers: authH() });
     if (handleUnauthorized('admin', res)) return;
     if (res.ok) setTerms(await res.json());
-  };
+  }, [currentYearId]);
 
   /* ── Fetch periods ───────────────────────────────────────────────── */
-  const fetchPeriods = async () => {
+  const fetchPeriods = useCallback(async () => {
     const res = await fetch(`${BASE}/api/setup/periods`, { headers: authH() });
     if (handleUnauthorized('admin', res)) return;
     if (res.ok) setPeriods(await res.json());
-  };
+  }, []);
 
   /* ── Fetch subjects ──────────────────────────────────────────────── */
-  const fetchSubjects = async () => {
-    if (!summary?.currentYearId) return;
-    const res = await fetch(`${BASE}/api/setup/subjects?academicYearId=${summary.currentYearId}`, { headers: authH() });
+  const fetchSubjects = useCallback(async () => {
+    if (!currentYearId) return;
+    const res = await fetch(`${BASE}/api/setup/subjects?academicYearId=${currentYearId}`, { headers: authH() });
     if (handleUnauthorized('admin', res)) return;
     if (res.ok) setSubjects(await res.json());
-  };
+  }, [currentYearId]);
 
   /* ── Fetch classes ───────────────────────────────────────────────── */
-  const fetchClasses = async () => {
-    if (!summary?.currentYearId) return;
-    const res = await fetch(`${BASE}/api/setup/classes?academicYearId=${summary.currentYearId}`, { headers: authH() });
+  const fetchClasses = useCallback(async () => {
+    if (!currentYearId) return;
+    const res = await fetch(`${BASE}/api/setup/classes?academicYearId=${currentYearId}`, { headers: authH() });
     if (handleUnauthorized('admin', res)) return;
     if (res.ok) setClasses(await res.json());
-  };
+  }, [currentYearId]);
 
   /* ── Fetch national subjects ─────────────────────────────────────── */
   const fetchNational = async (grade, stream) => {
@@ -190,15 +202,15 @@ const SchoolSetupPage = () => {
   useEffect(() => {
     fetchYears();
     fetchPeriods();
-  }, []);
+  }, [fetchYears, fetchPeriods]);
 
   useEffect(() => {
-    if (summary?.currentYearId) {
+    if (currentYearId) {
       fetchTerms();
       fetchSubjects();
       fetchClasses();
     }
-  }, [summary?.currentYearId]);
+  }, [currentYearId, fetchTerms, fetchSubjects, fetchClasses]);
 
   const isDone = {
     year:     !!summary?.hasCurrentYear,
@@ -292,7 +304,11 @@ const SchoolSetupPage = () => {
         };
       });
       setTermDates(prev => ({ ...prev, ...map }));
-    }, [terms]);
+    // `terms` is this file's own state one scope up (SchoolSetupPage), not a
+    // prop or local hook value of TermsSection itself — ESLint is right that
+    // listing it here doesn't mean what it would for a normal dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleSaveTerm = async (termNumber) => {
       if (!summary?.currentYearId) return toast('Set academic year first', 'error');
@@ -384,19 +400,6 @@ const SchoolSetupPage = () => {
      PERIODS SECTION
   ══════════════════════════════════════════════════════════════════ */
   const PeriodsSection = () => {
-    const DEFAULT_PERIODS = [
-      { periodNumber: 1,  name: 'Period 1',      timeStart: '07:30', timeEnd: '08:15', isBreak: false },
-      { periodNumber: 2,  name: 'Period 2',      timeStart: '08:15', timeEnd: '09:00', isBreak: false },
-      { periodNumber: 3,  name: 'Period 3',      timeStart: '09:00', timeEnd: '09:45', isBreak: false },
-      { periodNumber: 4,  name: 'Morning Break', timeStart: '09:45', timeEnd: '10:05', isBreak: true  },
-      { periodNumber: 5,  name: 'Period 4',      timeStart: '10:05', timeEnd: '10:50', isBreak: false },
-      { periodNumber: 6,  name: 'Period 5',      timeStart: '10:50', timeEnd: '11:35', isBreak: false },
-      { periodNumber: 7,  name: 'Period 6',      timeStart: '11:35', timeEnd: '12:20', isBreak: false },
-      { periodNumber: 8,  name: 'Lunch',         timeStart: '12:20', timeEnd: '13:00', isBreak: true  },
-      { periodNumber: 9,  name: 'Period 7',      timeStart: '13:00', timeEnd: '13:45', isBreak: false },
-      { periodNumber: 10, name: 'Period 8',      timeStart: '13:45', timeEnd: '14:30', isBreak: false },
-    ];
-
     const [rows, setRows]   = useState([]);
     const [saving, setSaving] = useState(false);
 
@@ -412,7 +415,11 @@ const SchoolSetupPage = () => {
       } else {
         setRows(DEFAULT_PERIODS);
       }
-    }, [periods]);
+    // `periods` is this file's own state one scope up (SchoolSetupPage), not a
+    // prop or local hook value of PeriodsSection itself — see TermsSection's
+    // identical `terms` situation above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const updateRow = (idx, field, value) =>
       setRows(r => r.map((row, i) => i === idx ? { ...row, [field]: value } : row));
@@ -521,11 +528,9 @@ const SchoolSetupPage = () => {
     const [selected,     setSelected]     = useState([]);
     const [adding,       setAdding]       = useState(false);
 
-    const loadNational = () => {
+    useEffect(() => {
       if (addGrade) fetchNational(parseInt(addGrade), parseInt(addGrade) >= 10 ? addStream : '');
-    };
-
-    useEffect(() => { if (addGrade) loadNational(); }, [addGrade, addStream]);
+    }, [addGrade, addStream]);
 
     const filteredSubjects = subjects.filter(s => {
       if (filterGrade  && s.grade  !== parseInt(filterGrade))  return false;

@@ -9,18 +9,7 @@ import BadgeOutlinedIcon              from '@mui/icons-material/BadgeOutlined';
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
 import SearchIcon                     from '@mui/icons-material/Search';
 import ArrowForwardIcon               from '@mui/icons-material/ArrowForward';
-import { LoginShell, MobileLogo, B, FF, inputSx } from '../components/LoginLayout';
-
-const LEFT = {
-  badge:    'Application Tracking',
-  tagline:  'Your admission status, always up to date.',
-  features: [
-    'Check application status in real time',
-    'View decisions from multiple schools',
-    'Accept your offer online',
-    'Receive instant notifications',
-  ],
-};
+import { MobileLogo, B, FF, inputSx } from '../components/LoginLayout';
 
 // Progress steps shown on the left panel
 const PROGRESS = [

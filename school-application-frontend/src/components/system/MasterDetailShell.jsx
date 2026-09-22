@@ -1,7 +1,6 @@
 import React, { Fragment } from 'react';
 import { Box, Typography, TextField } from '@mui/material';
 import { FONT, BORDER, CARD, SIDEBAR, INK, INK_SOFT, INK_FAINT, TEAL } from './SystemLayout';
-import { core } from '../../theme/tokens';
 
 const MasterDetailShell = ({
   breadcrumb = [],

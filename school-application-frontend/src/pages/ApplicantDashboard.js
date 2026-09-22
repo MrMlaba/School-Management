@@ -1,5 +1,5 @@
-﻿import API_BASE from '../config';
-import React, { useState, useEffect } from 'react';
+import API_BASE from '../config';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -13,10 +13,8 @@ import {
   Alert,
   CircularProgress,
   Dialog,
-  DialogTitle,
   DialogContent,
   DialogActions,
-  Divider,
   Avatar,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -139,9 +137,7 @@ const ApplicantDashboard = () => {
   const nationalId    = searchParams.get('nationalId');
   const applicationId = searchParams.get('applicationId');
 
-  useEffect(() => { fetchApplications(); }, [nationalId, applicationId]);
-
-  const fetchApplications = async () => {
+  const fetchApplications = useCallback(async () => {
     try {
       const params = new URLSearchParams();
       if (nationalId)    params.append('nationalId', nationalId);
@@ -161,7 +157,9 @@ const ApplicantDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [nationalId, applicationId]);
+
+  useEffect(() => { fetchApplications(); }, [fetchApplications]);
 
   const handleAcceptOffer = async (appId) => {
     setUpdating(prev => ({ ...prev, [appId]: true }));

@@ -1,6 +1,6 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, CircularProgress, Chip, IconButton, Tooltip } from '@mui/material';
+import { Box, Typography, CircularProgress, IconButton, Tooltip } from '@mui/material';
 import ArrowBackIcon  from '@mui/icons-material/ArrowBack';
 import MenuBookIcon   from '@mui/icons-material/MenuBook';
 import LogoutIcon     from '@mui/icons-material/Logout';
@@ -64,13 +64,6 @@ const fmt12 = (t) => {
 
 const todayName = () =>
   new Date().toLocaleDateString('en-US', { weekday: 'long' });
-
-const initials = () => {
-  try {
-    const p = JSON.parse(atob(sessionStorage.getItem('studentToken').split('.')[1]));
-    return `${p.firstName?.[0] ?? ''}${p.lastName?.[0] ?? ''}`.toUpperCase();
-  } catch { return '?'; }
-};
 
 /* ══════════════════════════════════════════════════════════════════════════
    PAGE

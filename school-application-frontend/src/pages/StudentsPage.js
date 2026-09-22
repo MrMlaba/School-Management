@@ -1,4 +1,4 @@
-﻿import API_BASE from '../config';
+import API_BASE from '../config';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Table, Button, TableBody, TableCell,
@@ -11,7 +11,6 @@ import ExpandMoreIcon    from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon    from '@mui/icons-material/ExpandLess';
 import FileDownloadIcon  from '@mui/icons-material/FileDownload';
 import PeopleAltIcon     from '@mui/icons-material/PeopleAlt';
-import AccessTimeIcon    from '@mui/icons-material/AccessTime';
 import SchoolIcon        from '@mui/icons-material/School';
 import SearchIcon        from '@mui/icons-material/Search';
 import HourglassTopIcon  from '@mui/icons-material/HourglassTop';
@@ -370,7 +369,13 @@ const StudentsPage = () => {
 
   const adminToken = sessionStorage.getItem('adminToken');
 
-  const authHeaders = { Authorization: `Bearer ${adminToken}` };
+  // Memoized on adminToken (a stable string, not an object) rather than
+  // recomputed every render — fetchData below depends on this function
+  // reference, and if it changed every render (a plain object/function
+  // literal at render scope does), fetchData would too. Since fetchData's own
+  // effect sets state that causes a re-render, an unstable reference here
+  // would turn that into a real fetch loop rather than a one-time load.
+  const authHeaders = useCallback(() => ({ Authorization: `Bearer ${adminToken}` }), [adminToken]);
 
   /* ── Fetch both lists ──────────────────────────────────────────────── */
   const fetchData = useCallback(async () => {
@@ -378,8 +383,8 @@ const StudentsPage = () => {
     setError('');
     try {
       const [pendingRes, enrolledRes] = await Promise.all([
-        fetch(`${API_BASE}/api/management/pending-enrollment`, { headers: authHeaders }),
-        fetch(`${API_BASE}/api/management/enrolled-students`,  { headers: authHeaders }),
+        fetch(`${API_BASE}/api/management/pending-enrollment`, { headers: authHeaders() }),
+        fetch(`${API_BASE}/api/management/enrolled-students`,  { headers: authHeaders() }),
       ]);
       if (handleUnauthorized('admin', [pendingRes, enrolledRes])) return;
 
@@ -398,7 +403,7 @@ const StudentsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authHeaders]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -423,7 +428,7 @@ const StudentsPage = () => {
       setSelectedGrade(filteredGrades[0]);
     }
     if (!filteredGrades.length) setSelectedGrade(null);
-  }, [filteredGrades.join(',')]);
+  }, [filteredGrades, selectedGrade]);
 
   /* ── Enroll action ──────────────────────────────────────────────────── */
   const handleOpenEnroll = (applicant) => {
@@ -437,7 +442,7 @@ const StudentsPage = () => {
     try {
       const res = await fetch(`${API_BASE}/api/management/enroll`, {
         method: 'POST',
-        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ applicationId: enrollTarget.id }),
       });
       if (handleUnauthorized('admin', res)) return;

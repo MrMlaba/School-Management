@@ -1,17 +1,16 @@
-﻿import API_BASE from '../config';
+import API_BASE from '../config';
 import { handleUnauthorized } from '../utils/authGuard';
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Table, TableBody, TableCell,
   TableHead, TableRow, TextField, CircularProgress,
-  IconButton, Tooltip, Chip, Paper, TableContainer
+  IconButton, Tooltip, Paper, TableContainer
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DownloadIcon from '@mui/icons-material/Download';
-import { createTheme, ThemeProvider } from '@mui/material/styles';
 
 /* ─── Google Font import ─────────────────────────────────────────────────── */
 const fontLink = document.createElement('link');
@@ -137,7 +136,6 @@ export default function TeacherGradebook() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
-  const [editing, setEditing] = useState({});
   const [drafts, setDrafts] = useState({});
   const [savingAll, setSavingAll] = useState(false);
   const [myClasses, setMyClasses] = useState([]);
@@ -198,10 +196,6 @@ export default function TeacherGradebook() {
     return () => { mounted = false; };
   }, [classId]);
 
-  const startEdit = (studentId, assignmentId, current) => {
-    setEditing({ studentId, assignmentId, value: current ?? '' });
-  };
-
   const isMarkInRange = (assignmentId, value) => {
     const num = Number(value);
     if (Number.isNaN(num) || num < 0) return false;
@@ -211,26 +205,6 @@ export default function TeacherGradebook() {
 
   const updateDraft = (studentId, assignmentId, value) => {
     setDrafts(d => ({ ...d, [studentId]: { ...d[studentId], [assignmentId]: value } }));
-  };
-
-  const saveEdit = async () => {
-    const token = sessionStorage.getItem('teacherToken');
-    const { studentId, assignmentId, value } = editing;
-    if (!studentId || !assignmentId) return;
-    if (!isMarkInRange(assignmentId, value)) { console.error(`Mark ${value} is out of range`); return; }
-    setLoading(true);
-    try {
-      const res = await fetch(`${BASE}/api/teacher/assignments/${assignmentId}/submissions/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ studentId, marksObtained: value })
-      });
-      if (handleUnauthorized('teacher', res)) return;
-      if (!res.ok) throw new Error('Failed to save');
-      await load();
-      setEditing({});
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
   };
 
   const saveCell = async (studentId, assignmentId) => {

@@ -1,12 +1,10 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Avatar, CircularProgress,
-  IconButton, Tooltip, LinearProgress, Stack,
+  LinearProgress, Stack,
 } from '@mui/material';
 import AssignmentIcon         from '@mui/icons-material/Assignment';
-import CalendarTodayIcon      from '@mui/icons-material/CalendarToday';
-import GradeIcon              from '@mui/icons-material/Grade';
 import LogoutIcon             from '@mui/icons-material/Logout';
 import ChatBubbleOutlineIcon  from '@mui/icons-material/ChatBubbleOutline';
 import ArrowForwardIcon       from '@mui/icons-material/ArrowForward';
@@ -749,8 +747,13 @@ export default function StudentDashboard() {
   /* ════ RENDER ════ */
   return (
     <Box sx={{
-      /* FIX: dvh for correct iOS full-height */
-      minHeight:'100dvh', minHeight:'100svh', minHeight:'100vh',
+      // dvh (dynamic viewport height) for correct iOS full-height — a plain
+      // JS object can't hold three same-named keys as a CSS-style fallback
+      // chain the way raw CSS can; duplicate keys just silently collapse to
+      // the last one, which up to now made this line evaluate to '100vh' and
+      // never actually apply dvh at all. dvh has solid support across current
+      // browsers, so a single value is both correct and sufficient.
+      minHeight:'100dvh',
       background:T.paper2,fontFamily:"'Plus Jakarta Sans',sans-serif",display:'flex',
     }}>
 
