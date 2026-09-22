@@ -486,17 +486,27 @@ router.post('/setup/classes', async (req, res) => {
     for (const item of payload) {
       const { academicYearId, grade, letter, stream, capacity } = item;
       const gr = parseInt(grade);
-      // Streamed grades can have the same letter across different streams
-      // (10A Physics and 10A Commerce are different classes), so the stream
-      // is part of the class's identity, not just metadata on it.
-      const className = stream ? `${gr}${letter.toUpperCase()} ${stream}` : `${gr}${letter.toUpperCase()}`;
+      const letterUpper = letter.toUpperCase();
+      // A letter is one grade-wide sequence shared by every stream — see
+      // phase2Routes.js's /classes for the school-admin-side twin of this check.
+      const { rows: clash } = await client.query(
+        `SELECT name FROM classes
+         WHERE school_id = $1 AND academic_year_id = $2 AND grade = $3 AND letter = $4
+           AND stream IS DISTINCT FROM $5 AND is_active = true`,
+        [sid(req), academicYearId, gr, letterUpper, stream || null]
+      );
+      if (clash.length) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ message: `Letter ${letterUpper} is already used by "${clash[0].name}" in Grade ${gr} — choose a different letter.` });
+      }
+      const className = stream ? `${gr}${letterUpper} ${stream}` : `${gr}${letterUpper}`;
       const { rows } = await client.query(
         `INSERT INTO classes (school_id, academic_year_id, grade, stream, letter, name, capacity)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (school_id, academic_year_id, grade, COALESCE(stream, 'NONE'), letter)
+         ON CONFLICT (school_id, academic_year_id, grade, letter)
          DO UPDATE SET capacity = $7, is_active = true
          RETURNING *`,
-        [sid(req), academicYearId, gr, stream || null, letter.toUpperCase(), className, capacity || 40]
+        [sid(req), academicYearId, gr, stream || null, letterUpper, className, capacity || 40]
       );
       created.push(rows[0]);
     }

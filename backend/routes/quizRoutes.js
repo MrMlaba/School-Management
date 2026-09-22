@@ -10,6 +10,7 @@ const multer   = require('multer');
 const path     = require('path');
 const crypto   = require('crypto');
 const pool     = require('../db');
+const { inClass, gradeInt } = require('../classScope');
 
 // ── File extraction helpers ───────────────────────────────────────────────────
 async function extractText(buffer, mimetype) {
@@ -519,25 +520,24 @@ const studentQuizRouter = express.Router();
 studentQuizRouter.get('/materials', async (req, res) => {
   const studentId = req.student.id;
   try {
-    const { rows: stuRows } = await pool.query(
-      `SELECT class_id, grade, stream, school_id FROM enrolled_students WHERE id = $1`, [studentId]
-    );
-    if (!stuRows.length) return res.status(404).json({ message: 'Student not found' });
-    const { class_id, grade, stream, school_id } = stuRows[0];
-    const numGrade = parseInt((grade || '').replace(/[^0-9]/g, '')) || 0;
-
+    // A material pinned to a class reaches only that class's students; one with
+    // no class reaches everyone whose grade+stream matches its subject. (The
+    // subject branch used to apply to pinned materials too, so they leaked to
+    // the whole grade.)
     const { rows } = await pool.query(
       `SELECT m.id, m.title, m.material_type, m.originalname, m.created_at,
               ss.id AS "subjectId", ss.name AS "subjectName"
        FROM teacher_materials m
+       JOIN enrolled_students es ON es.id = $1 AND es.school_id = m.school_id
        LEFT JOIN school_subjects ss ON ss.id = m.subject_id
-       WHERE m.school_id = $1
-         AND (
-           ($2::int IS NOT NULL AND m.class_id = $2)
-           OR (m.subject_id IS NOT NULL AND ss.grade = $3 AND ss.stream IS NOT DISTINCT FROM $4)
+       LEFT JOIN classes c ON c.id = m.class_id
+       WHERE (
+           (m.class_id IS NOT NULL AND ${inClass('es', 'c')})
+           OR (m.class_id IS NULL AND m.subject_id IS NOT NULL
+               AND ss.grade = ${gradeInt('es')} AND ss.stream IS NOT DISTINCT FROM es.stream)
          )
        ORDER BY ss.name ASC NULLS LAST, m.created_at DESC`,
-      [school_id, class_id || null, numGrade, stream || null]
+      [studentId]
     );
     res.json(rows);
   } catch (err) {
@@ -549,24 +549,20 @@ studentQuizRouter.get('/materials', async (req, res) => {
 studentQuizRouter.get('/materials/:id/download', async (req, res) => {
   const studentId = req.student.id;
   try {
-    const { rows: stuRows } = await pool.query(
-      `SELECT class_id, grade, stream, school_id FROM enrolled_students WHERE id = $1`, [studentId]
-    );
-    if (!stuRows.length) return res.status(404).json({ message: 'Student not found' });
-    const { class_id, grade, stream, school_id } = stuRows[0];
-    const numGrade = parseInt((grade || '').replace(/[^0-9]/g, '')) || 0;
-
     const { rows } = await pool.query(
       `SELECT m.filename, m.originalname, d.mimetype, d.data
        FROM teacher_materials m
+       JOIN enrolled_students es ON es.id = $2 AND es.school_id = m.school_id
        LEFT JOIN school_subjects ss ON ss.id = m.subject_id
+       LEFT JOIN classes c ON c.id = m.class_id
        JOIN document_files d ON d.filename = m.filename
-       WHERE m.id = $1 AND m.school_id = $2
+       WHERE m.id = $1
          AND (
-           ($3::int IS NOT NULL AND m.class_id = $3)
-           OR (m.subject_id IS NOT NULL AND ss.grade = $4 AND ss.stream IS NOT DISTINCT FROM $5)
+           (m.class_id IS NOT NULL AND ${inClass('es', 'c')})
+           OR (m.class_id IS NULL AND m.subject_id IS NOT NULL
+               AND ss.grade = ${gradeInt('es')} AND ss.stream IS NOT DISTINCT FROM es.stream)
          )`,
-      [req.params.id, school_id, class_id || null, numGrade, stream || null]
+      [req.params.id, studentId]
     );
     if (!rows.length) return res.status(404).json({ message: 'File not found' });
     res.setHeader('Content-Disposition', `inline; filename="${rows[0].originalname}"`);
@@ -581,13 +577,7 @@ studentQuizRouter.get('/materials/:id/download', async (req, res) => {
 studentQuizRouter.get('/quizzes', async (req, res) => {
   const studentId = req.student.id;
   try {
-    const { rows: stuRows } = await pool.query(
-      `SELECT grade, stream, school_id FROM enrolled_students WHERE id = $1`, [studentId]
-    );
-    if (!stuRows.length) return res.status(404).json({ message: 'Student not found' });
-    const { grade, school_id } = stuRows[0];
-    const numGrade = parseInt((grade || '').replace(/[^0-9]/g, '')) || 0;
-
+    // Only quizzes set for the student's own class — see classScope.js.
     const { rows } = await pool.query(
       `SELECT q.id, q.title, q.description, q.total_questions,
               q.time_limit_minutes, q.difficulty, q.published_at, q.closes_at,
@@ -596,13 +586,14 @@ studentQuizRouter.get('/quizzes', async (req, res) => {
               qa.score, qa.total AS "attemptTotal", qa.percentage
        FROM quizzes q
        JOIN classes c ON c.id = q.class_id
+       JOIN enrolled_students es ON es.id = $1 AND es.school_id = q.school_id
        LEFT JOIN school_subjects ss ON ss.id = q.subject_id
-       LEFT JOIN quiz_attempts qa ON qa.quiz_id = q.id AND qa.student_id = $1
-       WHERE q.school_id = $2 AND q.status = 'published'
-         AND c.grade::text = $3::text
+       LEFT JOIN quiz_attempts qa ON qa.quiz_id = q.id AND qa.student_id = es.id
+       WHERE q.status = 'published'
+         AND ${inClass('es', 'c')}
          AND (q.closes_at IS NULL OR q.closes_at > NOW())
        ORDER BY q.published_at DESC`,
-      [studentId, school_id, String(numGrade)]
+      [studentId]
     );
     res.json(rows);
   } catch (err) {
@@ -624,8 +615,10 @@ studentQuizRouter.get('/quizzes/:id', async (req, res) => {
        FROM quizzes q
        LEFT JOIN school_subjects ss ON ss.id = q.subject_id
        LEFT JOIN classes c ON c.id = q.class_id
-       WHERE q.id = $1 AND q.school_id = $2 AND q.status = 'published'`,
-      [req.params.id, school_id]
+       JOIN enrolled_students es ON es.id = $3 AND es.school_id = q.school_id
+       WHERE q.id = $1 AND q.school_id = $2 AND q.status = 'published'
+         AND (c.id IS NULL OR ${inClass('es', 'c')})`,
+      [req.params.id, school_id, studentId]
     );
     if (!quiz.length) return res.status(404).json({ message: 'Quiz not found or not available' });
 
@@ -664,10 +657,13 @@ studentQuizRouter.post('/quizzes/:id/attempt', async (req, res) => {
     const school_id = stuRows[0].school_id;
 
     const { rows: quiz } = await client.query(
-      `SELECT id, total_questions FROM quizzes
-       WHERE id=$1 AND school_id=$2 AND status='published'
-         AND (closes_at IS NULL OR closes_at > NOW())`,
-      [req.params.id, school_id]
+      `SELECT q.id, q.total_questions FROM quizzes q
+       LEFT JOIN classes c ON c.id = q.class_id
+       JOIN enrolled_students es ON es.id = $3 AND es.school_id = q.school_id
+       WHERE q.id=$1 AND q.school_id=$2 AND q.status='published'
+         AND (q.closes_at IS NULL OR q.closes_at > NOW())
+         AND (c.id IS NULL OR ${inClass('es', 'c')})`,
+      [req.params.id, school_id, studentId]
     );
     if (!quiz.length) { await client.query('ROLLBACK'); return res.status(404).json({ message: 'Quiz not available' }); }
 

@@ -18,6 +18,7 @@ const { requireParent, resetParentCredentials, parentLogin, parentChangePassword
 const { schoolAdminTicketsRouter, systemAdminTicketsRouter } = require('./routes/supportRoutes');
 const { router: systemRouter, requireSystemAdmin: requireSystemAdminFromSystem } = require('./routes/systemRoutes');
 const { router: managementRoutes, getStudentReportData, buildReportCardHTML, htmlToPdfBuffer, getSchoolLogoUrl } = require('./routes/managementRoutes');
+const { inClass } = require('./classScope');
 const phase2Routes            = require('./routes/phase2Routes');
 const phase3Routes            = require('./routes/phase3Routes');
 const systemSchoolMgmtRoutes  = require('./routes/systemSchoolMgmtRoutes');
@@ -441,27 +442,18 @@ app.patch('/api/student/me', requireStudent, async (req, res) => {
 
 app.get('/api/student/assignments', requireStudent, async (req, res) => {
   try {
-    const { rows: srows } = await pool.query(
-      'SELECT grade, stream, school_id FROM enrolled_students WHERE id = $1',
-      [req.student.id]
-    );
-    if (!srows.length) return res.status(404).json({ message: 'Student not found' });
-    const { grade, stream, school_id } = srows[0];
-    const numericGrade = parseInt((grade || '').replace(/[^0-9]/g, ''), 10) || null;
-    const params = [school_id];
-    let gradeFilter = '';
-    if (numericGrade) { params.push(numericGrade); gradeFilter = `AND c.grade = $${params.length}`; }
-    let streamFilter = '';
-    if (stream) { params.push(stream); streamFilter = `AND (c.stream IS NULL OR c.stream = $${params.length})`; }
+    // Only the student's own class's assignments — see classScope.js. (This used
+    // to match every class of the grade, so 9A and 9B saw each other's work.)
     const { rows } = await pool.query(
       `SELECT a.id, a.title, a.description, a.due_date AS "dueDate", a.total_marks AS "totalMarks",
               c.name AS "className", ss.name AS "subjectName"
        FROM assignments a
        JOIN classes c ON c.id = a.class_id
+       JOIN enrolled_students es ON es.id = $1 AND es.school_id = c.school_id
        JOIN school_subjects ss ON ss.id = a.subject_id
-       WHERE c.school_id = $1 ${gradeFilter} ${streamFilter}
+       WHERE ${inClass('es', 'c')}
        ORDER BY a.due_date DESC`,
-      params
+      [req.student.id]
     );
     res.json(rows);
   } catch (err) {
@@ -474,19 +466,12 @@ app.get('/api/student/assignments', requireStudent, async (req, res) => {
 // worksheets, etc.) — distinct from the student's own submitted file.
 app.get('/api/student/assignments/:id/files', requireStudent, async (req, res) => {
   try {
-    const { rows: srows } = await pool.query(
-      'SELECT grade, stream, school_id FROM enrolled_students WHERE id = $1',
-      [req.student.id]
-    );
-    if (!srows.length) return res.status(404).json({ message: 'Student not found' });
-    const { grade, stream, school_id } = srows[0];
-    const numericGrade = parseInt((grade || '').replace(/[^0-9]/g, ''), 10) || null;
     const { rows: visible } = await pool.query(
-      `SELECT a.id FROM assignments a JOIN classes c ON c.id = a.class_id
-       WHERE a.id = $1 AND c.school_id = $2
-         AND ($3::int IS NULL OR c.grade = $3)
-         AND ($4::text IS NULL OR c.stream IS NULL OR c.stream = $4)`,
-      [req.params.id, school_id, numericGrade, stream || null]
+      `SELECT a.id FROM assignments a
+       JOIN classes c ON c.id = a.class_id
+       JOIN enrolled_students es ON es.id = $2 AND es.school_id = c.school_id
+       WHERE a.id = $1 AND ${inClass('es', 'c')}`,
+      [req.params.id, req.student.id]
     );
     if (!visible.length) return res.status(404).json({ message: 'Assignment not found' });
     const { rows } = await pool.query(
@@ -503,56 +488,22 @@ app.get('/api/student/assignments/:id/files', requireStudent, async (req, res) =
 // GET /api/student/exams
 app.get('/api/student/exams', requireStudent, async (req, res) => {
   try {
-    const studentId = req.student.id;
-    const schoolId  = req.student.schoolId;
-    const { rows: stuRows } = await pool.query(
-      'SELECT grade, stream FROM enrolled_students WHERE id = $1', [studentId]
+    // The student's own class's exams — see classScope.js. This used to guess one
+    // class by grade+stream (with no ORDER BY, so not even a stable guess).
+    const { rows } = await pool.query(
+      `SELECT e.id, e.title, e.exam_date AS "examDate", e.total_marks AS "totalMarks",
+              e.type, ss.name AS "subjectName",
+              r.marks_obtained AS "marksObtained", r.percentage, r.captured_at AS "capturedAt"
+       FROM exams e
+       JOIN classes c ON c.id = e.class_id
+       JOIN enrolled_students es ON es.id = $1 AND es.school_id = e.school_id
+       JOIN school_subjects ss ON ss.id = e.subject_id
+       LEFT JOIN results r ON r.exam_id = e.id AND r.student_id = es.id
+       WHERE ${inClass('es', 'c')}
+       ORDER BY e.exam_date DESC`,
+      [req.student.id]
     );
-    if (!stuRows.length) return res.status(404).json({ message: 'Student not found' });
-    const { grade, stream } = stuRows[0];
-    const numericGrade = parseInt((grade || '').replace(/[^0-9]/g, ''), 10);
-    if (!numericGrade) return res.json([]);
-
-    const { rows: clsRows } = await pool.query(
-      `SELECT id FROM classes
-       WHERE school_id = $1 AND grade = $2
-         AND (($3::TEXT IS NULL AND stream IS NULL) OR stream = $3)
-         AND is_active = true
-       LIMIT 1`,
-      [schoolId, numericGrade, stream || null]
-    );
-
-    let exams;
-    if (clsRows.length) {
-      const classId = clsRows[0].id;
-      const { rows } = await pool.query(
-        `SELECT e.id, e.title, e.exam_date AS "examDate", e.total_marks AS "totalMarks",
-                e.type, ss.name AS "subjectName",
-                r.marks_obtained AS "marksObtained", r.percentage, r.captured_at AS "capturedAt"
-         FROM exams e
-         JOIN school_subjects ss ON ss.id = e.subject_id
-         LEFT JOIN results r ON r.exam_id = e.id AND r.student_id = $1
-         WHERE e.class_id = $2 AND e.school_id = $3
-         ORDER BY e.exam_date DESC`,
-        [studentId, classId, schoolId]
-      );
-      exams = rows;
-    } else {
-      const { rows } = await pool.query(
-        `SELECT e.id, e.title, e.exam_date AS "examDate", e.total_marks AS "totalMarks",
-                e.type, ss.name AS "subjectName",
-                r.marks_obtained AS "marksObtained", r.percentage, r.captured_at AS "capturedAt"
-         FROM exams e
-         JOIN classes c ON c.id = e.class_id
-         JOIN school_subjects ss ON ss.id = e.subject_id
-         LEFT JOIN results r ON r.exam_id = e.id AND r.student_id = $1
-         WHERE e.school_id = $2 AND c.grade = $3
-         ORDER BY e.exam_date DESC`,
-        [studentId, schoolId, numericGrade]
-      );
-      exams = rows;
-    }
-    res.json(exams);
+    res.json(rows);
   } catch (err) {
     console.error('[student exams]', err);
     res.status(500).json({ message: 'Server error' });
@@ -642,49 +593,88 @@ app.delete('/api/student/assignments/:id/submission', requireStudent, async (req
   }
 });
 
+// Resolves a student's class. Prefers the direct class_id set at enrolment —
+// the only accurate answer when a grade has several classes (9A vs 9B) — and
+// falls back to a grade+stream guess only for students enrolled before
+// class_id existed. Shared by the student and parent timetables so they can
+// never disagree. Returns null when there's no class.
+async function getStudentClass(schoolId, studentId) {
+  const { rows: stu } = await pool.query(
+    'SELECT grade, stream, class_id FROM enrolled_students WHERE id = $1 AND school_id = $2',
+    [studentId, schoolId]
+  );
+  if (!stu.length) return null;
+  const { grade, stream, class_id } = stu[0];
+  if (class_id) {
+    const { rows } = await pool.query(
+      'SELECT id, name, grade, stream FROM classes WHERE id = $1 AND school_id = $2 AND is_active = true',
+      [class_id, schoolId]
+    );
+    if (rows.length) return rows[0];
+  }
+  const numericGrade = parseInt((grade || '').replace(/[^0-9]/g, ''), 10);
+  if (!numericGrade) return null;
+  const { rows } = await pool.query(
+    `SELECT id, name, grade, stream FROM classes
+     WHERE school_id = $1 AND grade = $2
+       AND (($3::TEXT IS NULL AND stream IS NULL) OR stream = $3)
+       AND is_active = true
+     ORDER BY letter LIMIT 1`,
+    [schoolId, numericGrade, stream || null]
+  );
+  return rows[0] || null;
+}
+
+async function getClassTimetable(schoolId, classId) {
+  const [slotsRes, periodsRes] = await Promise.all([
+    pool.query(
+      `SELECT ts.day_of_week AS "dayOfWeek", ss.name AS "subjectName",
+              t.first_name AS "teacherFirstName", t.last_name AS "teacherLastName",
+              sp.period_number AS "periodNumber"
+       FROM timetable_slots ts
+       JOIN school_subjects ss ON ss.id = ts.subject_id
+       JOIN teachers t ON t.id = ts.teacher_id
+       JOIN school_periods sp ON sp.id = ts.period_id
+       WHERE ts.class_id = $1 AND ts.school_id = $2
+       ORDER BY sp.period_number`,
+      [classId, schoolId]
+    ),
+    pool.query(
+      `SELECT period_number AS "periodNumber", name, time_start AS "timeStart",
+              time_end AS "timeEnd", is_break AS "isBreak"
+       FROM school_periods WHERE school_id = $1 ORDER BY period_number`,
+      [schoolId]
+    ),
+  ]);
+  return { slots: slotsRes.rows, periods: periodsRes.rows };
+}
+
 app.get('/api/student/timetable', requireStudent, async (req, res) => {
   try {
     const schoolId = req.student.schoolId;
-    const { rows: stuRows } = await pool.query(
-      'SELECT grade, stream FROM enrolled_students WHERE id = $1', [req.student.id]
-    );
-    if (!stuRows.length) return res.status(404).json({ message: 'Student not found' });
-    const { grade, stream } = stuRows[0];
-    const numericGrade = parseInt((grade || '').replace(/[^0-9]/g, ''), 10);
-    if (!numericGrade) return res.json({ class: null, slots: [], periods: [] });
-    const { rows: classRows } = await pool.query(
-      `SELECT c.id, c.name, c.grade, c.stream FROM classes c
-       WHERE c.school_id = $1 AND c.grade = $2
-         AND (($3::TEXT IS NULL AND c.stream IS NULL) OR c.stream = $3)
-         AND c.is_active = true
-       ORDER BY c.letter LIMIT 1`,
-      [schoolId, numericGrade, stream || null]
-    );
-    if (!classRows.length) return res.json({ class: null, slots: [], periods: [] });
-    const cls = classRows[0];
-    const [slotsRes, periodsRes] = await Promise.all([
-      pool.query(
-        `SELECT ts.day_of_week AS "dayOfWeek", ss.name AS "subjectName",
-                t.first_name AS "teacherFirstName", t.last_name AS "teacherLastName",
-                sp.period_number AS "periodNumber"
-         FROM timetable_slots ts
-         JOIN school_subjects ss ON ss.id = ts.subject_id
-         JOIN teachers t ON t.id = ts.teacher_id
-         JOIN school_periods sp ON sp.id = ts.period_id
-         WHERE ts.class_id = $1 AND ts.school_id = $2
-         ORDER BY sp.period_number`,
-        [cls.id, schoolId]
-      ),
-      pool.query(
-        `SELECT period_number AS "periodNumber", name, time_start AS "timeStart",
-                time_end AS "timeEnd", is_break AS "isBreak"
-         FROM school_periods WHERE school_id = $1 ORDER BY period_number`,
-        [schoolId]
-      ),
-    ]);
-    res.json({ class: cls, slots: slotsRes.rows, periods: periodsRes.rows });
+    const cls = await getStudentClass(schoolId, req.student.id);
+    if (!cls) return res.json({ class: null, slots: [], periods: [] });
+    res.json({ class: cls, ...(await getClassTimetable(schoolId, cls.id)) });
   } catch (err) {
     console.error('[student timetable]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Announcements the school addressed to everyone or to students. Teachers and
+// parents have their own endpoints filtering on their own audience.
+app.get('/api/student/announcements', requireStudent, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, title, body, audience, is_pinned AS "isPinned", created_at AS "createdAt"
+       FROM announcements
+       WHERE school_id = $1 AND is_active = true AND audience IN ('all', 'students')
+       ORDER BY is_pinned DESC, created_at DESC LIMIT 50`,
+      [req.student.schoolId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[student announcements]', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -696,7 +686,14 @@ app.post('/api/assignments/:id/submit', requireStudent, upload.single('file'), a
   const v = validateFile(req.file, 'additional');
   if (!v.valid) return res.status(400).json({ success: false, message: v.error });
   try {
-    const { rows: asg } = await pool.query('SELECT id FROM assignments WHERE id = $1 AND school_id = $2', [assignmentId, req.student.schoolId]);
+    // Only assignments set for the student's own class can be submitted to.
+    const { rows: asg } = await pool.query(
+      `SELECT a.id FROM assignments a
+       JOIN classes c ON c.id = a.class_id
+       JOIN enrolled_students es ON es.id = $2 AND es.school_id = c.school_id
+       WHERE a.id = $1 AND ${inClass('es', 'c')}`,
+      [assignmentId, studentId]
+    );
     if (!asg.length) return res.status(404).json({ success: false, message: 'Assignment not found' });
     const ext      = path.extname(req.file.originalname).toLowerCase();
     const filename = crypto.randomBytes(16).toString('hex') + ext;
@@ -825,6 +822,9 @@ app.get('/api/parent/children', requireParent, async (req, res) => {
 // returning anything for them — otherwise a parent could read any student's
 // records just by changing the studentId in the URL.
 async function assertParentChild(parentId, studentId) {
+  // A non-numeric id would make Postgres throw (surfacing as a 500), so treat
+  // it as "not linked" instead.
+  if (!/^\d+$/.test(String(studentId))) return false;
   const { rows } = await pool.query(
     'SELECT 1 FROM student_parents WHERE parent_id = $1 AND student_id = $2',
     [parentId, studentId]
@@ -876,6 +876,103 @@ app.get('/api/parent/children/:studentId/results', requireParent, async (req, re
   } catch (err) {
     console.error('[parent child results]', err);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ─── Parent portal: school-wide info, timetable and report cards ─────────────
+// Everything below is read-only and scoped to the parent's own school; the
+// per-child routes also require the parent to be linked to that child.
+app.get('/api/parent/announcements', requireParent, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, title, body, audience, is_pinned AS "isPinned", created_at AS "createdAt"
+       FROM announcements
+       WHERE school_id = $1 AND is_active = true AND audience IN ('all', 'parents')
+       ORDER BY is_pinned DESC, created_at DESC LIMIT 50`,
+      [req.parent.schoolId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[parent announcements]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.get('/api/parent/events', requireParent, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, title, description, to_char(event_date, 'YYYY-MM-DD') AS "eventDate",
+              event_time AS "eventTime", location, type
+       FROM events
+       WHERE school_id = $1 AND event_date >= CURRENT_DATE
+       ORDER BY event_date ASC, event_time ASC NULLS LAST LIMIT 30`,
+      [req.parent.schoolId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[parent events]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.get('/api/parent/children/:studentId/timetable', requireParent, async (req, res) => {
+  const { studentId } = req.params;
+  const schoolId = req.parent.schoolId;
+  try {
+    if (!(await assertParentChild(req.parent.id, studentId)))
+      return res.status(403).json({ message: 'Not linked to this student' });
+    const cls = await getStudentClass(schoolId, studentId);
+    if (!cls) return res.json({ class: null, slots: [], periods: [] });
+    res.json({ class: cls, ...(await getClassTimetable(schoolId, cls.id)) });
+  } catch (err) {
+    console.error('[parent child timetable]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Terms whose report cards the school has released — same rule students get.
+app.get('/api/parent/report-terms', requireParent, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, term_number AS "termNumber", start_date AS "startDate",
+              end_date AS "endDate", released_at AS "releasedAt"
+       FROM terms
+       WHERE school_id = $1 AND reports_released = true
+       ORDER BY term_number DESC`,
+      [req.parent.schoolId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[parent report-terms]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.get('/api/parent/children/:studentId/report-card/:termId/pdf', requireParent, async (req, res) => {
+  const { studentId, termId } = req.params;
+  const schoolId = req.parent.schoolId;
+  try {
+    if (!(await assertParentChild(req.parent.id, studentId)))
+      return res.status(403).json({ message: 'Not linked to this student' });
+    if (!/^\d+$/.test(termId))
+      return res.status(400).json({ message: 'Invalid term' });
+    const { rows } = await pool.query(
+      'SELECT id FROM terms WHERE id = $1 AND school_id = $2 AND reports_released = true',
+      [termId, schoolId]
+    );
+    if (!rows.length) return res.status(403).json({ message: 'This report has not been released yet' });
+
+    const data = await getStudentReportData(schoolId, studentId, termId);
+    if (!data) return res.status(404).json({ message: 'Student not found' });
+
+    const logo = await getSchoolLogoUrl(req, schoolId);
+    const pdf  = await htmlToPdfBuffer(buildReportCardHTML(data, logo));
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="report_${data.student.studentNumber}.pdf"`);
+    res.send(pdf);
+  } catch (err) {
+    console.error('[parent report-card pdf]', err);
+    res.status(500).json({ message: 'Failed to generate report card' });
   }
 });
 

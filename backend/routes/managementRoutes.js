@@ -15,6 +15,8 @@ const express   = require('express');
 const router    = express.Router();
 const pool      = require('../db');
 const puppeteer = require('puppeteer');
+const { logAudit } = require('../auth');
+const { inClass } = require('../classScope');
 
 // ── Stream derivation (exact match) ──────────────────────────────────────────
 // The application form's "Subject Stream" dropdown offers exactly Physics/
@@ -43,16 +45,27 @@ const deriveStream = (grade, subject) => {
 // in letter order (A before B before C…), so admission naturally fills class A
 // before spilling into class B. Throws a descriptive error the enrollment
 // route turns into a 409 when there's no room or no matching class at all.
+//
+// FOR UPDATE locks the matching class rows up front, so two enrolments racing
+// for the same grade/stream serialize on them rather than both reading "room
+// left" at once. The enrolled-count check is then a deliberately SEPARATE,
+// freshly-issued query, not a subquery in the locked SELECT's own column
+// list — when a blocked FOR UPDATE unblocks, Postgres refreshes the locked
+// row's own columns, but not a correlated subquery over a different table in
+// the same SELECT, so embedding the count there let a transaction that had
+// waited still see the pre-wait, no-longer-true count and enrol into a seat
+// another transaction had just filled. A separate query, issued only after
+// the lock is actually held, always sees the latest committed data. Every
+// caller must already be inside a transaction (`client` from BEGIN).
 async function allocateClass(client, schoolId, gradeStr, stream) {
   const gradeNum = parseInt(String(gradeStr).replace(/[^0-9]/g, ''), 10);
   const label = `Grade ${gradeNum}${stream ? ' ' + stream : ''}`;
   const { rows: candidates } = await client.query(
-    `SELECT c.id, c.name, c.capacity,
-            (SELECT COUNT(*) FROM enrolled_students es WHERE es.class_id = c.id AND es.is_active = true) AS enrolled_count
-     FROM classes c
-     WHERE c.school_id = $1 AND c.grade = $2 AND c.is_active = true
-       AND c.stream IS NOT DISTINCT FROM $3
-     ORDER BY c.letter ASC`,
+    `SELECT id, name, capacity FROM classes
+     WHERE school_id = $1 AND grade = $2 AND is_active = true
+       AND stream IS NOT DISTINCT FROM $3
+     ORDER BY letter ASC
+     FOR UPDATE`,
     [schoolId, gradeNum, stream || null]
   );
   if (!candidates.length) {
@@ -60,18 +73,16 @@ async function allocateClass(client, schoolId, gradeStr, stream) {
     err.code = 'NO_CLASS';
     throw err;
   }
-  const open = candidates.find(c => parseInt(c.enrolled_count, 10) < c.capacity);
-  if (!open) {
-    const err = new Error(`All ${label} classes are full (capacity reached) — ask your system administrator to create another class.`);
-    err.code = 'CLASS_FULL';
-    throw err;
+  for (const c of candidates) {
+    const { rows: cnt } = await client.query(
+      'SELECT COUNT(*)::int AS n FROM enrolled_students WHERE class_id = $1 AND is_active = true',
+      [c.id]
+    );
+    if (cnt[0].n < c.capacity) return c;
   }
-  return open;
-}
-
-// ── Grade where clause helper ─────────────────────────────────────────────────
-function gradeWhere(paramIndex) {
-  return `(es.grade::TEXT = $${paramIndex}::TEXT OR es.grade::TEXT = 'Grade ' || $${paramIndex} OR REGEXP_REPLACE(es.grade::TEXT,'[^0-9]','','g') = $${paramIndex}::TEXT)`;
+  const err = new Error(`All ${label} classes are full (capacity reached) — ask your system administrator to create another class.`);
+  err.code = 'CLASS_FULL';
+  throw err;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -156,6 +167,7 @@ router.get('/enrolled-students', async (req, res) => {
       SELECT es.id, es.student_number AS "studentNumber", es.first_name AS "firstName",
              es.last_name AS "lastName", es.national_id AS "nationalId", es.email, es.phone,
              es.date_of_birth AS "dateOfBirth", es.gender, es.grade, es.stream,
+             es.class_id AS "classId", (SELECT c.name FROM classes c WHERE c.id = es.class_id) AS "className",
              es.enrollment_date AS "enrollmentDate", es.notes, es.created_at AS "createdAt",
              (es.password_hash IS NOT NULL AND es.password_hash <> '') AS "hasCredentials",
              COALESCE(json_agg(json_build_object('id',p.id,'firstName',p.first_name,'lastName',p.last_name,'phone',p.phone,'email',p.email,'relationship',p.relationship,'isEmergency',p.is_emergency_contact)) FILTER (WHERE p.id IS NOT NULL),'[]') AS parents
@@ -172,6 +184,131 @@ router.get('/enrolled-students', async (req, res) => {
   } catch (err) {
     console.error('[enrolled-students]', err);
     res.status(500).json({ message: 'Failed to fetch enrolled students' });
+  }
+});
+
+const classLabel = (grade, stream) => `Grade ${grade}${stream ? ' ' + stream : ''}`;
+
+// ── Set (or change) the class a student is in ────────────────────────────────
+// Enrolment auto-picks a class but nothing could change it afterwards, and
+// students enrolled before class_id existed have none at all. Their timetable,
+// report card and the class capacity counts all follow this column, so the
+// school needs a way to record the real one.
+router.patch('/students/:id/class', async (req, res) => {
+  const schoolId = req.admin.schoolId;
+  const { classId } = req.body || {};
+  if (!/^\d+$/.test(req.params.id) || !/^\d+$/.test(String(classId ?? '')))
+    return res.status(400).json({ message: 'A valid student and class are required' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: stu } = await client.query(
+      `SELECT id, first_name, last_name, grade, stream, class_id FROM enrolled_students
+       WHERE id = $1 AND school_id = $2 AND is_active = true FOR UPDATE`,
+      [req.params.id, schoolId]
+    );
+    if (!stu.length) { await client.query('ROLLBACK'); return res.status(404).json({ message: 'Student not found' }); }
+
+    // Locking the class row makes two admins moving students into a nearly
+    // full class take turns, so the capacity check below can't be raced past.
+    const { rows: cls } = await client.query(
+      `SELECT id, name, grade, stream, capacity FROM classes
+       WHERE id = $1 AND school_id = $2 AND is_active = true FOR UPDATE`,
+      [classId, schoolId]
+    );
+    if (!cls.length) { await client.query('ROLLBACK'); return res.status(404).json({ message: 'Class not found' }); }
+
+    const s = stu[0], c = cls[0];
+    if (s.class_id === c.id) {
+      await client.query('ROLLBACK');
+      return res.json({ success: true, classId: c.id, className: c.name, unchanged: true });
+    }
+    const studentGrade = parseInt(String(s.grade).replace(/[^0-9]/g, ''), 10);
+    if (c.grade !== studentGrade || (c.stream || null) !== (s.stream || null)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        message: `${c.name} is a ${classLabel(c.grade, c.stream)} class, but ${s.first_name} is in ${classLabel(studentGrade, s.stream)}.`,
+      });
+    }
+    const { rows: cnt } = await client.query(
+      'SELECT COUNT(*)::int AS n FROM enrolled_students WHERE class_id = $1 AND is_active = true', [c.id]
+    );
+    if (cnt[0].n >= c.capacity) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ message: `${c.name} is full (${cnt[0].n}/${c.capacity}). Raise its capacity or pick another class.` });
+    }
+
+    await client.query('UPDATE enrolled_students SET class_id = $1, updated_at = NOW() WHERE id = $2', [c.id, s.id]);
+    await client.query('COMMIT');
+    await logAudit(pool, {
+      actor: req.admin.username, actorRole: 'school_admin', action: 'ASSIGN_CLASS',
+      target: `${s.first_name} ${s.last_name} → ${c.name}`, school: req.admin.school, schoolId,
+    });
+    res.json({ success: true, classId: c.id, className: c.name });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[assign class]', err);
+    res.status(500).json({ message: 'Could not change the class' });
+  } finally {
+    client.release();
+  }
+});
+
+// ── Place every student who has no class, the same way enrolment does ────────
+// allocateClass() fills class A before spilling into B, so this is a sensible
+// default for students enrolled before classes were tracked — the school can
+// then correct individuals with the route above. Students who can't be placed
+// (no class exists for their grade/stream, or every one is full) are reported
+// back rather than failing the whole run.
+router.post('/students/allocate-classes', async (req, res) => {
+  const schoolId = req.admin.schoolId;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // FOR UPDATE: a double-click (or a second admin) makes the second run wait,
+    // then find nobody left unassigned instead of placing the same students twice.
+    const { rows: students } = await client.query(
+      `SELECT id, student_number, first_name, last_name, grade, stream FROM enrolled_students
+       WHERE school_id = $1 AND is_active = true AND class_id IS NULL
+       ORDER BY grade, last_name, first_name FOR UPDATE`,
+      [schoolId]
+    );
+
+    const placed = {};
+    const skipped = [];
+    let assigned = 0;
+    for (const s of students) {
+      const gradeNum = parseInt(String(s.grade).replace(/[^0-9]/g, ''), 10);
+      const label = gradeNum ? classLabel(gradeNum, s.stream) : String(s.grade || 'no grade');
+      const skip = (reason) => skipped.push({
+        id: s.id, studentNumber: s.student_number, name: `${s.first_name} ${s.last_name}`,
+        grade: s.grade, stream: s.stream, reason,
+      });
+      if (!gradeNum) { skip('Grade not recognised'); continue; }
+      try {
+        const cls = await allocateClass(client, schoolId, s.grade, s.stream);
+        await client.query('UPDATE enrolled_students SET class_id = $1, updated_at = NOW() WHERE id = $2', [cls.id, s.id]);
+        placed[cls.name] = (placed[cls.name] || 0) + 1;
+        assigned++;
+      } catch (e) {
+        if (e.code === 'NO_CLASS')        skip(`No ${label} class has been set up yet`);
+        else if (e.code === 'CLASS_FULL') skip(`All ${label} classes are full`);
+        else throw e;
+      }
+    }
+    await client.query('COMMIT');
+    await logAudit(pool, {
+      actor: req.admin.username, actorRole: 'school_admin', action: 'AUTO_ASSIGN_CLASSES',
+      target: null, school: req.admin.school, schoolId, detail: `assigned=${assigned} skipped=${skipped.length}`,
+    });
+    res.json({ success: true, assigned, placed, skipped });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[allocate classes]', err);
+    res.status(500).json({ message: 'Could not assign classes' });
+  } finally {
+    client.release();
   }
 });
 
@@ -294,8 +431,8 @@ router.get('/reports/classes', async (req, res) => {
        FROM classes c
        LEFT JOIN enrolled_students es
          ON es.school_id = c.school_id
-         AND REGEXP_REPLACE(es.grade::TEXT,'[^0-9]','','g') = c.grade::TEXT
          AND es.is_active = true
+         AND ${inClass('es', 'c')}
        WHERE c.school_id = $1 AND c.is_active = true
        GROUP BY c.id, c.name, c.grade, c.stream
        ORDER BY c.grade, c.name`,
@@ -323,14 +460,15 @@ router.get('/reports/attendance', async (req, res) => {
     if (!clsRows.length) return res.status(404).json({ message: 'Class not found' });
     const cls = clsRows[0];
 
-    // Get students in this class
+    // Get students in this class — see classScope.js
     const { rows: students } = await pool.query(
       `SELECT es.id, es.student_number AS "studentNumber",
               es.first_name AS "firstName", es.last_name AS "lastName"
        FROM enrolled_students es
-       WHERE es.school_id=$1 AND ${gradeWhere(2)} AND es.is_active=true
+       JOIN classes c ON c.id=$2 AND c.school_id = es.school_id
+       WHERE es.school_id=$1 AND ${inClass()} AND es.is_active=true
        ORDER BY es.last_name, es.first_name`,
-      [schoolId, String(cls.grade)]
+      [schoolId, cls.id]
     );
 
     if (!students.length) return res.json({ class: cls, students: [], dateRange: { startDate, endDate } });
@@ -399,14 +537,15 @@ router.get('/reports/results', async (req, res) => {
     if (!clsRows.length) return res.status(404).json({ message: 'Class not found' });
     const cls = clsRows[0];
 
-    // Students
+    // Students in the class — see classScope.js
     const { rows: students } = await pool.query(
       `SELECT es.id, es.student_number AS "studentNumber",
               es.first_name AS "firstName", es.last_name AS "lastName"
        FROM enrolled_students es
-       WHERE es.school_id=$1 AND ${gradeWhere(2)} AND es.is_active=true
+       JOIN classes c ON c.id=$2 AND c.school_id = es.school_id
+       WHERE es.school_id=$1 AND ${inClass()} AND es.is_active=true
        ORDER BY es.last_name, es.first_name`,
-      [schoolId, String(cls.grade)]
+      [schoolId, cls.id]
     );
 
     // Subjects for this class
@@ -1084,12 +1223,13 @@ router.get('/reports/class/:classId/pdf', async (req, res) => {
     if (!clsRows.length) return res.status(404).json({ message: 'Class not found' });
     const cls = clsRows[0];
 
-    // Get all students in this class
+    // Get all students in this class — see classScope.js
     const { rows: students } = await pool.query(
       `SELECT es.id FROM enrolled_students es
-       WHERE es.school_id=$1 AND REGEXP_REPLACE(es.grade::TEXT,'[^0-9]','','g')=$2::TEXT AND es.is_active=true
+       JOIN classes c ON c.id=$2 AND c.school_id = es.school_id
+       WHERE es.school_id=$1 AND ${inClass()} AND es.is_active=true
        ORDER BY es.last_name, es.first_name`,
-      [schoolId, String(cls.grade)]
+      [schoolId, cls.id]
     );
 
     if (!students.length)

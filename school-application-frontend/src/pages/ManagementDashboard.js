@@ -325,6 +325,7 @@ const OverviewSection = () => {
                   all:      { bg: '#f2f2f2', color: '#3f3f3f' },
                   teachers: { bg: '#f8f8f8', color: '#626262' },
                   students: { bg: '#f8f8f8', color: '#484848' },
+                  parents:  { bg: '#f8f8f8', color: '#555555' },
                 };
                 const ac = AUDIENCE_COLOR[a.audience] || AUDIENCE_COLOR.all;
                 return (
@@ -422,6 +423,87 @@ const OverviewSection = () => {
 /* ═══════════════════════════════════════════════════════════════
    STUDENTS
 ═══════════════════════════════════════════════════════════════ */
+/* Shows and changes which class a student is in. Timetables, report cards and
+   class capacity all follow this value, and students enrolled before classes
+   were tracked have none until it's set here. */
+const StudentClassPicker = ({ student, onChanged, toast }) => {
+  const navigate = useNavigate();
+  const [options,  setOptions]  = useState(null);   // null = still loading
+  const [selected, setSelected] = useState(student.classId || '');
+  const [saving,   setSaving]   = useState(false);
+
+  useEffect(() => { setSelected(student.classId || ''); }, [student.id, student.classId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setOptions(null);
+    const grade = parseInt(String(student.grade).replace(/[^0-9]/g, ''), 10);
+    if (!grade) { setOptions([]); return; }
+    (async () => {
+      try {
+        const res = await fetch(`${BASE}/api/setup/classes?grade=${grade}`, { headers: authH() });
+        if (redirectOn401([res], navigate)) return;
+        const all = res.ok ? await res.json() : [];
+        // Only classes matching the student's stream — the server enforces the same rule.
+        if (!cancelled) setOptions(all.filter(c => (c.stream || null) === (student.stream || null)));
+      } catch {
+        if (!cancelled) setOptions([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [student.id, student.grade, student.stream, navigate]);
+
+  const chosen  = options?.find(c => c.id === selected);
+  const changed = !!selected && selected !== student.classId;
+
+  const save = async () => {
+    if (student.classId && !window.confirm(`Move ${student.firstName} from ${student.className} to ${chosen?.name}? Their timetable and report card will follow the new class.`)) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${BASE}/api/management/students/${student.id}/class`, {
+        method: 'PATCH', headers: jsonH(), body: JSON.stringify({ classId: selected }),
+      });
+      if (redirectOn401([res], navigate)) return;
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) { toast(`${student.firstName} is now in ${d.className}`); onChanged(); }
+      else toast(d.message || 'Could not change the class', 'error');
+    } catch { toast('Network error', 'error'); }
+    setSaving(false);
+  };
+
+  return (
+    <Box>
+      <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: student.className ? C.text : C.warn }}>
+        {student.className || 'Not assigned yet'}
+      </Typography>
+      {options === null ? (
+        <CircularProgress size={16} sx={{ color: C.brand, mt: 0.75 }} />
+      ) : options.length === 0 ? (
+        <Typography sx={{ fontSize: '0.68rem', color: C.muted, mt: 0.5 }}>
+          No class exists for this grade{student.stream ? ' and stream' : ''} yet — create one under School Setup.
+        </Typography>
+      ) : (
+        <Box sx={{ display: 'flex', gap: 1, mt: 0.75, alignItems: 'center', flexWrap: 'wrap' }}>
+          <TextField select size="small" value={options.some(c => c.id === selected) ? selected : ''}
+            onChange={e => setSelected(e.target.value)} sx={{ minWidth: 160 }}>
+            {options.map(c => {
+              const n = parseInt(c.enrolled_count, 10) || 0;
+              const isFull = n >= c.capacity && c.id !== student.classId;
+              return <MenuItem key={c.id} value={c.id} disabled={isFull}>{c.name} · {n}/{c.capacity}{isFull ? ' (full)' : ''}</MenuItem>;
+            })}
+          </TextField>
+          {changed && (
+            <Button size="small" variant="contained" disabled={saving} onClick={save}
+              sx={{ background: C.brand, textTransform: 'none', fontWeight: 700, boxShadow: 'none', fontFamily: "'IBM Plex Sans', sans-serif" }}>
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+          )}
+        </Box>
+      )}
+    </Box>
+  );
+};
+
 const StudentsSection = () => {
   const navigate = useNavigate();
   const [enrolled,    setEnrolled]    = useState([]);
@@ -438,6 +520,7 @@ const StudentsSection = () => {
   const [saving, setSaving] = useState(false);
   const [snack, setSnack] = useState({ open: false, msg: '', sev: 'success' });
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [allocResult, setAllocResult] = useState(null);   // result of "Assign Classes" when some students couldn't be placed
   const toast = toast_(setSnack);
 
   const fetchAll = useCallback(async () => {
@@ -470,6 +553,24 @@ const StudentsSection = () => {
   const grouped = filtered.reduce((acc,s)=>{(acc[s.grade]=acc[s.grade]||[]).push(s);return acc;},{});
   const allGrades = [...new Set(enrolled.map(s=>s.grade))].sort();
 
+  const unassigned = enrolled.filter(s=>!s.classId).length;
+  const autoAssign = async () => {
+    if (!window.confirm(`Place the ${unassigned} student${unassigned!==1?'s':''} who have no class?\n\nThey are placed the way new enrolments are: the first class of their grade with room (A, then B, and so on). If your students are already split into sections, fix individuals afterwards from the Class field in their details.`)) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${BASE}/api/management/students/allocate-classes`, { method:'POST', headers:authH() });
+      if (redirectOn401([res], navigate)) return;
+      const d = await res.json().catch(()=>({}));
+      if (res.ok) {
+        const skipped = d.skipped || [];
+        toast(`Placed ${d.assigned} student${d.assigned!==1?'s':''}${skipped.length?` · ${skipped.length} could not be placed`:''}`, skipped.length?'warning':'success');
+        if (skipped.length) setAllocResult(d);
+        fetchAll();
+      } else toast(d.message||'Could not assign classes','error');
+    } catch { toast('Network error','error'); }
+    setSaving(false);
+  };
+
   if (loading) return <Box sx={{display:'flex',justifyContent:'center',py:8}}><CircularProgress sx={{color:C.brand}}/></Box>;
 
   return (
@@ -496,6 +597,12 @@ const StudentsSection = () => {
             }} sx={{background:C.brand,textTransform:'none',fontWeight:700,boxShadow:'none',fontFamily:"'IBM Plex Sans', sans-serif"}} startIcon={<KeyIcon/>}>
             {saving?'Working…':'Bulk Generate Logins'}
           </Button>
+          {unassigned>0 && (
+            <Button size="small" variant="outlined" disabled={saving} onClick={autoAssign} startIcon={<SchoolIcon sx={{fontSize:16}}/>}
+              sx={{textTransform:'none',fontWeight:700,borderColor:C.warn,color:C.warn,fontFamily:"'IBM Plex Sans', sans-serif"}}>
+              Assign Classes ({unassigned})
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -517,7 +624,7 @@ const StudentsSection = () => {
                 <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'4px'}}>
                   <Table size="small" sx={{borderCollapse:'collapse'}}>
                     <TableHead><TableRow>
-                      {['#','Student No.','Name','National ID','Email','Phone','Stream','Login','Enrolled'].map(h=>(
+                      {['#','Student No.','Name','National ID','Email','Phone','Stream','Class','Login','Enrolled'].map(h=>(
                         <TableCell key={h} sx={{...hc,...(h==='Enrolled'?{borderRight:'none'}:{})}}>{h}</TableCell>
                       ))}
                     </TableRow></TableHead>
@@ -531,6 +638,7 @@ const StudentsSection = () => {
                           <TableCell sx={{...bc,color:'#575757'}}>{s.email||'—'}</TableCell>
                           <TableCell sx={bc}>{s.phone||'—'}</TableCell>
                           <TableCell sx={bc}>{s.stream?<Chip label={s.stream} size="small" sx={{fontSize:'0.62rem',fontWeight:700,bgcolor:'#f2f2f2',color:'#3f3f3f'}}/>:<Typography sx={{fontSize:'0.7rem',color:C.muted}}>—</Typography>}</TableCell>
+                          <TableCell sx={bc}>{s.className?<Typography sx={{fontSize:'0.72rem',fontWeight:600}}>{s.className}</Typography>:<Chip label="No class" size="small" sx={{fontSize:'0.62rem',fontWeight:700,bgcolor:C.warnBg,color:C.warn}}/>}</TableCell>
                           <TableCell sx={bc}>
                             <Box sx={{display:'flex',gap:0.5}}>
                               <Tooltip title="Set Login Credentials">
@@ -578,6 +686,7 @@ const StudentsSection = () => {
               <FormRow label="Email"><Typography sx={{fontSize:'0.75rem',color:'#575757'}}>{selectedStudent.email||'—'}</Typography></FormRow>
               <FormRow label="Phone"><Typography sx={{fontSize:'0.75rem'}}>{selectedStudent.phone||'—'}</Typography></FormRow>
               <FormRow label="Stream">{selectedStudent.stream?<Chip label={selectedStudent.stream} size="small" sx={{fontSize:'0.62rem',fontWeight:700,bgcolor:'#f2f2f2',color:'#3f3f3f'}}/>:<Typography sx={{fontSize:'0.75rem',color:C.muted}}>—</Typography>}</FormRow>
+              <FormRow label="Class"><StudentClassPicker student={selectedStudent} onChanged={fetchAll} toast={toast}/></FormRow>
               <FormRow label="Enrolled"><Typography sx={{fontSize:'0.75rem',color:C.muted}}>{selectedStudent.enrollmentDate?fmt(selectedStudent.enrollmentDate):'—'}</Typography></FormRow>
               <FormRow label="Login">
                 <Chip label={selectedStudent.hasCredentials?'Set':'Not set'} size="small" sx={{fontWeight:700,fontSize:'0.62rem',bgcolor:selectedStudent.hasCredentials?'#f2f2f2':'#f7f7f7',color:selectedStudent.hasCredentials?'#3f3f3f':C.danger}}/>
@@ -621,6 +730,41 @@ const StudentsSection = () => {
           )}
         </Box>
       </Box>
+
+      {/* Students "Assign Classes" couldn't place */}
+      <Dialog open={!!allocResult} onClose={()=>setAllocResult(null)} maxWidth="sm" fullWidth PaperProps={{sx:{borderRadius:'10px'}}}>
+        <DialogTitle sx={{fontWeight:700,color:C.text,fontFamily:"'IBM Plex Sans', sans-serif"}}>Assign Classes — Results</DialogTitle>
+        <Divider/>
+        <DialogContent sx={{pt:2.5,display:'flex',flexDirection:'column',gap:2}}>
+          <Typography sx={{fontSize:'0.8rem',fontFamily:"'IBM Plex Sans', sans-serif"}}>
+            Placed <strong>{allocResult?.assigned}</strong> student{allocResult?.assigned!==1?'s':''}
+            {Object.keys(allocResult?.placed||{}).length>0 && ` (${Object.entries(allocResult.placed).map(([n,c])=>`${n}: ${c}`).join(', ')})`}.
+          </Typography>
+          <InfoBanner>These students were not placed. Create the missing class (or raise a full class's capacity) under School Setup, then run Assign Classes again.</InfoBanner>
+          <TableContainer component={Paper} elevation={0} sx={{border:`1px solid ${C.border}`,borderRadius:'6px'}}>
+            <Table size="small">
+              <TableHead><TableRow>
+                <TableCell sx={hc}>Student</TableCell>
+                <TableCell sx={hc}>Grade</TableCell>
+                <TableCell sx={hc}>Why</TableCell>
+              </TableRow></TableHead>
+              <TableBody>
+                {(allocResult?.skipped||[]).map(s=>(
+                  <TableRow key={s.id}>
+                    <TableCell sx={bc}>{s.name}</TableCell>
+                    <TableCell sx={bc}>{s.grade}{s.stream?` · ${s.stream}`:''}</TableCell>
+                    <TableCell sx={bc}>{s.reason}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <Divider/>
+        <DialogActions sx={{px:3,py:2}}>
+          <Button onClick={()=>setAllocResult(null)} sx={{textTransform:'none'}}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Student credential dialog */}
       <Dialog open={!!credDialogStudent} onClose={()=>setCredDialogStudent(null)} maxWidth="xs" fullWidth PaperProps={{sx:{borderRadius:'10px'}}}>
@@ -1325,7 +1469,7 @@ const SetupSection = () => {
       if (redirectOn401([r], navigate)) return;
       if(r.ok)setNatSubs(await r.json());
     })();
-  },[addGrade,addStream]);
+  },[addGrade,addStream,navigate]);
 
   const added=new Set(subjects.filter(s=>s.grade===parseInt(addGrade)&&(s.stream===addStream||(!s.stream&&!addStream))).map(s=>s.national_subject_id));
   const available=natSubs.filter(ns=>!added.has(ns.id));
@@ -1510,8 +1654,12 @@ const SetupSection = () => {
                   {STREAMS.map(s=><MenuItem key={s} value={s}>{s}</MenuItem>)}
                 </TextField>
               )}
-              <TextField select label="Letter" value={clsForm.letter} onChange={e=>setClsForm(f=>({...f,letter:e.target.value}))} size="small" sx={{width:100}}>
-                {LETTERS.map(l=><MenuItem key={l} value={l}>{l}</MenuItem>)}
+              <TextField select label="Letter" value={clsForm.letter} onChange={e=>setClsForm(f=>({...f,letter:e.target.value}))} size="small" sx={{width:100}}
+                helperText="Shared across streams — no two classes in a grade share a letter">
+                {LETTERS.map(l=>{
+                  const takenBy=classes.find(c=>c.grade===parseInt(clsForm.grade)&&c.letter===l&&(c.stream||null)!==(clsForm.stream||null));
+                  return <MenuItem key={l} value={l} disabled={!!takenBy}>{l}{takenBy?` — used by ${takenBy.name}`:''}</MenuItem>;
+                })}
               </TextField>
               <TextField label="Capacity" type="number" value={clsForm.capacity} onChange={e=>setClsForm(f=>({...f,capacity:parseInt(e.target.value)||40}))} size="small" sx={{width:100}} inputProps={{min:1,max:60}}/>
               <Button variant="contained" startIcon={<AddIcon/>} onClick={addClass} disabled={saving||!summary?.hasCurrentYear}
@@ -1784,7 +1932,7 @@ const AnnouncementsSection = () => {
     fetch_();
   };
  
-  const AUDIENCE_COLORS = {all:{bg:'#f2f2f2',color:'#3f3f3f'},teachers:{bg:'#f8f8f8',color:'#626262'},students:{bg:'#f8f8f8',color:'#484848'}};
+  const AUDIENCE_COLORS = {all:{bg:'#f2f2f2',color:'#3f3f3f'},teachers:{bg:'#f8f8f8',color:'#626262'},students:{bg:'#f8f8f8',color:'#484848'},parents:{bg:'#f8f8f8',color:'#555555'}};
  
   const fmtDate = d => new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
 
@@ -1868,6 +2016,7 @@ const AnnouncementsSection = () => {
                   <MenuItem value="all">Everyone</MenuItem>
                   <MenuItem value="teachers">Teachers only</MenuItem>
                   <MenuItem value="students">Students only</MenuItem>
+                  <MenuItem value="parents">Parents only</MenuItem>
                 </TextField>
               </FormRow>
               <FormRow label="Pin to top">

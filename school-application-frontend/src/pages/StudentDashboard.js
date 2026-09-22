@@ -31,6 +31,8 @@ import DownloadIcon           from '@mui/icons-material/Download';
 import ErrorOutlineIcon       from '@mui/icons-material/ErrorOutline';
 import EditOutlinedIcon       from '@mui/icons-material/EditOutlined';
 import FolderOutlinedIcon     from '@mui/icons-material/FolderOutlined';
+import CampaignOutlinedIcon   from '@mui/icons-material/CampaignOutlined';
+import PushPinIcon            from '@mui/icons-material/PushPin';
 import SchoolLogoHeader from '../components/SchoolLogoHeader';
 import OfflineBanner from '../components/OfflineBanner';
 import API_BASE from '../config';
@@ -209,7 +211,7 @@ const BASE = API_BASE;
 const TAB_TITLES = {
   overview: 'Overview', assignments: 'Assignments', quizzes: 'Quizzes',
   results: 'Results', deadlines: 'Deadlines', exams: 'Exams',
-  attendance: 'Attendance', profile: 'My Profile',
+  attendance: 'Attendance', profile: 'My Profile', announcements: 'Announcements',
 };
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
@@ -325,6 +327,7 @@ const AssignmentCard = ({a,sub}) => {
 function Sidebar({student,desktopTab,setDesktopTab,overdueCount,pendingQuizzesCount,avgMark,gradeId,onLogout}) {
   const NAV = [
     {key:'overview',   label:'Overview',    icon:<DashboardIcon  sx={{fontSize:17}}/>},
+    {key:'announcements', label:'Announcements', icon:<CampaignOutlinedIcon sx={{fontSize:17}}/>},
     {key:'assignments',label:'Assignments', icon:<AssignmentIcon sx={{fontSize:17}}/>, badge:overdueCount},
     {key:'quizzes',    label:'Quizzes',     icon:<QuizIcon       sx={{fontSize:17}}/>, badge:pendingQuizzesCount},
     {key:'results',    label:'Results',     icon:<BarChartIcon   sx={{fontSize:17}}/>},
@@ -426,6 +429,7 @@ export default function StudentDashboard() {
   const [attendance,     setAttendance]     = useState(null); // { records, summary }
   const [materials,      setMaterials]      = useState([]);
   const [reportTerms,    setReportTerms]    = useState([]);
+  const [announcements,  setAnnouncements]  = useState([]);
   const [loadErrors,     setLoadErrors]     = useState([]); // plain-language messages for sections that failed to load
   const [mobileTab,      setMobileTab]      = useState('home');
   const [desktopTab,     setDesktopTab]     = useState('overview');
@@ -440,7 +444,7 @@ export default function StudentDashboard() {
     (async()=>{
       const errors = [];
       try {
-        const [pRes,aRes,sRes,qRes,eRes,perfRes,attRes,rtRes,matRes] = await Promise.all([
+        const [pRes,aRes,sRes,qRes,eRes,perfRes,attRes,rtRes,matRes,annRes] = await Promise.all([
           fetch(`${BASE}/api/student/me`,             {headers}),
           fetch(`${BASE}/api/student/assignments`,    {headers}),
           fetch(`${BASE}/api/student/submissions`,    {headers}),
@@ -450,6 +454,7 @@ export default function StudentDashboard() {
           fetch(`${BASE}/api/student/attendance`,     {headers}),
           fetch(`${BASE}/api/student/report-terms`,   {headers}),
           fetch(`${BASE}/api/student/materials`,      {headers}),
+          fetch(`${BASE}/api/student/announcements`,  {headers}),
         ]);
         if (pRes.status===401){sessionStorage.removeItem('studentToken');navigate('/student-login');return;}
         if (pRes.ok) setStudent(await pRes.json());
@@ -465,6 +470,7 @@ export default function StudentDashboard() {
         if (attRes?.ok) setAttendance(await attRes.json()); else errors.push('Attendance could not be loaded.');
         if (rtRes?.ok) setReportTerms(await rtRes.json());
         if (matRes?.ok) setMaterials(await matRes.json()); else errors.push('Learning materials could not be loaded.');
+        if (annRes?.ok) setAnnouncements(await annRes.json()); else errors.push('Announcements could not be loaded.');
       } catch(e){
         console.error(e);
         errors.push('Some information could not be loaded — check your connection.');
@@ -515,6 +521,9 @@ export default function StudentDashboard() {
         <StatTile icon={<TrendingUpIcon/>} label="Avg Mark"        value={avgMark!=null?`${avgMark}%`:'—'}       accent={T.green} delay={100} sub={avgMark!=null?gradeLabel(avgMark).text:null}/>
         <StatTile icon={<QuizIcon/>}       label="Quizzes Pending" value={pendingQuizzes.length}                accent="#7C3AED" delay={150}/>
       </Box>
+
+      {/* Latest school announcements */}
+      {announcements.length>0&&<AnnouncementsSection announcements={announcements} limit={2} onViewAll={()=>setMobileTab('announcements')}/>}
 
       {/* Report card ready */}
       {reportTerms.length>0&&(
@@ -677,6 +686,7 @@ export default function StudentDashboard() {
             {label:'My Profile', icon:<PersonOutlineIcon    sx={{fontSize:22,color:T.blue}}/>, onClick:()=>setMobileTab('profile'), disabled:false},
             {label:'Attendance', icon:<EventAvailableIcon   sx={{fontSize:22,color:T.blue}}/>, onClick:()=>setMobileTab('attendance'), disabled:false},
             {label:'Materials',  icon:<FolderOutlinedIcon    sx={{fontSize:22,color:T.blue}}/>, onClick:()=>setMobileTab('materials'), disabled:false},
+            {label:'Announcements', icon:<CampaignOutlinedIcon sx={{fontSize:22,color:T.blue}}/>, onClick:()=>setMobileTab('announcements'), disabled:false},
             {label:'Messages',   icon:<MenuBookIcon          sx={{fontSize:22,color:T.ink4}}/>, href:'#', disabled:true},
           ].map(link=>(
             <Box key={link.label}
@@ -703,6 +713,7 @@ export default function StudentDashboard() {
   const DesktopOverview = ()=>(
     <Box sx={{display:'grid',gridTemplateColumns:'1fr 320px',gap:2.5,alignItems:'start'}}>
       <Box sx={{display:'flex',flexDirection:'column',gap:2.5}}>
+        {announcements.length>0&&<AnnouncementsSection announcements={announcements} limit={2} onViewAll={()=>setDesktopTab('announcements')}/>}
         {reportTerms.length>0&&(
           <Box onClick={()=>setDesktopTab('profile')} sx={{p:2.5,borderRadius:'var(--r)',background:T.greenL,border:'1px solid #A7F3D0',display:'flex',alignItems:'center',gap:2,cursor:'pointer',transition:'transform .15s','&:hover':{transform:'translateY(-1px)'}}}>
             <DescriptionOutlinedIcon sx={{color:T.green,fontSize:26,flexShrink:0}}/>
@@ -832,6 +843,7 @@ export default function StudentDashboard() {
           {desktopTab==='exams' && <ExamsSection exams={exams} fullWidth/>}
           {desktopTab==='attendance' && <AttendanceSection attendance={attendance}/>}
           {desktopTab==='materials' && <MaterialsSection materials={materials}/>}
+          {desktopTab==='announcements' && <AnnouncementsSection announcements={announcements}/>}
           {desktopTab==='profile' && <ProfileSection student={student} setStudent={setStudent} reportTerms={reportTerms}/>}
         </Box>
 
@@ -844,6 +856,7 @@ export default function StudentDashboard() {
           {mobileTab==='exams' && <ExamsSection exams={exams} fullWidth/>}
           {mobileTab==='attendance' && <AttendanceSection attendance={attendance}/>}
           {mobileTab==='materials' && <MaterialsSection materials={materials}/>}
+          {mobileTab==='announcements' && <AnnouncementsSection announcements={announcements}/>}
           {mobileTab==='profile' && <ProfileSection student={student} setStudent={setStudent} reportTerms={reportTerms}/>}
           {mobileTab==='more'    && <MobileMore/>}
         </Box>
@@ -897,6 +910,35 @@ export default function StudentDashboard() {
 /* ════════════════════════════════════════════════════════════
    SECTION COMPONENTS (unchanged)
 ════════════════════════════════════════════════════════════ */
+// Pass `limit` + `onViewAll` for the compact preview on the home screens; omit
+// both for the full list on the Announcements page.
+function AnnouncementsSection({announcements,limit,onViewAll}) {
+  const shown = limit ? announcements.slice(0,limit) : announcements;
+  return (
+    <Card title={`Announcements${announcements.length?` (${announcements.length})`:''}`}
+      aside={onViewAll&&announcements.length>limit
+        ?<Box onClick={onViewAll} sx={{px:1.25,py:'5px',borderRadius:'6px',background:T.paper3,cursor:'pointer',minHeight:32,display:'flex',alignItems:'center'}}>
+          <Typography sx={{fontSize:'0.75rem',fontWeight:700,color:T.ink2,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>View all</Typography>
+        </Box>
+        :null}>
+      <Box sx={{p:1.75,display:'flex',flexDirection:'column',gap:1}}>
+        {shown.length===0
+          ?<Typography sx={{color:T.ink4,fontSize:'0.85rem',textAlign:'center',py:3,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>No announcements from your school yet</Typography>
+          :shown.map(a=>(
+            <Box key={a.id} sx={{px:1.75,py:1.25,borderRadius:'var(--r-sm)',background:a.isPinned?T.amberL:T.paper3,border:`1px solid ${a.isPinned?T.amberM:T.border}`}}>
+              <Box sx={{display:'flex',alignItems:'center',gap:.75,mb:.5}}>
+                {a.isPinned&&<PushPinIcon sx={{fontSize:14,color:T.amber,transform:'rotate(45deg)',flexShrink:0}}/>}
+                <Typography sx={{fontSize:'0.88rem',fontWeight:700,color:T.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{a.title}</Typography>
+              </Box>
+              <Typography sx={{fontSize:'0.82rem',color:T.ink2,lineHeight:1.55,whiteSpace:'pre-wrap',fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{a.body}</Typography>
+              <Typography sx={{fontSize:'0.68rem',color:T.ink4,mt:.75,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Posted {fmtDate(a.createdAt)}</Typography>
+            </Box>
+          ))}
+      </Box>
+    </Card>
+  );
+}
+
 function AssignmentsSection({sortedAssignments,submissionsMap,assignments}) {
   return (
     <Card title={`Assignments (${assignments.length})`}

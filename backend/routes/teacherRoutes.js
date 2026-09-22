@@ -10,6 +10,7 @@ const jwt               = require('jsonwebtoken');
 const bcrypt            = require('bcrypt');
 const pool              = require('../db');
 const { logAudit }      = require('../auth');
+const { inClass, studentInClass, membersOfClass } = require('../classScope');
 const multer  = require('multer');
 const path    = require('path');
 const crypto  = require('crypto');
@@ -99,22 +100,6 @@ async function ensureSupportTables() {
       UNIQUE(class_id, subject_id, term_id)
     )
   `);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  FIX 6 HELPER — safe grade filter SQL fragment
-//  enrolled_students.grade can be stored as:
-//    - integer string:  "10"
-//    - prefixed string: "Grade 10"
-//    - integer column:  10
-//  This helper builds a WHERE clause that handles ALL three formats.
-// ─────────────────────────────────────────────────────────────────────────────
-function gradeWhereClause(paramIndex) {
-  return `(
-    es.grade::TEXT = $${paramIndex}::TEXT
-    OR es.grade::TEXT = 'Grade ' || $${paramIndex}
-    OR REGEXP_REPLACE(es.grade::TEXT, '[^0-9]', '', 'g') = $${paramIndex}::TEXT
-  )`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -260,7 +245,7 @@ router.get('/dashboard', async (req, res) => {
     const { rows: pendingResults } = await pool.query(
       `SELECT e.id, e.title, e.exam_date AS "examDate", c.name AS "className", ss.name AS "subjectName",
               (SELECT COUNT(*) FROM enrolled_students es WHERE es.school_id = $2
-                AND REGEXP_REPLACE(es.grade::TEXT,'[^0-9]','','g') = c.grade::TEXT
+                AND ${inClass('es', 'c')}
                 AND es.is_active = true) AS "totalStudents",
               (SELECT COUNT(*) FROM results r WHERE r.exam_id = e.id) AS "captured"
        FROM exams e
@@ -310,7 +295,7 @@ router.get('/timetable', async (req, res) => {
 });
 
 // ── Class students ───────────────────────────────────────────────────────────
-// FIX 6: Uses gradeWhereClause() to handle all grade storage formats
+// Students in the class — see classScope.js for what "in the class" means.
 router.get('/classes/:classId/students', async (req, res) => {
   const teacherId = req.teacher.id;
   const schoolId  = req.teacher.schoolId;
@@ -323,21 +308,21 @@ router.get('/classes/:classId/students', async (req, res) => {
     if (!check.length) return res.status(403).json({ message: 'You do not teach this class' });
 
     const { rows: cls } = await pool.query(
-      'SELECT id, name, grade, stream FROM classes WHERE id = $1', [classId]
+      'SELECT id, name, grade, stream FROM classes WHERE id = $1 AND school_id = $2', [classId, schoolId]
     );
     if (!cls.length) return res.status(404).json({ message: 'Class not found' });
 
-    // FIX 6: gradeWhereClause handles 'Grade 10', '10', and integer 10
     const { rows: students } = await pool.query(
       `SELECT es.id, es.student_number AS "studentNumber",
               es.first_name AS "firstName", es.last_name AS "lastName",
               es.gender, es.email, es.phone
        FROM enrolled_students es
+       JOIN classes c ON c.id = $2 AND c.school_id = es.school_id
        WHERE es.school_id = $1
-         AND ${gradeWhereClause(2)}
+         AND ${inClass()}
          AND es.is_active = true
        ORDER BY es.last_name, es.first_name`,
-      [schoolId, String(cls[0].grade)]
+      [schoolId, cls[0].id]
     );
     res.json({ class: cls[0], students });
   } catch (err) {
@@ -347,7 +332,7 @@ router.get('/classes/:classId/students', async (req, res) => {
 });
 
 // ── Attendance GET ───────────────────────────────────────────────────────────
-// FIX 6: Uses gradeWhereClause() for consistent student lookup
+// Lists the students in the lesson's class — see classScope.js.
 router.get('/attendance', async (req, res) => {
   const teacherId = req.teacher.id;
   const schoolId  = req.teacher.schoolId;
@@ -365,16 +350,16 @@ router.get('/attendance', async (req, res) => {
     );
     if (!slot.length) return res.status(403).json({ message: 'Slot not found or not yours' });
 
-    // FIX 6: handles all grade formats
     const { rows: students } = await pool.query(
       `SELECT es.id, es.student_number AS "studentNumber",
               es.first_name AS "firstName", es.last_name AS "lastName"
        FROM enrolled_students es
+       JOIN classes c ON c.id = $2 AND c.school_id = es.school_id
        WHERE es.school_id = $1
-         AND ${gradeWhereClause(2)}
+         AND ${inClass()}
          AND es.is_active = true
        ORDER BY es.last_name, es.first_name`,
-      [schoolId, String(slot[0].grade)]
+      [schoolId, slot[0].class_id]
     );
 
     const { rows: existing } = await pool.query(
@@ -416,8 +401,20 @@ router.post('/attendance', async (req, res) => {
 
   const client = await pool.connect();
   try {
+    // The slot id and student ids come from the request body, so trust neither:
+    // the lesson must be this teacher's, and only students actually in its
+    // class can be marked (anyone else is skipped, e.g. moved class since the
+    // list loaded).
+    const { rows: slot } = await client.query(
+      'SELECT id, class_id FROM timetable_slots WHERE id = $1 AND teacher_id = $2 AND school_id = $3',
+      [slotId, teacherId, schoolId]
+    );
+    if (!slot.length) return res.status(403).json({ message: 'Slot not found or not yours' });
+    const members = await membersOfClass(client, schoolId, slot[0].class_id, records.map(r => r.studentId));
+    const valid   = records.filter(r => members.has(Number(r.studentId)));
+
     await client.query('BEGIN');
-    for (const r of records) {
+    for (const r of valid) {
       await client.query(
         `INSERT INTO attendance (school_id, timetable_slot_id, student_id, date, status, marked_by, note)
          VALUES ($1,$2,$3,$4,$5,$6,$7)
@@ -427,7 +424,11 @@ router.post('/attendance', async (req, res) => {
       );
     }
     await client.query('COMMIT');
-    res.json({ success: true, message: `Attendance marked for ${records.length} students` });
+    const skipped = records.length - valid.length;
+    res.json({
+      success: true, saved: valid.length, skipped,
+      message: `Attendance marked for ${valid.length} students${skipped ? ` (${skipped} skipped — not in this class)` : ''}`,
+    });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[teacher attendance POST]', err);
@@ -548,7 +549,7 @@ router.put('/term-weights', async (req, res) => {
 });
 
 // ── Marks table GET ──────────────────────────────────────────────────────────
-// FIX 6: Uses gradeWhereClause() for student lookup
+// Students in the class — see classScope.js.
 router.get('/marks-table', async (req, res) => {
   const schoolId        = req.teacher.schoolId;
   const { classId, termId } = req.query;
@@ -568,16 +569,16 @@ router.get('/marks-table', async (req, res) => {
     aQ += ' ORDER BY due_date DESC';
     const { rows: assignments } = await pool.query(aQ, aParams);
 
-    // FIX 6: handles all grade formats
     const { rows: students } = await pool.query(
       `SELECT es.id, es.student_number AS "studentNumber",
               es.first_name AS "firstName", es.last_name AS "lastName"
        FROM enrolled_students es
+       JOIN classes c ON c.id = $2 AND c.school_id = es.school_id
        WHERE es.school_id = $1
-         AND ${gradeWhereClause(2)}
+         AND ${inClass()}
          AND es.is_active = true
        ORDER BY es.last_name, es.first_name`,
-      [schoolId, String(classRow.grade)]
+      [schoolId, classRow.id]
     );
 
     let submissions = [];
@@ -762,10 +763,10 @@ router.post('/assignments/:assignmentId/submissions/create', async (req, res) =>
   if (!studentId) return res.status(400).json({ message: 'studentId is required' });
   try {
     await ensureSupportTables();
-    const { rows: asg } = await pool.query('SELECT id, total_marks FROM assignments WHERE id = $1 AND teacher_id = $2', [assignmentId, teacherId]);
+    const { rows: asg } = await pool.query('SELECT id, class_id, total_marks FROM assignments WHERE id = $1 AND teacher_id = $2', [assignmentId, teacherId]);
     if (!asg.length) return res.status(403).json({ message: 'Assignment not found or not yours' });
-    const { rows: stu } = await pool.query('SELECT id FROM enrolled_students WHERE id = $1 AND school_id = $2', [studentId, schoolId]);
-    if (!stu.length) return res.status(404).json({ message: 'Student not found' });
+    if (!(await studentInClass(pool, schoolId, studentId, asg[0].class_id)))
+      return res.status(404).json({ message: "Student not found in this assignment's class" });
     const total = parseFloat(asg[0].total_marks) || 100;
     const marks = (marksObtained === undefined || marksObtained === null || marksObtained === '') ? null : parseFloat(marksObtained);
     if (marks !== null && (Number.isNaN(marks) || marks < 0 || marks > total))
@@ -796,17 +797,16 @@ router.get('/assignments/:id/export', async (req, res) => {
     const { rows: asg } = await pool.query('SELECT id, class_id FROM assignments WHERE id = $1 AND teacher_id = $2', [assignmentId, teacherId]);
     if (!asg.length) return res.status(403).json({ message: 'Assignment not found or not yours' });
     const classId = asg[0].class_id;
-    const { rows: clsRows } = await pool.query('SELECT grade FROM classes WHERE id = $1', [classId]);
+    const { rows: clsRows } = await pool.query('SELECT id FROM classes WHERE id = $1', [classId]);
     if (!clsRows.length) return res.status(404).json({ message: 'Class not found' });
 
-    // FIX 6: consistent grade matching
     const { rows: students } = await pool.query(
       `SELECT es.id, es.student_number AS "studentNumber", es.first_name AS "firstName", es.last_name AS "lastName"
        FROM enrolled_students es
-       WHERE es.school_id = (SELECT school_id FROM classes WHERE id = $1)
-         AND ${gradeWhereClause(2)}
+       JOIN classes c ON c.id = $1 AND c.school_id = es.school_id
+       WHERE ${inClass()} AND es.is_active = true
        ORDER BY es.last_name, es.first_name`,
-      [classId, String(clsRows[0].grade)]
+      [classId]
     );
     const { rows: subs } = await pool.query(
       'SELECT student_id, marks_obtained AS "marksObtained", percentage FROM assignment_submissions WHERE assignment_id = $1',
@@ -855,7 +855,7 @@ router.post('/assignments/:id/import', memoryUpload.single('file'), async (req, 
         const { rows: srows } = await pool.query('SELECT id FROM enrolled_students WHERE student_number = $1 AND school_id = $2 LIMIT 1', [cols[studentNumberIdx], schoolId]);
         if (srows.length) studentId = srows[0].id;
       }
-      if (!studentId) continue;
+      if (!studentId || !(await studentInClass(pool, schoolId, studentId, asg[0].class_id))) continue;
       const marks = cols[marksIdx] ? parseFloat(cols[marksIdx]) : null;
       const pct   = marks !== null ? ((marks / total) * 100).toFixed(2) : null;
       const { rows: existing } = await pool.query('SELECT id FROM assignment_submissions WHERE assignment_id = $1 AND student_id = $2', [assignmentId, studentId]);
@@ -875,12 +875,15 @@ router.post('/assignments/:id/import', memoryUpload.single('file'), async (req, 
 
 router.post('/assignments/:id/submit', uploadSubmissionFile.single('file'), async (req, res) => {
   const teacherId = req.teacher.id;
+  const schoolId  = req.teacher.schoolId;
   const { id: assignmentId } = req.params;
   const { studentId } = req.body;
   if (!req.file) return res.status(400).json({ message: 'File is required' });
   try {
-    const { rows: asg } = await pool.query('SELECT id FROM assignments WHERE id = $1 AND teacher_id = $2', [assignmentId, teacherId]);
+    const { rows: asg } = await pool.query('SELECT id, class_id FROM assignments WHERE id = $1 AND teacher_id = $2', [assignmentId, teacherId]);
     if (!asg.length) return res.status(403).json({ message: 'Assignment not found or not yours' });
+    if (studentId && !(await studentInClass(pool, schoolId, studentId, asg[0].class_id)))
+      return res.status(404).json({ message: "Student not found in this assignment's class" });
     await ensureSupportTables();
     const filename = await saveFileToDb(req.file);
     const { rows } = await pool.query(
@@ -1061,9 +1064,10 @@ router.get('/exams/marks-table', async (req, res) => {
       `SELECT es.id, es.student_number AS "studentNumber",
               es.first_name AS "firstName", es.last_name AS "lastName"
        FROM enrolled_students es
-       WHERE es.school_id = $1 AND ${gradeWhereClause(2)} AND es.is_active = true
+       JOIN classes c ON c.id = $2 AND c.school_id = es.school_id
+       WHERE es.school_id = $1 AND ${inClass()} AND es.is_active = true
        ORDER BY es.last_name, es.first_name`,
-      [schoolId, String(classRow.grade)]
+      [schoolId, classRow.id]
     );
 
     let examResults = [];
@@ -1106,7 +1110,7 @@ router.get('/exams/marks-table', async (req, res) => {
 });
 
 // ── Results ──────────────────────────────────────────────────────────────────
-// FIX 6: Uses gradeWhereClause() for student lookup
+// Students in the exam's class — see classScope.js.
 router.get('/exams/:examId/results', async (req, res) => {
   const teacherId = req.teacher.id;
   const schoolId  = req.teacher.schoolId;
@@ -1121,16 +1125,16 @@ router.get('/exams/:examId/results', async (req, res) => {
     );
     if (!exam.length) return res.status(403).json({ message: 'Exam not found or not yours' });
 
-    // FIX 6: handles all grade formats
     const { rows: students } = await pool.query(
       `SELECT es.id, es.student_number AS "studentNumber",
               es.first_name AS "firstName", es.last_name AS "lastName"
        FROM enrolled_students es
+       JOIN classes c ON c.id = $2 AND c.school_id = es.school_id
        WHERE es.school_id = $1
-         AND ${gradeWhereClause(2)}
+         AND ${inClass()}
          AND es.is_active = true
        ORDER BY es.last_name, es.first_name`,
-      [schoolId, String(exam[0].grade)]
+      [schoolId, exam[0].class_id]
     );
 
     const { rows: existing } = await pool.query(
@@ -1163,9 +1167,12 @@ router.post('/exams/:examId/results', async (req, res) => {
   if (!Array.isArray(results) || !results.length)
     return res.status(400).json({ message: 'results array is required' });
   try {
-    const { rows: exam } = await pool.query('SELECT total_marks FROM exams WHERE id = $1 AND teacher_id = $2', [examId, teacherId]);
+    const { rows: exam } = await pool.query('SELECT total_marks, class_id FROM exams WHERE id = $1 AND teacher_id = $2', [examId, teacherId]);
     if (!exam.length) return res.status(403).json({ message: 'Exam not found or not yours' });
     const totalMarks = exam[0].total_marks || 100;
+    // Only students in the exam's class can have a result captured — the ids
+    // come from the request body.
+    const members = await membersOfClass(pool, schoolId, exam[0].class_id, results.map(r => r.studentId));
     for (const r of results) {
       if (r.marksObtained === '' || r.marksObtained === null) continue;
       const marks = parseFloat(r.marksObtained);
@@ -1175,10 +1182,10 @@ router.post('/exams/:examId/results', async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      let saved = 0;
       for (const r of results) {
         if (r.marksObtained === '' || r.marksObtained === null) continue;
-        const { rows: stu } = await client.query('SELECT id FROM enrolled_students WHERE id = $1 AND school_id = $2', [r.studentId, schoolId]);
-        if (!stu.length) continue;
+        if (!members.has(Number(r.studentId))) continue;
         const marks = parseFloat(r.marksObtained);
         const pct   = ((marks / totalMarks) * 100).toFixed(2);
         await client.query(
@@ -1188,9 +1195,10 @@ router.post('/exams/:examId/results', async (req, res) => {
            DO UPDATE SET marks_obtained = $4, percentage = $5, captured_at = NOW()`,
           [schoolId, r.studentId, examId, marks, pct, teacherId]
         );
+        saved++;
       }
       await client.query('COMMIT');
-      res.json({ success: true, message: `Results saved for ${results.length} students` });
+      res.json({ success: true, saved, message: `Results saved for ${saved} students` });
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;
