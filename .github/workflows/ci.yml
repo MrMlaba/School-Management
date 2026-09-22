@@ -39,14 +39,15 @@ jobs:
         env:
           CI: false
 
-      # No test step: `npm test` is currently broken here independent of this
-      # workflow — react-scripts (Create React App, unmaintained since 2022)
-      # bundles a Jest resolver too old to load react-router-dom v7's module
-      # format, so even the single untouched default test fails before it can
-      # run. That default test also isn't testing anything real (it checks
-      # for CRA's own placeholder "learn react" link, not this app). A real
-      # test step belongs here once there are real tests to run and that
-      # resolver issue is actually fixed — bundled separately from "add CI".
+      # react-scripts' bundled Jest resolver is too old to load
+      # react-router-dom v7's module format on its own; jest.moduleNameMapper
+      # in package.json points it at the real files directly, and
+      # setupTests.js polyfills the jsdom globals (TextEncoder,
+      # IntersectionObserver, ...) that resolving it then needs.
+      - name: Test
+        run: npx react-scripts test --watchAll=false
+        env:
+          CI: true
 
   backend:
     runs-on: ubuntu-latest
