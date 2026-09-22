@@ -1,0 +1,126 @@
+name: CI
+
+# Every push and every pull request into main. Pushing to any branch gives
+# feedback immediately, even before you open a PR; the pull_request trigger
+# means a PR from a fork (which wouldn't fire "push" for you) still gets
+# checked.
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: school-application-frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: school-application-frontend/package-lock.json
+
+      - run: npm ci
+
+      # CI=false deliberately: this repo has ~30 files with pre-existing
+      # ESLint warnings (unused imports, BOM markers) that predate this
+      # workflow. With CI=true, Create React App turns every warning into a
+      # build-breaking error — which would fail this job on the very first
+      # run for reasons unrelated to whatever you actually changed, and
+      # Vercel itself doesn't build this app that strictly either. Fixing
+      # those warnings is a separate, real cleanup task, not something to
+      # bundle silently into adding CI.
+      - name: Build
+        run: npm run build
+        env:
+          CI: false
+
+      # No test step: `npm test` is currently broken here independent of this
+      # workflow — react-scripts (Create React App, unmaintained since 2022)
+      # bundles a Jest resolver too old to load react-router-dom v7's module
+      # format, so even the single untouched default test fails before it can
+      # run. That default test also isn't testing anything real (it checks
+      # for CRA's own placeholder "learn react" link, not this app). A real
+      # test step belongs here once there are real tests to run and that
+      # resolver issue is actually fixed — bundled separately from "add CI".
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      # A throwaway Postgres for this run only — nothing like your local
+      # database or production, so there's nothing to protect it from.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: school_applications
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PORT: 8080
+      PGHOST: localhost
+      PGPORT: 5432
+      PGDATABASE: school_applications
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      # Not real secrets — CI never talks to a real user, so these only need
+      # to be present, not private. Never put real production secrets in a
+      # workflow file; use repo Settings > Secrets for those instead.
+      JWT_SECRET: ci-only-not-a-real-secret
+      SYSTEM_JWT_SECRET: ci-only-not-a-real-secret
+      STUDENT_JWT_SECRET: ci-only-not-a-real-secret
+      TEACHER_JWT_SECRET: ci-only-not-a-real-secret
+      PARENT_JWT_SECRET: ci-only-not-a-real-secret
+      RESEND_API_KEY: ci-only-not-a-real-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+
+      # Cheap and fast: every backend file has to at least parse, including
+      # migration files and standalone scripts server.js never requires (so
+      # never gets loaded, and never syntax-checked, by the step below).
+      - name: Syntax-check every file
+        run: find . -name "*.js" -not -path "./node_modules/*" -print0 | xargs -0 -n1 node --check
+
+      # The real test: start the app exactly like Render would, against a
+      # brand-new, empty database, and confirm it actually finishes booting.
+      # This runs every migration in order from scratch — the same "full
+      # rebuild path if the DB is ever lost" the baseline migration's own
+      # comment describes — and this session added three new migration files,
+      # so this is the first time that full chain has actually been proven to
+      # work end-to-end rather than just against an already-migrated database.
+      - name: Boot the server against a fresh database
+        run: |
+          node server.js &
+          SERVER_PID=$!
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/api/schools > /dev/null; then
+              echo "Server is up and answering requests."
+              kill $SERVER_PID
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server never became healthy within 30s — dumping what it logged:"
+          kill $SERVER_PID 2>/dev/null || true
+          exit 1
